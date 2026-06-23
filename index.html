@@ -91,7 +91,8 @@ const S = {
     selectedEmoji: null,
     selectedSchedule: 'daily',
     selectedDays: [],
-    selectedKids: 'all'
+    selectedKids: 'all',
+    parentPin: ''
 };
 
 // ─── KID EMOJIS ──────────────────────────────────────────────────
@@ -281,7 +282,7 @@ function vHome() {
           <p class="text-gray-400 mt-2">Family Allowance Tracker</p>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button onclick="go('parent',{tab:'overview'})"
+          <button onclick="goParent()"
             class="sm:col-span-2 bg-emerald-600 hover:bg-emerald-700 text-white py-5 rounded-2xl text-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-colors">
             <span>👨‍💼</span> Ouer (Parent)
           </button>
@@ -326,6 +327,7 @@ function vParent() {
       </nav>
       <div style="padding:16px;border-top:1px solid rgba(255,255,255,0.1)">
         <button onclick="go('home')" style="color:rgba(255,255,255,0.5);font-size:13px;display:block;margin-bottom:6px">← Home</button>
+        <button onclick="openModal('set-parent-pin')" style="color:rgba(255,255,255,0.5);font-size:13px;display:block;margin-bottom:6px">🔐 Parent PIN</button>
         <button onclick="signOut()" style="color:rgba(255,255,255,0.3);font-size:12px">Sign out</button>
       </div>
     </aside>`;
@@ -333,7 +335,10 @@ function vParent() {
     const mobileHeader = `
     <div class="md:hidden bg-emerald-700 text-white px-5 pt-8 pb-4 flex justify-between items-center">
       <h1 class="text-lg font-bold">👨‍💼 Parent Dashboard</h1>
-      <button onclick="go('home')" class="text-emerald-300 text-sm">← Home</button>
+      <div class="flex items-center gap-4">
+        <button onclick="openModal('set-parent-pin')" class="text-emerald-300 text-sm">🔐 PIN</button>
+        <button onclick="go('home')" class="text-emerald-300 text-sm">← Home</button>
+      </div>
     </div>
     <div class="md:hidden bg-white border-b border-gray-100 flex sticky top-0 z-10">
       ${navItems.map(t => `
@@ -597,6 +602,49 @@ function checkPin() {
     }
 }
 
+function goParent() {
+    const pin = currentUser?.user_metadata?.parent_pin;
+    if (pin) { S.parentPin = ''; go('parent-pin'); } else { go('parent', { tab: 'overview' }); }
+}
+
+function vParentPin() {
+    const dots = [0,1,2,3].map(i =>
+        `<div class="pin-dot ${S.parentPin.length > i ? 'filled' : ''}"></div>`).join('');
+    const keys = [1,2,3,4,5,6,7,8,9,null,0,'⌫'];
+    const pad = keys.map(k => k === null
+        ? `<div></div>`
+        : `<button class="numpad-btn" onclick="parentPinPress('${k}')">${k}</button>`
+    ).join('');
+    return `
+    <div class="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6">
+      <button onclick="go('home')" class="text-gray-400 mb-10 text-sm self-start absolute top-6 left-6">← Terug</button>
+      <div class="flex flex-col items-center">
+        <div style="font-size:64px;margin-bottom:12px">👨‍💼</div>
+        <h2 class="text-3xl font-bold text-gray-900 mb-1">Ouer (Parent)</h2>
+        <p class="text-gray-400 mb-10">Enter parent PIN</p>
+        <div class="flex gap-6 mb-3">${dots}</div>
+        <p id="ppin-err" class="text-red-400 text-sm mb-8 h-5"></p>
+        <div class="grid grid-cols-3 gap-3 w-72">${pad}</div>
+      </div>
+    </div>`;
+}
+function parentPinPress(k) {
+    if (k === '⌫') { S.parentPin = S.parentPin.slice(0,-1); render(); return; }
+    if (S.parentPin.length >= 4) return;
+    S.parentPin += k; render();
+    if (S.parentPin.length === 4) setTimeout(checkParentPin, 120);
+}
+function checkParentPin() {
+    const correctPin = currentUser?.user_metadata?.parent_pin;
+    if (S.parentPin === correctPin) {
+        S.parentPin = ''; go('parent', { tab: 'overview' });
+    } else {
+        const el = document.getElementById('ppin-err');
+        if (el) el.textContent = 'Wrong PIN. Try again.';
+        setTimeout(() => { S.parentPin = ''; render(); }, 900);
+    }
+}
+
 function vKid() {
     const db = DB.load();
     const kid = db.kids.find(k => k.id === S.kidId);
@@ -812,6 +860,19 @@ function renderModal() {
         </div>`;
     }
 
+    if (type === 'set-parent-pin') {
+        const hasPin = !!currentUser?.user_metadata?.parent_pin;
+        body = `
+        <h3 class="text-lg font-bold mb-1">Parent PIN</h3>
+        <p class="text-gray-400 text-sm mb-4">${hasPin ? '🔐 A PIN is currently set.' : '⚠️ No PIN set — anyone can access the parent dashboard.'}</p>
+        <input id="pp-pin" placeholder="New 4-digit PIN" maxlength="4" inputmode="numeric" class="mb-4">
+        <div class="flex gap-2">
+          <button onclick="closeModal()" class="btn-outline flex-1 py-2.5 text-sm">Cancel</button>
+          ${hasPin ? `<button onclick="removeParentPin()" class="flex-1 py-2.5 text-sm font-semibold border-1.5 border-red-200 text-red-400 rounded-2xl bg-red-50">Remove</button>` : ''}
+          <button onclick="saveParentPin()" class="btn-primary flex-1 py-2.5 text-sm">Save PIN</button>
+        </div>`;
+    }
+
     if (type === 'payout') {
         const kid = db.kids.find(k => k.id === data.kidId);
         body = `
@@ -988,6 +1049,21 @@ async function doModalPayout(kidId) {
     closeModal(); toast(`${R(amount)} payout recorded for ${k.name}.`);
 }
 
+async function saveParentPin() {
+    const pin = document.getElementById('pp-pin').value.trim();
+    if (!/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits.');
+    const { data, error } = await sb.auth.updateUser({ data: { parent_pin: pin } });
+    if (error) return toast('❌ Could not save PIN.');
+    if (data?.user) currentUser = data.user;
+    closeModal(); toast('Parent PIN saved! 🔐');
+}
+async function removeParentPin() {
+    const { data, error } = await sb.auth.updateUser({ data: { parent_pin: null } });
+    if (error) return toast('❌ Could not remove PIN.');
+    if (data?.user) currentUser = data.user;
+    closeModal(); toast('Parent PIN removed.');
+}
+
 // ─── RENDER ──────────────────────────────────────────────────────
 function render() {
     const toastHtml = S.toast
@@ -997,7 +1073,7 @@ function render() {
         document.getElementById('app').innerHTML = vLogin() + toastHtml;
         return;
     }
-    const views = { home: vHome, parent: vParent, 'kid-pin': vKidPin, kid: vKid };
+    const views = { home: vHome, parent: vParent, 'kid-pin': vKidPin, kid: vKid, 'parent-pin': vParentPin };
     const html  = (views[S.view] || vHome)();
     document.getElementById('app').innerHTML = html + renderModal() + toastHtml;
 }
