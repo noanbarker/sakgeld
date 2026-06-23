@@ -284,7 +284,7 @@ function vHome() {
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button onclick="goParent()"
             class="sm:col-span-2 bg-emerald-600 hover:bg-emerald-700 text-white py-5 rounded-2xl text-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-colors">
-            <span>👨‍💼</span> Ouer (Parent)
+            <span>👨‍💼</span> Parent
           </button>
           ${kids.length === 0
             ? `<p class="sm:col-span-2 text-center text-gray-400 text-sm pt-2">No kids yet — log in as parent to add them.</p>`
@@ -399,7 +399,7 @@ function pOverview(db) {
     const totalWeekly = db.kids.reduce((s, k) => s + weeklyPossible(db, k.id), 0);
     const totalEarned = db.kids.reduce((s, k) => s + weeklyEarned(db, k.id), 0);
     const weeklyCard  = db.kids.length === 0 ? '' : `
-    <div class="card mb-5" style="background:linear-gradient(135deg,#1d4ed8,#1e40af);color:white">
+    <div class="card mb-5" style="background:linear-gradient(135deg,#1d4ed8,#1e40af);color:white;max-width:60%;margin-left:auto;margin-right:auto">
       <p class="text-xs font-bold uppercase tracking-wide mb-3" style="color:#bfdbfe">Weekly Payout Summary</p>
       <div class="flex justify-between items-end mb-3">
         <div>
@@ -414,7 +414,7 @@ function pOverview(db) {
       <div style="background:rgba(255,255,255,0.2);border-radius:99px;height:8px;overflow:hidden">
         <div style="background:white;width:${totalWeekly>0?Math.min(100,Math.round(totalEarned/totalWeekly*100)):0}%;height:100%;border-radius:99px"></div>
       </div>
-      <div class="flex justify-between mt-3" style="border-top:1px solid rgba(255,255,255,0.15);padding-top:10px">
+      <div class="flex justify-center gap-8 mt-3" style="border-top:1px solid rgba(255,255,255,0.15);padding-top:10px">
         ${db.kids.map(k => `
           <div class="text-center">
             <p style="font-size:16px">${kidIcon(k)}</p>
@@ -427,19 +427,19 @@ function pOverview(db) {
     ${weeklyCard}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
       <div>
-        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Pending Approvals ${pending.length ? `<span class="badge ml-1">${pending.length}</span>` : ''}</p>
-        <div class="flex flex-col gap-2">
-          ${pending.length === 0
-            ? `<div class="card text-center text-gray-300 text-sm py-6">Nothing waiting for approval 🎉</div>`
-            : pendingRows}
-        </div>
-      </div>
-      <div>
         <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Balances</p>
         <div class="flex flex-col gap-2">
           ${db.kids.length === 0
             ? `<div class="card text-center text-gray-300 text-sm py-6">No kids added yet.</div>`
             : kidRows}
+        </div>
+      </div>
+      <div>
+        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Pending Approvals ${pending.length ? `<span class="badge ml-1">${pending.length}</span>` : ''}</p>
+        <div class="flex flex-col gap-2">
+          ${pending.length === 0
+            ? `<div class="card text-center text-gray-300 text-sm py-6">Nothing waiting for approval 🎉</div>`
+            : pendingRows}
         </div>
       </div>
     </div>`;
@@ -620,7 +620,7 @@ function vParentPin() {
       <button onclick="go('home')" class="text-gray-400 mb-10 text-sm self-start absolute top-6 left-6">← Terug</button>
       <div class="flex flex-col items-center">
         <div style="font-size:64px;margin-bottom:12px">👨‍💼</div>
-        <h2 class="text-3xl font-bold text-gray-900 mb-1">Ouer (Parent)</h2>
+        <h2 class="text-3xl font-bold text-gray-900 mb-1">Parent</h2>
         <p class="text-gray-400 mb-10">Enter parent PIN</p>
         <div class="flex gap-6 mb-3">${dots}</div>
         <p id="ppin-err" class="text-red-400 text-sm mb-8 h-5"></p>
