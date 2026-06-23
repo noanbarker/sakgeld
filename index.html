@@ -119,7 +119,13 @@ const CHORE_EMOJIS = [
 
 // ─── UTILS ───────────────────────────────────────────────────────
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
-function R(n) { return 'R ' + (+(n || 0)).toFixed(2); }
+function R(n) {
+    const code = currentUser?.user_metadata?.currency || 'ZAR';
+    if (code === 'pts') return (+(n || 0)).toFixed(0) + ' pts';
+    const curr = CURRENCIES.find(c => c.code === code) || { symbol: 'R' };
+    const decimals = NO_DECIMAL_CURRENCIES.includes(code) ? 0 : 2;
+    return curr.symbol + ' ' + (+(n || 0)).toFixed(decimals);
+}
 function dateStr(iso) { return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }); }
 function kidIcon(kidOrName) {
     if (kidOrName && typeof kidOrName === 'object') {
@@ -138,6 +144,66 @@ function toast(msg) {
     S.toastTimer = setTimeout(() => { S.toast = null; render(); }, 2800);
 }
 const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+// ─── CURRENCIES ──────────────────────────────────────────────────
+const CURRENCIES = [
+    { code: 'pts',  symbol: '',      name: 'Points (no currency symbol)' },
+    { code: 'USD',  symbol: '$',     name: 'USD – US Dollar' },
+    { code: 'EUR',  symbol: '€',     name: 'EUR – Euro' },
+    { code: 'GBP',  symbol: '£',     name: 'GBP – British Pound' },
+    { code: 'JPY',  symbol: '¥',     name: 'JPY – Japanese Yen' },
+    { code: 'CHF',  symbol: 'CHF',   name: 'CHF – Swiss Franc' },
+    { code: 'CAD',  symbol: 'C$',    name: 'CAD – Canadian Dollar' },
+    { code: 'AUD',  symbol: 'A$',    name: 'AUD – Australian Dollar' },
+    { code: 'NZD',  symbol: 'NZ$',   name: 'NZD – New Zealand Dollar' },
+    { code: 'ZAR',  symbol: 'R',     name: 'ZAR – South African Rand' },
+    { code: 'NGN',  symbol: '₦',     name: 'NGN – Nigerian Naira' },
+    { code: 'KES',  symbol: 'KSh',   name: 'KES – Kenyan Shilling' },
+    { code: 'GHS',  symbol: 'GH₵',   name: 'GHS – Ghanaian Cedi' },
+    { code: 'EGP',  symbol: 'E£',    name: 'EGP – Egyptian Pound' },
+    { code: 'MAD',  symbol: 'MAD',   name: 'MAD – Moroccan Dirham' },
+    { code: 'ETB',  symbol: 'Br',    name: 'ETB – Ethiopian Birr' },
+    { code: 'TZS',  symbol: 'TSh',   name: 'TZS – Tanzanian Shilling' },
+    { code: 'UGX',  symbol: 'USh',   name: 'UGX – Ugandan Shilling' },
+    { code: 'ZMW',  symbol: 'ZK',    name: 'ZMW – Zambian Kwacha' },
+    { code: 'AED',  symbol: 'AED',   name: 'AED – UAE Dirham' },
+    { code: 'SAR',  symbol: 'SAR',   name: 'SAR – Saudi Riyal' },
+    { code: 'QAR',  symbol: 'QAR',   name: 'QAR – Qatari Riyal' },
+    { code: 'KWD',  symbol: 'KD',    name: 'KWD – Kuwaiti Dinar' },
+    { code: 'BHD',  symbol: 'BD',    name: 'BHD – Bahraini Dinar' },
+    { code: 'ILS',  symbol: '₪',     name: 'ILS – Israeli Shekel' },
+    { code: 'CNY',  symbol: '¥',     name: 'CNY – Chinese Yuan' },
+    { code: 'INR',  symbol: '₹',     name: 'INR – Indian Rupee' },
+    { code: 'KRW',  symbol: '₩',     name: 'KRW – South Korean Won' },
+    { code: 'HKD',  symbol: 'HK$',   name: 'HKD – Hong Kong Dollar' },
+    { code: 'SGD',  symbol: 'S$',    name: 'SGD – Singapore Dollar' },
+    { code: 'TWD',  symbol: 'NT$',   name: 'TWD – Taiwan Dollar' },
+    { code: 'THB',  symbol: '฿',     name: 'THB – Thai Baht' },
+    { code: 'MYR',  symbol: 'RM',    name: 'MYR – Malaysian Ringgit' },
+    { code: 'IDR',  symbol: 'Rp',    name: 'IDR – Indonesian Rupiah' },
+    { code: 'PHP',  symbol: '₱',     name: 'PHP – Philippine Peso' },
+    { code: 'VND',  symbol: '₫',     name: 'VND – Vietnamese Dong' },
+    { code: 'PKR',  symbol: '₨',     name: 'PKR – Pakistani Rupee' },
+    { code: 'BDT',  symbol: '৳',     name: 'BDT – Bangladeshi Taka' },
+    { code: 'LKR',  symbol: 'Rs',    name: 'LKR – Sri Lankan Rupee' },
+    { code: 'SEK',  symbol: 'kr',    name: 'SEK – Swedish Krona' },
+    { code: 'NOK',  symbol: 'kr',    name: 'NOK – Norwegian Krone' },
+    { code: 'DKK',  symbol: 'kr',    name: 'DKK – Danish Krone' },
+    { code: 'PLN',  symbol: 'zł',    name: 'PLN – Polish Zloty' },
+    { code: 'CZK',  symbol: 'Kč',    name: 'CZK – Czech Koruna' },
+    { code: 'HUF',  symbol: 'Ft',    name: 'HUF – Hungarian Forint' },
+    { code: 'RON',  symbol: 'lei',   name: 'RON – Romanian Leu' },
+    { code: 'TRY',  symbol: '₺',     name: 'TRY – Turkish Lira' },
+    { code: 'RUB',  symbol: '₽',     name: 'RUB – Russian Ruble' },
+    { code: 'UAH',  symbol: '₴',     name: 'UAH – Ukrainian Hryvnia' },
+    { code: 'BRL',  symbol: 'R$',    name: 'BRL – Brazilian Real' },
+    { code: 'MXN',  symbol: 'MX$',   name: 'MXN – Mexican Peso' },
+    { code: 'ARS',  symbol: 'AR$',   name: 'ARS – Argentine Peso' },
+    { code: 'CLP',  symbol: 'CL$',   name: 'CLP – Chilean Peso' },
+    { code: 'COP',  symbol: 'CO$',   name: 'COP – Colombian Peso' },
+    { code: 'PEN',  symbol: 'S/',    name: 'PEN – Peruvian Sol' },
+];
+const NO_DECIMAL_CURRENCIES = ['JPY','KRW','VND','IDR','HUF','UGX','TZS'];
 
 function weekStart() {
     const d = new Date(); const day = d.getDay();
@@ -305,10 +371,11 @@ function vParent() {
     const db = DB.load();
     const pending = db.completions.filter(c => !c.approved && !c.rejected).length;
     const navItems = [
-        { id: 'overview', icon: '📊', label: 'Overview', badge: pending },
-        { id: 'chores',   icon: '📋', label: 'Chores' },
-        { id: 'kids',     icon: '👦', label: 'Kids' },
-        { id: 'payouts',  icon: '💸', label: 'Payouts' },
+        { id: 'overview',  icon: '📊', label: 'Overview', badge: pending },
+        { id: 'chores',    icon: '📋', label: 'Chores' },
+        { id: 'kids',      icon: '👦', label: 'Kids' },
+        { id: 'payouts',   icon: '💸', label: 'Payouts' },
+        { id: 'settings',  icon: '⚙️', label: 'Settings' },
     ];
     const sidebar = `
     <aside style="width:220px;min-height:100vh;background:#065f46;display:flex;flex-direction:column;flex-shrink:0" class="hidden md:flex">
@@ -355,10 +422,11 @@ function vParent() {
       <div style="flex:1;display:flex;flex-direction:column;min-width:0">
         ${mobileHeader}
         <div style="flex:1;overflow:auto;padding:24px 28px;background:#f9fafb">
-          ${S.tab === 'overview' ? pOverview(db) :
-            S.tab === 'chores'   ? pChores(db) :
-            S.tab === 'kids'     ? pKids(db) :
-                                   pPayouts(db)}
+          ${S.tab === 'overview'  ? pOverview(db) :
+            S.tab === 'chores'    ? pChores(db) :
+            S.tab === 'kids'      ? pKids(db) :
+            S.tab === 'settings'  ? pSettings() :
+                                    pPayouts(db)}
         </div>
       </div>
     </div>`;
@@ -557,6 +625,22 @@ function pPayouts(db) {
                 </div>`;
               }).join('')}
         </div>
+      </div>
+    </div>`;
+}
+
+function pSettings() {
+    const currCode = currentUser?.user_metadata?.currency || 'ZAR';
+    return `
+    <div style="max-width:560px">
+      <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-5">Settings</p>
+      <div class="card mb-4">
+        <p class="font-semibold text-gray-900 mb-1">Currency / Value Display</p>
+        <p class="text-sm text-gray-400 mb-4">Choose how values are displayed throughout the app. Select "Points" for a non-monetary reward system.</p>
+        <select onchange="saveCurrency(this.value)">
+          ${CURRENCIES.map(c => `<option value="${c.code}" ${c.code === currCode ? 'selected' : ''}>${c.name}</option>`).join('')}
+        </select>
+        <p class="text-xs text-gray-400 mt-3">Preview: <span class="font-bold text-gray-700">${R(25)}</span></p>
       </div>
     </div>`;
 }
@@ -1047,6 +1131,14 @@ async function doModalPayout(kidId) {
     k.balance = newBalance;
     cache.transactions.push({ id, kidId, amount: -amount, type: 'payout', description: 'Cash payout', createdAt });
     closeModal(); toast(`${R(amount)} payout recorded for ${k.name}.`);
+}
+
+async function saveCurrency(code) {
+    const { data, error } = await sb.auth.updateUser({ data: { currency: code } });
+    if (error) return toast('❌ Could not save setting.');
+    if (data?.user) currentUser = data.user;
+    render();
+    toast('Currency updated!');
 }
 
 async function saveParentPin() {
