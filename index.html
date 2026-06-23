@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Sakgeld</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .pin-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #059669; transition: background 0.15s; }
+        .pin-dot.filled { background: #059669; }
+        .numpad-btn { height: 64px; font-size: 22px; font-weight: 600; border-radius: 16px; background: white;
+            border: 1px solid #e5e7eb; box-shadow: 0 1px 2px rgba(0,0,0,0.06); transition: background 0.1s; }
+        .numpad-btn:active { background: #f3f4f6; }
+        .tab-active { color: #059669; border-bottom: 2px solid #059669; }
+        .tab-inactive { color: #6b7280; }
+        .card { background: white; border-radius: 16px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .sidebar-item { display:flex;align-items:center;gap:12px;width:100%;padding:10px 14px;border-radius:12px;font-size:14px;font-weight:600;transition:background 0.15s;text-align:left; }
+        .sidebar-item.active { background:rgba(255,255,255,0.15);color:white; }
+        .sidebar-item:not(.active) { color:rgba(255,255,255,0.6); }
+        .sidebar-item:not(.active):hover { background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.85); }
+        input, select { outline: none; border: 1.5px solid #e5e7eb; border-radius: 12px; padding: 10px 14px;
+            width: 100%; font-size: 15px; transition: border-color 0.15s; }
+        input:focus, select:focus { border-color: #059669; }
+        .btn-primary { background: #059669; color: white; border-radius: 14px; padding: 12px; font-weight: 600;
+            font-size: 16px; width: 100%; transition: opacity 0.15s; }
+        .btn-primary:active { opacity: 0.85; }
+        .btn-outline { border: 1.5px solid #e5e7eb; color: #374151; border-radius: 14px; padding: 12px;
+            font-weight: 600; font-size: 15px; width: 100%; }
+        .badge { display: inline-flex; align-items: center; justify-content: center;
+            background: #ef4444; color: white; font-size: 11px; font-weight: 700;
+            width: 18px; height: 18px; border-radius: 50%; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+<div id="app" class="min-h-screen"></div>
+
+<script>
+// ─── SUPABASE ────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://ptwrlkzoreogggrjjsro.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0d3Jsa3pvcmVvZ2dncmpqc3JvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxOTE2MjMsImV4cCI6MjA5Nzc2NzYyM30.1Anwz7skk2_1_n_iG0iDqMFwFVvh-HTDevHMEoi67pE';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+let cache = { kids: [], chores: [], completions: [], transactions: [] };
+const DB = { load: () => cache };
+
+async function loadCache() {
+    const uid = currentUser.id;
+    const [kRes, cRes, compRes, txRes] = await Promise.all([
+        sb.from('kids').select('*').eq('user_id', uid),
+        sb.from('chores').select('*').eq('user_id', uid),
+        sb.from('completions').select('*').eq('user_id', uid),
+        sb.from('transactions').select('*').eq('user_id', uid),
+    ]);
+    cache = {
+        kids: kRes.data || [],
+        chores: (cRes.data || []).map(c => ({ ...c, assignedTo: c.assigned_to })),
+        completions: (compRes.data || []).map(c => ({ ...c, choreId: c.chore_id, kidId: c.kid_id, completedAt: c.completed_at })),
+        transactions: (txRes.data || []).map(t => ({ ...t, kidId: t.kid_id, createdAt: t.created_at })),
+    };
+}
+
+async function initApp() {
+    document.getElementById('app').innerHTML = '<div class="min-h-screen flex items-center justify-center"><p class="text-gray-400">Loading…</p></div>';
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) { currentUser = session.user; await loadCache(); }
+    render();
+    sb.auth.onAuthStateChange(async (event, session) => {
+        currentUser = session?.user || null;
+        if (currentUser) { await loadCache(); }
+        else { cache = { kids: [], chores: [], completions: [], transactions: [] }; S.view = 'home'; }
+        render();
+    });
+}
+
+async function signOut() { await sb.auth.signOut(); }
+
+// ─── STATE ───────────────────────────────────────────────────────
+const S = {
+    view: 'home',
+    kidId: null,
+    tab: 'overview',
+    pin: '',
+    pinKidId: null,
+    modal: null,
+    toast: null,
+    toastTimer: null,
+    selectedEmoji: null,
+    selectedSchedule: 'daily',
+    selectedDays: [],
+    selectedKids: 'all'
+};
+
+// ─── KID EMOJIS ──────────────────────────────────────────────────
+const KID_EMOJIS = [
+    '😀','😃','😄','😁','😆','😎','🤩','😍','🥰','😜',
+    '🤪','🤓','😇','🥳','🤗','🤠','👻','🥸','😸','🙂',
+    '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯',
+    '🦁','🐮','🐸','🐵','🐔','🐧','🦆','🦉','🦋','🐢',
+    '🐠','🐟','🦄','🦖','🐬','🦭','🐘','🦒','🦓','🐕',
+    '🐩','🐈','🐇','🐿️','🦔','🦜','🦚','🦩','🐲','🦈',
+    '⭐','🌟','🏆','🥇','🎯','🎮','🎲','🎨','🎸','🥊',
+    '⚽','🏀','🎾','🚀','🎭','🏄','🤸','🎠','🎡','🛹',
+    '🌸','🌺','🌻','🌹','🌷','🌳','🌲','🌈','☀️','🌙',
+    '❄️','🔥','💎','🍕','🎂','🍦','🍩','🌊','🎈','🎁'
+];
+
+// ─── CHORE EMOJIS ────────────────────────────────────────────────
+const CHORE_EMOJIS = [
+    '🧹','🧺','🍽️','🛁','🧽','🗑️','🐕','🌿','🛏️','🚗',
+    '🍳','🛒','📚','🧸','🪟','🧻','🚿','🐈','🐟','🌻',
+    '🪣','🏡','💪','⭐','🌟','🎯','🧤','🔧','📦','🍕',
+    '🧁','🥗','🪴','🐇','🦜','🌊','🧊','🎒','🖥️','🛋️'
+];
+
+// ─── UTILS ───────────────────────────────────────────────────────
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function R(n) { return 'R ' + (+(n || 0)).toFixed(2); }
+function dateStr(iso) { return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }); }
+function kidIcon(kidOrName) {
+    if (kidOrName && typeof kidOrName === 'object') {
+        if (kidOrName.emoji) return kidOrName.emoji;
+        kidOrName = kidOrName.name || '';
+    }
+    const icons = ['🧒','👦','👧','🧑','🐻','🦁','🐯','🦊'];
+    let h = 0; for (const c of String(kidOrName)) h += c.charCodeAt(0);
+    return icons[h % icons.length];
+}
+function go(view, params = {}) { Object.assign(S, params); S.view = view; render(); }
+function setTab(t) { S.tab = t; render(); }
+function toast(msg) {
+    if (S.toastTimer) clearTimeout(S.toastTimer);
+    S.toast = msg; render();
+    S.toastTimer = setTimeout(() => { S.toast = null; render(); }, 2800);
+}
+const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+function weekStart() {
+    const d = new Date(); const day = d.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    const mon = new Date(d); mon.setDate(d.getDate() + diff); mon.setHours(0,0,0,0); return mon;
+}
+function weeklyEarned(db, kidId) {
+    const mon = weekStart();
+    return db.transactions
+        .filter(t => t.kidId === kidId && t.type === 'chore' && new Date(t.createdAt) >= mon)
+        .reduce((s, t) => s + t.amount, 0);
+}
+function weeklyPossible(db, kidId) {
+    return db.chores
+        .filter(c => choreAssignedTo(c, kidId))
+        .reduce((s, c) => {
+            const freq = (!c.schedule || c.schedule === 'daily') ? 7 : (c.days || []).length;
+            return s + (c.value * freq);
+        }, 0);
+}
+function choreScheduleLabel(c) {
+    if (!c.schedule || c.schedule === 'daily') return 'Daily';
+    if (!c.days || c.days.length === 0) return 'No days set';
+    if (c.days.length === 7) return 'Daily';
+    return c.days.join(', ');
+}
+function choreIsForToday(c) {
+    if (!c.schedule || c.schedule === 'daily') return true;
+    const today = DAYS[(new Date().getDay() + 6) % 7];
+    return (c.days || []).includes(today);
+}
+function choreAssignedTo(c, kidId) {
+    if (!c.assignedTo || c.assignedTo === 'all') return true;
+    if (Array.isArray(c.assignedTo)) return c.assignedTo.includes(kidId);
+    return c.assignedTo === kidId;
+}
+function choreAssignmentLabel(c, kids) {
+    if (!c.assignedTo || c.assignedTo === 'all') return 'All kids';
+    if (Array.isArray(c.assignedTo)) {
+        if (c.assignedTo.length === kids.length) return 'All kids';
+        return c.assignedTo.map(id => kids.find(k => k.id === id)?.name || '?').join(', ');
+    }
+    return kids.find(k => k.id === c.assignedTo)?.name || '?';
+}
+
+function openModal(type, data = {}) {
+    const defaultEmoji = (type === 'add-kid' || type === 'edit-kid') ? '😀' : '⭐';
+    S.selectedEmoji    = data.emoji    || defaultEmoji;
+    S.selectedSchedule = data.schedule || 'daily';
+    S.selectedDays     = data.days     ? [...data.days] : [];
+    S.selectedKids     = !data.assignedTo || data.assignedTo === 'all' ? 'all'
+                       : Array.isArray(data.assignedTo) ? [...data.assignedTo]
+                       : [data.assignedTo];
+    S.modal = { type, data }; render();
+}
+function closeModal() { S.modal = null; render(); }
+
+function snapModalInputs() {
+    if (!S.modal) return;
+    const t = S.modal.type;
+    if (t === 'add-chore' || t === 'edit-chore') {
+        const n = document.getElementById('c-name');
+        const d = document.getElementById('c-desc');
+        const v = document.getElementById('c-val');
+        if (n) S.modal.data = { ...S.modal.data, name: n.value, description: d?.value, value: v?.value };
+    }
+    if (t === 'add-kid' || t === 'edit-kid') {
+        const n = document.getElementById('k-name');
+        const p = document.getElementById('k-pin');
+        if (n) S.modal.data = { ...S.modal.data, name: n.value, pin: p?.value };
+    }
+}
+function pickEmoji(em) { snapModalInputs(); S.selectedEmoji = em; render(); }
+function setSchedule(s) { snapModalInputs(); S.selectedSchedule = s; render(); }
+function setAllKids() { snapModalInputs(); S.selectedKids = 'all'; render(); }
+function toggleKidAssignment(id) {
+    snapModalInputs();
+    if (S.selectedKids === 'all') { S.selectedKids = [id]; render(); return; }
+    const arr = Array.isArray(S.selectedKids) ? [...S.selectedKids] : [];
+    const i = arr.indexOf(id);
+    if (i === -1) arr.push(id); else arr.splice(i, 1);
+    S.selectedKids = arr.length === 0 ? 'all' : arr;
+    render();
+}
+function toggleDay(d) {
+    snapModalInputs();
+    const i = S.selectedDays.indexOf(d);
+    if (i === -1) S.selectedDays.push(d); else S.selectedDays.splice(i, 1);
+    render();
+}
+
+// ─── AUTH VIEW ───────────────────────────────────────────────────
+function vLogin() {
+    return `
+    <div class="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+      <div class="w-full max-w-sm">
+        <div class="text-center mb-8">
+          <div class="text-6xl mb-4">💰</div>
+          <h1 class="text-3xl font-bold text-gray-900">Sakgeld</h1>
+          <p class="text-gray-400 mt-2">Family Allowance Tracker</p>
+        </div>
+        <input type="email" id="l-email" placeholder="Email address" class="mb-3"
+          onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()">
+        <input type="password" id="l-pass" placeholder="Password" class="mb-2"
+          onkeydown="if(event.key==='Enter')doSignIn()">
+        <p id="l-err" class="text-red-500 text-sm mb-3 h-5"></p>
+        <button onclick="doSignIn()" class="btn-primary mb-3">Sign In</button>
+        <button onclick="doSignUp()" class="btn-outline">Create Account</button>
+        <p class="text-xs text-gray-400 text-center mt-6">Your family's data is stored securely in the cloud.</p>
+      </div>
+    </div>`;
+}
+async function doSignIn() {
+    const email = document.getElementById('l-email')?.value?.trim();
+    const pass  = document.getElementById('l-pass')?.value;
+    const errEl = document.getElementById('l-err');
+    if (!email || !pass) { if (errEl) errEl.textContent = 'Please enter email and password.'; return; }
+    if (errEl) errEl.textContent = 'Signing in…';
+    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (error && errEl) errEl.textContent = error.message;
+}
+async function doSignUp() {
+    const email = document.getElementById('l-email')?.value?.trim();
+    const pass  = document.getElementById('l-pass')?.value;
+    const errEl = document.getElementById('l-err');
+    if (!email || !pass) { if (errEl) errEl.textContent = 'Please enter email and password.'; return; }
+    if (errEl) errEl.textContent = 'Creating account…';
+    const { error } = await sb.auth.signUp({ email, password: pass });
+    if (error) { if (errEl) errEl.textContent = error.message; }
+    else { toast('Account created! Check your email to confirm, then sign in.'); }
+}
+
+// ─── VIEWS ───────────────────────────────────────────────────────
+function vHome() {
+    const { kids } = DB.load();
+    return `
+    <div class="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6">
+      <div class="w-full max-w-2xl">
+        <div class="text-center mb-10">
+          <div class="text-7xl mb-4">💰</div>
+          <h1 class="text-4xl font-bold text-gray-900">Sakgeld</h1>
+          <p class="text-gray-400 mt-2">Family Allowance Tracker</p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button onclick="go('parent',{tab:'overview'})"
+            class="sm:col-span-2 bg-emerald-600 hover:bg-emerald-700 text-white py-5 rounded-2xl text-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-colors">
+            <span>👨‍💼</span> Ouer (Parent)
+          </button>
+          ${kids.length === 0
+            ? `<p class="sm:col-span-2 text-center text-gray-400 text-sm pt-2">No kids yet — log in as parent to add them.</p>`
+            : kids.map(k => `
+              <button onclick="go('kid-pin',{pinKidId:'${k.id}'})"
+                class="bg-white border-2 border-gray-100 py-5 rounded-2xl text-lg font-semibold text-gray-800 shadow-sm flex items-center justify-center gap-2 hover:border-emerald-200 hover:bg-emerald-50 transition-colors">
+                <span style="font-size:28px">${kidIcon(k)}</span> ${k.name}
+              </button>`).join('')}
+        </div>
+        <div class="text-center mt-8">
+          <button onclick="signOut()" class="text-gray-300 text-xs hover:text-gray-400">Sign out</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function vParent() {
+    const db = DB.load();
+    const pending = db.completions.filter(c => !c.approved && !c.rejected).length;
+    const navItems = [
+        { id: 'overview', icon: '📊', label: 'Overview', badge: pending },
+        { id: 'chores',   icon: '📋', label: 'Chores' },
+        { id: 'kids',     icon: '👦', label: 'Kids' },
+        { id: 'payouts',  icon: '💸', label: 'Payouts' },
+    ];
+    const sidebar = `
+    <aside style="width:220px;min-height:100vh;background:#065f46;display:flex;flex-direction:column;flex-shrink:0" class="hidden md:flex">
+      <div style="padding:28px 20px 20px;border-bottom:1px solid rgba(255,255,255,0.1)">
+        <div style="font-size:28px;margin-bottom:6px">💰</div>
+        <h1 style="color:white;font-size:17px;font-weight:700">Sakgeld</h1>
+        <p style="color:rgba(255,255,255,0.5);font-size:12px;margin-top:2px">Parent Dashboard</p>
+      </div>
+      <nav style="flex:1;padding:12px">
+        ${navItems.map(t => `
+          <button onclick="setTab('${t.id}')" class="sidebar-item ${S.tab === t.id ? 'active' : ''}" style="margin-bottom:4px">
+            <span style="font-size:18px">${t.icon}</span>
+            <span style="flex:1">${t.label}</span>
+            ${t.badge ? `<span class="badge">${t.badge}</span>` : ''}
+          </button>`).join('')}
+      </nav>
+      <div style="padding:16px;border-top:1px solid rgba(255,255,255,0.1)">
+        <button onclick="go('home')" style="color:rgba(255,255,255,0.5);font-size:13px;display:block;margin-bottom:6px">← Home</button>
+        <button onclick="signOut()" style="color:rgba(255,255,255,0.3);font-size:12px">Sign out</button>
+      </div>
+    </aside>`;
+
+    const mobileHeader = `
+    <div class="md:hidden bg-emerald-700 text-white px-5 pt-8 pb-4 flex justify-between items-center">
+      <h1 class="text-lg font-bold">👨‍💼 Parent Dashboard</h1>
+      <button onclick="go('home')" class="text-emerald-300 text-sm">← Home</button>
+    </div>
+    <div class="md:hidden bg-white border-b border-gray-100 flex sticky top-0 z-10">
+      ${navItems.map(t => `
+        <button onclick="setTab('${t.id}')"
+          class="flex-1 py-3 text-xs font-semibold relative ${S.tab === t.id ? 'tab-active' : 'tab-inactive'}">
+          ${t.label}
+          ${t.badge ? `<span class="badge absolute top-1.5 right-1">${t.badge}</span>` : ''}
+        </button>`).join('')}
+    </div>`;
+
+    return `
+    <div style="display:flex;min-height:100vh">
+      ${sidebar}
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+        ${mobileHeader}
+        <div style="flex:1;overflow:auto;padding:24px 28px;background:#f9fafb">
+          ${S.tab === 'overview' ? pOverview(db) :
+            S.tab === 'chores'   ? pChores(db) :
+            S.tab === 'kids'     ? pKids(db) :
+                                   pPayouts(db)}
+        </div>
+      </div>
+    </div>`;
+}
+
+function pOverview(db) {
+    const pending = db.completions.filter(c => !c.approved && !c.rejected);
+    const kidRows = db.kids.map(k => {
+        const kBalance = k.balance || 0;
+        return `
+        <div class="card flex items-center gap-3">
+          <div class="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center text-xl">${kidIcon(k)}</div>
+          <div class="flex-1">
+            <p class="font-semibold text-gray-900 text-sm">${k.name}</p>
+            <p class="text-xs text-gray-400">Weekly potential: ${R(weeklyPossible(db, k.id))}</p>
+          </div>
+          <div class="text-right">
+            <p class="font-bold text-emerald-600">${R(kBalance)}</p>
+            <button onclick="openModal('payout',{kidId:'${k.id}'})" class="text-xs text-gray-300 underline mt-0.5">pay out</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    const pendingRows = pending.map(c => {
+        const chore = db.chores.find(x => x.id === c.choreId);
+        const kid   = db.kids.find(x => x.id === c.kidId);
+        return `
+        <div class="card flex items-center gap-3">
+          <div class="flex-1">
+            <p class="font-semibold text-gray-900 text-sm">${chore?.name || 'Deleted chore'}</p>
+            <p class="text-xs text-gray-500">${kid?.name || '?'} · ${R(chore?.value)} · ${dateStr(c.completedAt)}</p>
+          </div>
+          <button onclick="approveChore('${c.id}')" class="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl text-xs font-bold">✓ Approve</button>
+          <button onclick="rejectChore('${c.id}')"  class="bg-red-50 text-red-500 px-3 py-1.5 rounded-xl text-xs font-bold">✗</button>
+        </div>`;
+    }).join('');
+
+    const totalWeekly = db.kids.reduce((s, k) => s + weeklyPossible(db, k.id), 0);
+    const totalEarned = db.kids.reduce((s, k) => s + weeklyEarned(db, k.id), 0);
+    const weeklyCard  = db.kids.length === 0 ? '' : `
+    <div class="card mb-5" style="background:linear-gradient(135deg,#1d4ed8,#1e40af);color:white">
+      <p class="text-xs font-bold uppercase tracking-wide mb-3" style="color:#bfdbfe">Weekly Payout Summary</p>
+      <div class="flex justify-between items-end mb-3">
+        <div>
+          <p style="color:#bfdbfe;font-size:11px">Earned so far this week</p>
+          <p class="text-2xl font-bold">${R(totalEarned)}</p>
+        </div>
+        <div class="text-right">
+          <p style="color:#bfdbfe;font-size:11px">Total possible this week</p>
+          <p class="text-2xl font-bold">${R(totalWeekly)}</p>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,0.2);border-radius:99px;height:8px;overflow:hidden">
+        <div style="background:white;width:${totalWeekly>0?Math.min(100,Math.round(totalEarned/totalWeekly*100)):0}%;height:100%;border-radius:99px"></div>
+      </div>
+      <div class="flex justify-between mt-3" style="border-top:1px solid rgba(255,255,255,0.15);padding-top:10px">
+        ${db.kids.map(k => `
+          <div class="text-center">
+            <p style="font-size:16px">${kidIcon(k)}</p>
+            <p style="font-size:10px;color:#bfdbfe;margin-top:2px">${R(weeklyPossible(db,k.id))}</p>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+    return `
+    ${weeklyCard}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
+      <div>
+        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Pending Approvals ${pending.length ? `<span class="badge ml-1">${pending.length}</span>` : ''}</p>
+        <div class="flex flex-col gap-2">
+          ${pending.length === 0
+            ? `<div class="card text-center text-gray-300 text-sm py-6">Nothing waiting for approval 🎉</div>`
+            : pendingRows}
+        </div>
+      </div>
+      <div>
+        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Balances</p>
+        <div class="flex flex-col gap-2">
+          ${db.kids.length === 0
+            ? `<div class="card text-center text-gray-300 text-sm py-6">No kids added yet.</div>`
+            : kidRows}
+        </div>
+      </div>
+    </div>`;
+}
+
+function pChores(db) {
+    return `
+    <div class="flex justify-between items-center mb-4">
+      <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Chores</p>
+      <button onclick="openModal('add-chore')" class="bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold">+ Add Chore</button>
+    </div>
+    ${db.chores.length === 0
+        ? `<div class="card text-center text-gray-300 text-sm py-12">📋<br><br>No chores yet. Add one above.</div>`
+        : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          ${db.chores.map(c => {
+            const who = choreAssignmentLabel(c, db.kids);
+            return `
+            <div class="card flex items-center gap-3">
+              <div class="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0">${c.emoji || '⭐'}</div>
+              <div class="flex-1 min-w-0">
+                <p class="font-semibold text-gray-900">${c.name}</p>
+                <p class="text-xs text-gray-400 mt-0.5">${who} · ${R(c.value)}</p>
+                <p class="text-xs text-emerald-600 mt-0.5">${choreScheduleLabel(c)}</p>
+              </div>
+              <div class="flex flex-col gap-1 flex-shrink-0">
+                <button onclick="editChore('${c.id}')" class="text-gray-300 p-1.5 rounded-lg text-base hover:bg-gray-100">✏️</button>
+                <button onclick="deleteChore('${c.id}')" class="text-red-200 p-1.5 rounded-lg text-base hover:bg-red-50">🗑️</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`}`;
+}
+
+function pKids(db) {
+    return `
+    <div class="flex justify-between items-center mb-4">
+      <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Kids</p>
+      <button onclick="openModal('add-kid')" class="bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold">+ Add Kid</button>
+    </div>
+    ${db.kids.length === 0
+        ? `<div class="card text-center text-gray-300 text-sm py-12">👨‍👩‍👧‍👦<br><br>No kids yet. Add one above.</div>`
+        : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          ${db.kids.map(k => {
+            const earned   = weeklyEarned(db, k.id);
+            const possible = weeklyPossible(db, k.id);
+            const pct      = possible > 0 ? Math.min(100, Math.round(earned / possible * 100)) : 0;
+            return `
+            <div class="card">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-2xl">${kidIcon(k)}</div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-bold text-gray-900">${k.name}</p>
+                  <p class="text-xs text-gray-400">PIN: ${k.pin}</p>
+                </div>
+                <div class="flex gap-1">
+                  <button onclick="editKid('${k.id}')" class="text-gray-300 p-1 rounded-lg hover:bg-gray-100">✏️</button>
+                  <button onclick="deleteKid('${k.id}')" class="text-red-200 p-1 rounded-lg hover:bg-red-50">🗑️</button>
+                </div>
+              </div>
+              <div class="border-t border-gray-50 pt-3">
+                <div class="flex justify-between items-baseline mb-1">
+                  <p class="text-xs text-gray-400">Balance</p>
+                  <p class="font-bold text-emerald-600">${R(k.balance)}</p>
+                </div>
+                <div class="flex justify-between items-baseline mb-2">
+                  <p class="text-xs text-gray-400">This week</p>
+                  <p class="text-xs font-semibold text-gray-600">${R(earned)} / ${R(possible)}</p>
+                </div>
+                <div style="background:#f0fdf4;border-radius:99px;height:6px;overflow:hidden">
+                  <div style="background:#059669;width:${pct}%;height:100%;border-radius:99px"></div>
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`}`;
+}
+
+function pPayouts(db) {
+    const recent = db.transactions
+        .filter(t => t.type === 'payout')
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 20);
+    return `
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div>
+        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4">Record a Cash Payout</p>
+        <div class="card">
+          <select id="po-kid" class="mb-3">
+            <option value="">Select a kid...</option>
+            ${db.kids.map(k => `<option value="${k.id}">${k.name} (${R(k.balance)})</option>`).join('')}
+          </select>
+          <div class="relative mb-3">
+            <span class="absolute left-3 top-2.5 text-gray-400 text-sm">R</span>
+            <input type="number" id="po-amount" placeholder="0.00" step="0.01" min="0" style="padding-left:28px">
+          </div>
+          <button onclick="recordPayout()" class="btn-primary">Record Payout</button>
+          <p class="text-xs text-gray-300 mt-3">This deducts the amount from the kid's balance.</p>
+        </div>
+      </div>
+      <div>
+        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4">Recent Payouts</p>
+        <div class="flex flex-col gap-2">
+          ${recent.length === 0
+            ? `<div class="card text-center text-gray-300 text-sm py-8">No payouts recorded yet.</div>`
+            : recent.map(t => {
+                const kid = db.kids.find(k => k.id === t.kidId);
+                return `
+                <div class="card flex items-center gap-3">
+                  <div class="w-9 h-9 bg-blue-50 rounded-full flex items-center justify-center text-lg">💸</div>
+                  <div class="flex-1">
+                    <p class="font-semibold text-gray-900">${kid?.name || '?'}</p>
+                    <p class="text-xs text-gray-400">${dateStr(t.createdAt)}</p>
+                  </div>
+                  <p class="font-bold text-red-400">${R(t.amount)}</p>
+                </div>`;
+              }).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+function vKidPin() {
+    const db = DB.load();
+    const kid = db.kids.find(k => k.id === S.pinKidId);
+    const dots = [0,1,2,3].map(i =>
+        `<div class="pin-dot ${S.pin.length > i ? 'filled' : ''}"></div>`).join('');
+    const keys = [1,2,3,4,5,6,7,8,9,null,0,'⌫'];
+    const pad = keys.map(k => k === null
+        ? `<div></div>`
+        : `<button class="numpad-btn" onclick="pinPress('${k}')">${k}</button>`
+    ).join('');
+    return `
+    <div class="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6">
+      <button onclick="go('home')" class="text-gray-400 mb-10 text-sm self-start absolute top-6 left-6">← Terug</button>
+      <div class="flex flex-col items-center">
+        <div style="font-size:64px;margin-bottom:12px">${kidIcon(kid)}</div>
+        <h2 class="text-3xl font-bold text-gray-900 mb-1">${kid?.name || ''}</h2>
+        <p class="text-gray-400 mb-10">Enter your PIN</p>
+        <div class="flex gap-6 mb-3">${dots}</div>
+        <p id="pin-err" class="text-red-400 text-sm mb-8 h-5"></p>
+        <div class="grid grid-cols-3 gap-3 w-72">${pad}</div>
+      </div>
+    </div>`;
+}
+function pinPress(k) {
+    if (k === '⌫') { S.pin = S.pin.slice(0,-1); render(); return; }
+    if (S.pin.length >= 4) return;
+    S.pin += k; render();
+    if (S.pin.length === 4) setTimeout(checkPin, 120);
+}
+function checkPin() {
+    const db = DB.load();
+    const kid = db.kids.find(k => k.id === S.pinKidId);
+    if (kid && S.pin === kid.pin) {
+        S.kidId = S.pinKidId; S.pin = ''; go('kid');
+    } else {
+        const el = document.getElementById('pin-err');
+        if (el) el.textContent = 'Wrong PIN. Try again.';
+        setTimeout(() => { S.pin = ''; render(); }, 900);
+    }
+}
+
+function vKid() {
+    const db = DB.load();
+    const kid = db.kids.find(k => k.id === S.kidId);
+    if (!kid) { go('home'); return ''; }
+    const today     = new Date().toDateString();
+    const allChores = db.chores.filter(c => choreAssignedTo(c, kid.id) && choreIsForToday(c));
+    const doneToday = db.completions.filter(c => c.kidId === kid.id && !c.rejected && new Date(c.completedAt).toDateString() === today);
+    const doneTodayIds = doneToday.map(c => c.choreId);
+    const pending   = doneToday.filter(c => !c.approved);
+    const ready     = allChores.filter(c => !doneTodayIds.includes(c.id));
+    const txns      = db.transactions.filter(t => t.kidId === kid.id)
+                        .sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt))
+                        .slice(0, 12);
+    const typeIcon  = { payout:'💸', weekly:'📅', chore:'✅', manual:'💰' };
+    return `
+    <div class="flex flex-col min-h-screen">
+      <div class="bg-emerald-700 text-white px-8 pt-10 pb-8">
+        <div class="max-w-5xl mx-auto">
+          <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center gap-4">
+              <span style="font-size:48px">${kidIcon(kid)}</span>
+              <div>
+                <p class="text-emerald-300 text-sm">Hi there,</p>
+                <h1 class="text-2xl font-bold">${kid.name}</h1>
+              </div>
+            </div>
+            <button onclick="go('home')" class="text-emerald-300 text-sm">← Home</button>
+          </div>
+          <div class="flex items-baseline gap-2">
+            <p class="text-5xl font-bold">${R(kid.balance)}</p>
+            <p class="text-emerald-400">current balance</p>
+          </div>
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto p-6 md:p-8">
+        <div class="max-w-5xl mx-auto">
+        ${(() => {
+            const earned   = weeklyEarned(db, kid.id);
+            const possible = weeklyPossible(db, kid.id);
+            const pct      = possible > 0 ? Math.min(100, Math.round(earned / possible * 100)) : 0;
+            return `
+            <div class="card mb-4" style="background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border:1.5px solid #a7f3d0">
+              <div class="flex justify-between items-baseline mb-2">
+                <p class="text-xs font-bold text-emerald-800 uppercase tracking-wide">This week's earnings</p>
+                <p class="text-xs text-emerald-600 font-semibold">${pct}%</p>
+              </div>
+              <div class="flex items-baseline gap-1 mb-2">
+                <p class="text-2xl font-bold text-emerald-700">${R(earned)}</p>
+                <p class="text-sm text-emerald-500">of ${R(possible)} possible</p>
+              </div>
+              <div style="background:#d1fae5;border-radius:99px;height:10px;overflow:hidden">
+                <div style="background:#059669;width:${pct}%;height:100%;border-radius:99px;transition:width 0.4s ease"></div>
+              </div>
+            </div>`;
+        })()}
+        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+          Today's Chores
+          <span class="ml-1 font-normal text-gray-400 normal-case">&mdash; ${new Date().toLocaleDateString('en-ZA',{weekday:'long', day:'numeric', month:'short'})}</span>
+        </p>
+        ${ready.length === 0
+            ? `<div class="card text-center text-gray-300 text-sm py-8 mb-6">🎉 All done for today!</div>`
+            : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
+              ${ready.map(c => `
+                <div class="card flex items-center gap-4">
+                  <div class="flex-shrink-0 w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center" style="font-size:36px">${c.emoji || '⭐'}</div>
+                  <div class="flex-1 min-w-0">
+                    <p class="font-bold text-gray-900">${c.name}</p>
+                    ${c.description ? `<p class="text-xs text-gray-400 mt-0.5">${c.description}</p>` : ''}
+                    <div class="flex items-center gap-2 mt-1">
+                      <p class="text-emerald-600 font-bold">+ ${R(c.value)}</p>
+                      <span style="font-size:10px;background:#f0fdf4;color:#059669;border-radius:6px;padding:2px 7px;font-weight:600">${choreScheduleLabel(c)}</span>
+                    </div>
+                  </div>
+                  <button onclick="markDone('${c.id}')"
+                    class="bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex-shrink-0">Done!</button>
+                </div>`).join('')}
+              </div>`}
+        ${pending.length > 0 ? `
+          <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 mt-2">Waiting for Approval</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
+            ${pending.map(c => {
+              const chore = db.chores.find(x => x.id === c.choreId);
+              return `
+              <div class="card flex items-center gap-4" style="background:#fffbeb;border:1.5px solid #fde68a">
+                <div class="flex-shrink-0 w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center" style="font-size:36px">${chore?.emoji || '⏳'}</div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-bold text-amber-900">${chore?.name || 'Deleted chore'}</p>
+                  <p class="text-xs text-amber-600 mt-0.5">Waiting for parent ⏳</p>
+                  <p class="text-emerald-700 font-bold mt-1">+ ${R(chore?.value)}</p>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>` : ''}
+        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 mt-2">History</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+          ${txns.length === 0
+            ? `<div class="card text-center text-gray-300 text-sm md:col-span-2">No transactions yet.</div>`
+            : txns.map(t => `
+              <div class="card flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center ${t.amount>0 ? 'bg-emerald-50' : 'bg-red-50'}" style="font-size:18px;flex-shrink:0">
+                  ${typeIcon[t.type] || '💰'}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-medium text-gray-900 truncate">${t.description}</p>
+                  <p class="text-xs text-gray-400">${dateStr(t.createdAt)}</p>
+                </div>
+                <p class="font-bold ${t.amount>0 ? 'text-emerald-600' : 'text-red-400'} flex-shrink-0">
+                  ${t.amount>0?'+':''}${R(t.amount)}
+                </p>
+              </div>`).join('')}
+        </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ─── MODALS ──────────────────────────────────────────────────────
+function renderModal() {
+    if (!S.modal) return '';
+    const db = DB.load();
+    const { type, data } = S.modal;
+    let body = '';
+
+    if (type === 'add-kid' || type === 'edit-kid') {
+        const e = type === 'edit-kid';
+        body = `
+        <h3 class="text-lg font-bold mb-4">${e ? 'Edit' : 'Add'} Kid</h3>
+        <input id="k-name" placeholder="Name" value="${data.name||''}" class="mb-3">
+        <input id="k-pin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" value="${data.pin||''}" class="mb-4">
+        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Emoji <span style="font-size:20px;margin-left:6px">${S.selectedEmoji || data.emoji || '😀'}</span></p>
+        <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:3px;max-height:150px;overflow-y:auto;border:1.5px solid #e5e7eb;border-radius:12px;padding:8px;margin-bottom:16px">
+          ${KID_EMOJIS.map(em => {
+            const sel = (S.selectedEmoji || data.emoji || '😀') === em;
+            return `<button onclick="pickEmoji('${em}')" type="button"
+              style="font-size:20px;width:36px;height:36px;border-radius:8px;border:2px solid ${sel?'#059669':'transparent'};background:${sel?'#ecfdf5':'transparent'}">
+              ${em}</button>`;
+          }).join('')}
+        </div>
+        <div class="flex gap-2 mt-1">
+          <button onclick="closeModal()" class="btn-outline flex-1 py-2.5 text-sm">Cancel</button>
+          <button onclick="${e ? `saveKid('${data.id}')` : 'addKid()'}" class="btn-primary flex-1 py-2.5 text-sm">${e ? 'Save' : 'Add'}</button>
+        </div>`;
+    }
+
+    if (type === 'add-chore' || type === 'edit-chore') {
+        const e = type === 'edit-chore';
+        const selEmoji = S.selectedEmoji || data.emoji || '⭐';
+        const emojiGrid = CHORE_EMOJIS.map(em => `
+            <button onclick="pickEmoji('${em}')" type="button"
+                style="font-size:22px;width:42px;height:42px;border-radius:10px;border:2px solid ${em===selEmoji?'#059669':'transparent'};background:${em===selEmoji?'#ecfdf5':'transparent'};transition:all 0.1s">
+                ${em}
+            </button>`).join('');
+        body = `
+        <h3 class="text-lg font-bold mb-3">${e ? 'Edit' : 'Add'} Chore</h3>
+        <input id="c-name" placeholder="Chore name" value="${data.name||''}" class="mb-3">
+        <input id="c-desc" placeholder="Description (optional)" value="${data.description||''}" class="mb-3">
+        <div class="relative mb-3">
+          <span class="absolute left-3 top-2.5 text-gray-400 text-sm">R</span>
+          <input id="c-val" type="number" placeholder="Value" value="${data.value||''}" step="0.01" min="0" style="padding-left:28px">
+        </div>
+        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Assigned to</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+          <button onclick="setAllKids()" type="button"
+            style="padding:6px 12px;border-radius:10px;font-size:13px;font-weight:600;border:2px solid ${S.selectedKids==='all'?'#059669':'#e5e7eb'};background:${S.selectedKids==='all'?'#ecfdf5':'white'};color:${S.selectedKids==='all'?'#059669':'#6b7280'}">
+            👨‍👩‍👧‍👦 All kids
+          </button>
+          ${db.kids.map(k => {
+            const sel = Array.isArray(S.selectedKids) && S.selectedKids.includes(k.id);
+            return `<button onclick="toggleKidAssignment('${k.id}')" type="button"
+              style="padding:6px 12px;border-radius:10px;font-size:13px;font-weight:600;border:2px solid ${sel?'#059669':'#e5e7eb'};background:${sel?'#ecfdf5':'white'};color:${sel?'#059669':'#6b7280'}">
+              ${kidIcon(k)} ${k.name}
+            </button>`;
+          }).join('')}
+        </div>
+        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Schedule</p>
+        <div class="flex gap-2 mb-3">
+          <button onclick="setSchedule('daily')" type="button"
+            style="flex:1;padding:8px;border-radius:12px;font-size:13px;font-weight:600;border:2px solid ${S.selectedSchedule==='daily'?'#059669':'#e5e7eb'};background:${S.selectedSchedule==='daily'?'#ecfdf5':'white'};color:${S.selectedSchedule==='daily'?'#059669':'#6b7280'}">
+            📅 Daily
+          </button>
+          <button onclick="setSchedule('weekly')" type="button"
+            style="flex:1;padding:8px;border-radius:12px;font-size:13px;font-weight:600;border:2px solid ${S.selectedSchedule==='weekly'?'#059669':'#e5e7eb'};background:${S.selectedSchedule==='weekly'?'#ecfdf5':'white'};color:${S.selectedSchedule==='weekly'?'#059669':'#6b7280'}">
+            📆 Specific days
+          </button>
+        </div>
+        ${S.selectedSchedule === 'weekly' ? `
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:14px">
+          ${DAYS.map(d => {
+            const sel = S.selectedDays.includes(d);
+            return `<button onclick="toggleDay('${d}')" type="button"
+              style="padding:6px 0;border-radius:10px;font-size:11px;font-weight:700;border:2px solid ${sel?'#059669':'#e5e7eb'};background:${sel?'#059669':'white'};color:${sel?'white':'#9ca3af'}">
+              ${d}
+            </button>`;
+          }).join('')}
+        </div>` : '<div style="margin-bottom:14px"></div>'}
+        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Emoji <span style="font-size:20px;margin-left:6px">${selEmoji}</span></p>
+        <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:4px;max-height:130px;overflow-y:auto;border:1.5px solid #e5e7eb;border-radius:12px;padding:8px;margin-bottom:16px">
+          ${emojiGrid}
+        </div>
+        <div class="flex gap-2">
+          <button onclick="closeModal()" class="btn-outline flex-1 py-2.5 text-sm">Cancel</button>
+          <button onclick="${e ? `saveChore('${data.id}')` : 'addChore()'}" class="btn-primary flex-1 py-2.5 text-sm">${e ? 'Save' : 'Add'}</button>
+        </div>`;
+    }
+
+    if (type === 'confirm-delete') {
+        body = `
+        <h3 class="text-lg font-bold mb-3">Are you sure?</h3>
+        <p class="text-gray-500 text-sm mb-5">${data.msg}</p>
+        <div class="flex gap-2">
+          <button onclick="closeModal()" class="btn-outline flex-1 py-2.5 text-sm">Cancel</button>
+          <button onclick="${data.onConfirm}" class="flex-1 py-2.5 text-sm font-semibold bg-red-500 text-white rounded-2xl">Delete</button>
+        </div>`;
+    }
+
+    if (type === 'payout') {
+        const kid = db.kids.find(k => k.id === data.kidId);
+        body = `
+        <h3 class="text-lg font-bold mb-1">Pay Out</h3>
+        <p class="text-gray-400 text-sm mb-4">${kid?.name} · Balance: ${R(kid?.balance)}</p>
+        <div class="relative mb-4">
+          <span class="absolute left-3 top-2.5 text-gray-400 text-sm">R</span>
+          <input type="number" id="m-po-amt" placeholder="0.00" step="0.01" min="0" style="padding-left:28px">
+        </div>
+        <div class="flex gap-2">
+          <button onclick="closeModal()" class="btn-outline flex-1 py-2.5 text-sm">Cancel</button>
+          <button onclick="doModalPayout('${data.kidId}')" class="btn-primary flex-1 py-2.5 text-sm">Pay Out</button>
+        </div>`;
+    }
+
+    return `
+    <div class="fixed inset-0 bg-black/40 flex items-end justify-center z-50" onclick="if(event.target===this)closeModal()">
+      <div class="bg-white rounded-t-3xl p-6 w-full max-w-sm">${body}</div>
+    </div>`;
+}
+
+// ─── ACTIONS ─────────────────────────────────────────────────────
+async function addKid() {
+    const name  = document.getElementById('k-name').value.trim();
+    const pin   = document.getElementById('k-pin').value.trim();
+    const emoji = S.selectedEmoji || '😀';
+    if (!name)                 return toast('⚠️ Please enter a name.');
+    if (!/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits (e.g. 1234).');
+    const id = uid();
+    const { error } = await sb.from('kids').insert({ id, user_id: currentUser.id, name, pin, emoji, balance: 0 });
+    if (error) return toast('❌ Could not save. Check your connection.');
+    cache.kids.push({ id, name, pin, emoji, balance: 0 });
+    closeModal(); toast(`${name} added! 🎉`);
+}
+function editKid(id) {
+    const k = cache.kids.find(x => x.id === id);
+    if (k) openModal('edit-kid', { ...k });
+}
+async function saveKid(id) {
+    const name  = document.getElementById('k-name').value.trim();
+    const pin   = document.getElementById('k-pin').value.trim();
+    const emoji = S.selectedEmoji || '😀';
+    if (!name)                 return toast('⚠️ Please enter a name.');
+    if (!/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits (e.g. 1234).');
+    const { error } = await sb.from('kids').update({ name, pin, emoji }).eq('id', id).eq('user_id', currentUser.id);
+    if (error) return toast('❌ Could not save.');
+    const k = cache.kids.find(x => x.id === id);
+    if (k) { k.name = name; k.pin = pin; k.emoji = emoji; }
+    closeModal(); toast('Saved!');
+}
+function deleteKid(id) {
+    const k = cache.kids.find(x => x.id === id);
+    openModal('confirm-delete', { msg: `Remove ${k?.name}? All their data will be deleted.`, onConfirm: `doDeleteKid('${id}')` });
+}
+async function doDeleteKid(id) {
+    const { error } = await sb.from('kids').delete().eq('id', id).eq('user_id', currentUser.id);
+    if (error) return toast('❌ Could not delete.');
+    cache.kids         = cache.kids.filter(x => x.id !== id);
+    cache.completions  = cache.completions.filter(x => x.kidId !== id);
+    cache.transactions = cache.transactions.filter(x => x.kidId !== id);
+    closeModal(); render();
+}
+
+async function addChore() {
+    const name       = document.getElementById('c-name').value.trim();
+    const desc       = document.getElementById('c-desc').value.trim();
+    const val        = parseFloat(document.getElementById('c-val').value) || 0;
+    const assignedTo = S.selectedKids;
+    const emoji      = S.selectedEmoji || '⭐';
+    const schedule   = S.selectedSchedule || 'daily';
+    const days       = schedule === 'weekly' ? [...S.selectedDays] : [];
+    if (!name) return toast('⚠️ Please enter a chore name.');
+    if (schedule === 'weekly' && days.length === 0) return toast('⚠️ Please select at least one day.');
+    if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('⚠️ Please select at least one kid.');
+    const id = uid();
+    const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: desc, value: val, assigned_to: assignedTo, emoji, schedule, days });
+    if (error) return toast('❌ Could not save. Check your connection.');
+    cache.chores.push({ id, name, description: desc, value: val, assignedTo, emoji, schedule, days });
+    closeModal(); toast('Chore added!');
+}
+function editChore(id) {
+    const c = cache.chores.find(x => x.id === id);
+    if (c) openModal('edit-chore', { ...c });
+}
+async function saveChore(id) {
+    const name       = document.getElementById('c-name').value.trim();
+    const desc       = document.getElementById('c-desc').value.trim();
+    const val        = parseFloat(document.getElementById('c-val').value) || 0;
+    const assignedTo = S.selectedKids;
+    const emoji      = S.selectedEmoji || '⭐';
+    const schedule   = S.selectedSchedule || 'daily';
+    const days       = schedule === 'weekly' ? [...S.selectedDays] : [];
+    if (!name) return toast('⚠️ Please enter a chore name.');
+    if (schedule === 'weekly' && days.length === 0) return toast('⚠️ Please select at least one day.');
+    if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('⚠️ Please select at least one kid.');
+    const { error } = await sb.from('chores').update({ name, description: desc, value: val, assigned_to: assignedTo, emoji, schedule, days }).eq('id', id).eq('user_id', currentUser.id);
+    if (error) return toast('❌ Could not save.');
+    const c = cache.chores.find(x => x.id === id);
+    if (c) { c.name = name; c.description = desc; c.value = val; c.assignedTo = assignedTo; c.emoji = emoji; c.schedule = schedule; c.days = days; }
+    closeModal(); toast('Saved!');
+}
+function deleteChore(id) {
+    openModal('confirm-delete', { msg: 'Delete this chore?', onConfirm: `doDeleteChore('${id}')` });
+}
+async function doDeleteChore(id) {
+    const { error } = await sb.from('chores').delete().eq('id', id).eq('user_id', currentUser.id);
+    if (error) return toast('❌ Could not delete.');
+    cache.chores = cache.chores.filter(x => x.id !== id);
+    closeModal(); render();
+}
+
+async function approveChore(cid) {
+    const comp  = cache.completions.find(x => x.id === cid);
+    if (!comp) return;
+    const chore = cache.chores.find(x => x.id === comp.choreId);
+    const kid   = cache.kids.find(x => x.id === comp.kidId);
+    await sb.from('completions').update({ approved: true }).eq('id', cid).eq('user_id', currentUser.id);
+    comp.approved = true;
+    if (chore && kid) {
+        const newBalance = (kid.balance || 0) + chore.value;
+        const txId = uid();
+        const txCreatedAt = new Date().toISOString();
+        await sb.from('kids').update({ balance: newBalance }).eq('id', kid.id).eq('user_id', currentUser.id);
+        await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, kid_id: kid.id, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt });
+        kid.balance = newBalance;
+        cache.transactions.push({ id: txId, kidId: kid.id, amount: chore.value, type: 'chore', description: chore.name, createdAt: txCreatedAt });
+    }
+    toast(`✓ Approved! ${R(chore?.value)} added to ${kid?.name}.`);
+}
+async function rejectChore(cid) {
+    await sb.from('completions').update({ rejected: true }).eq('id', cid).eq('user_id', currentUser.id);
+    const c = cache.completions.find(x => x.id === cid);
+    if (c) c.rejected = true;
+    render();
+}
+async function markDone(choreId) {
+    const id = uid();
+    const completedAt = new Date().toISOString();
+    const { error } = await sb.from('completions').insert({ id, user_id: currentUser.id, chore_id: choreId, kid_id: S.kidId, completed_at: completedAt, approved: false, rejected: false });
+    if (error) return toast('❌ Could not save. Check your connection.');
+    cache.completions.push({ id, choreId, kidId: S.kidId, completedAt, approved: false, rejected: false });
+    toast('Marked as done! Waiting for parent to approve. ⏳');
+}
+async function recordPayout() {
+    const kidId  = document.getElementById('po-kid').value;
+    const amount = parseFloat(document.getElementById('po-amount').value) || 0;
+    if (!kidId)    return toast('⚠️ Please select a kid.');
+    if (amount<=0) return toast('⚠️ Please enter a valid amount.');
+    const k = cache.kids.find(x => x.id === kidId);
+    if (!k) return;
+    const newBalance = (k.balance||0) - amount;
+    const id = uid();
+    const createdAt = new Date().toISOString();
+    await sb.from('kids').update({ balance: newBalance }).eq('id', kidId).eq('user_id', currentUser.id);
+    await sb.from('transactions').insert({ id, user_id: currentUser.id, kid_id: kidId, amount: -amount, type: 'payout', description: 'Cash payout', created_at: createdAt });
+    k.balance = newBalance;
+    cache.transactions.push({ id, kidId, amount: -amount, type: 'payout', description: 'Cash payout', createdAt });
+    document.getElementById('po-kid').value = '';
+    document.getElementById('po-amount').value = '';
+    toast(`${R(amount)} payout recorded for ${k.name}.`);
+}
+async function doModalPayout(kidId) {
+    const amount = parseFloat(document.getElementById('m-po-amt').value) || 0;
+    if (amount<=0) return toast('⚠️ Please enter a valid amount.');
+    const k = cache.kids.find(x => x.id === kidId);
+    if (!k) return;
+    const newBalance = (k.balance||0) - amount;
+    const id = uid();
+    const createdAt = new Date().toISOString();
+    await sb.from('kids').update({ balance: newBalance }).eq('id', kidId).eq('user_id', currentUser.id);
+    await sb.from('transactions').insert({ id, user_id: currentUser.id, kid_id: kidId, amount: -amount, type: 'payout', description: 'Cash payout', created_at: createdAt });
+    k.balance = newBalance;
+    cache.transactions.push({ id, kidId, amount: -amount, type: 'payout', description: 'Cash payout', createdAt });
+    closeModal(); toast(`${R(amount)} payout recorded for ${k.name}.`);
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────
+function render() {
+    const toastHtml = S.toast
+        ? `<div class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-sm px-5 py-2.5 rounded-2xl shadow-lg z-50 max-w-xs text-center">${S.toast}</div>`
+        : '';
+    if (!currentUser) {
+        document.getElementById('app').innerHTML = vLogin() + toastHtml;
+        return;
+    }
+    const views = { home: vHome, parent: vParent, 'kid-pin': vKidPin, kid: vKid };
+    const html  = (views[S.view] || vHome)();
+    document.getElementById('app').innerHTML = html + renderModal() + toastHtml;
+}
+
+initApp();
+</script>
+</body>
+</html>
