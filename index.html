@@ -21,7 +21,7 @@
         .sidebar-item.active { background:rgba(255,255,255,0.15);color:white; }
         .sidebar-item:not(.active) { color:rgba(255,255,255,0.6); }
         .sidebar-item:not(.active):hover { background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.85); }
-        input, select { outline: none; border: 1.5px solid #e5e7eb; border-radius: 12px; padding: 10px 14px;
+        input, select { outline: none; border: 1.5px solid #e5e7eb; border-radius: 12px; padding: 10px 14px 10px 18px;
             width: 100%; font-size: 15px; transition: border-color 0.15s; }
         input:focus, select:focus { border-color: #059669; }
         .btn-primary { background: #059669; color: white; border-radius: 14px; padding: 12px; font-weight: 600;
@@ -119,6 +119,11 @@ const CHORE_EMOJIS = [
 
 // ─── UTILS ───────────────────────────────────────────────────────
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function currSymbol() {
+    const code = currentUser?.user_metadata?.currency || 'ZAR';
+    if (code === 'pts') return '';
+    return (CURRENCIES.find(c => c.code === code) || { symbol: 'R' }).symbol;
+}
 function R(n) {
     const code = currentUser?.user_metadata?.currency || 'ZAR';
     if (code === 'pts') return (+(n || 0)).toFixed(0) + ' pts';
@@ -600,8 +605,8 @@ function pPayouts(db) {
             ${db.kids.map(k => `<option value="${k.id}">${k.name} (${R(k.balance)})</option>`).join('')}
           </select>
           <div class="relative mb-3">
-            <span class="absolute left-3 top-2.5 text-gray-400 text-sm">R</span>
-            <input type="number" id="po-amount" placeholder="0.00" step="0.01" min="0" style="padding-left:28px">
+            <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:#9ca3af;font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
+            <input type="number" id="po-amount" placeholder="0.00" step="0.01" min="0" style="padding-left:38px">
           </div>
           <button onclick="recordPayout()" class="btn-primary">Record Payout</button>
           <p class="text-xs text-gray-300 mt-3">This deducts the amount from the kid's balance.</p>
@@ -886,8 +891,8 @@ function renderModal() {
         <input id="c-name" placeholder="Chore name" value="${data.name||''}" class="mb-3">
         <input id="c-desc" placeholder="Description (optional)" value="${data.description||''}" class="mb-3">
         <div class="relative mb-3">
-          <span class="absolute left-3 top-2.5 text-gray-400 text-sm">R</span>
-          <input id="c-val" type="number" placeholder="Value" value="${data.value||''}" step="0.01" min="0" style="padding-left:28px">
+          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:#9ca3af;font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
+          <input id="c-val" type="number" placeholder="Value" value="${data.value||''}" step="0.01" min="0" style="padding-left:38px">
         </div>
         <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Assigned to</p>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
@@ -963,8 +968,8 @@ function renderModal() {
         <h3 class="text-lg font-bold mb-1">Pay Out</h3>
         <p class="text-gray-400 text-sm mb-4">${kid?.name} · Balance: ${R(kid?.balance)}</p>
         <div class="relative mb-4">
-          <span class="absolute left-3 top-2.5 text-gray-400 text-sm">R</span>
-          <input type="number" id="m-po-amt" placeholder="0.00" step="0.01" min="0" style="padding-left:28px">
+          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:#9ca3af;font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
+          <input type="number" id="m-po-amt" placeholder="0.00" step="0.01" min="0" style="padding-left:38px">
         </div>
         <div class="flex gap-2">
           <button onclick="closeModal()" class="btn-outline flex-1 py-2.5 text-sm">Cancel</button>
