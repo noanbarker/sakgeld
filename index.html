@@ -897,13 +897,15 @@ function vHome() {
               ? `<p style="text-align:center;color:var(--color-text-secondary);font-family:var(--font-family);font-size:13px;padding:12px 0 20px">No kids yet — log in as parent to add them.</p>`
               : `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px;margin-bottom:28px">
                 ${kids.map((k, i) => {
-                  const ac = kidAccent(k);
+                  const ac    = kidAccent(k);
+                  const stage = getTreeStage(k.balance);
                   return `<button onclick="go('kid-pin',{pinKidId:'${k.id}'})"
-                    style="padding:16px 6px 14px;border-radius:16px;border:1.5px solid ${ac.border};background:${ac.bg};cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:7px;transition:filter 0.15s,transform 0.15s"
+                    style="padding:16px 8px 14px;border-radius:16px;border:1.5px solid ${ac.border};background:${ac.bg};cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:filter 0.15s,transform 0.15s"
                     onmouseenter="this.style.filter='brightness(0.96)';this.style.transform='scale(0.98)'"
                     onmouseleave="this.style.filter='';this.style.transform=''">
                     <span style="font-size:28px">${kidIcon(k)}</span>
                     <span style="font-family:var(--font-family);font-size:13px;font-weight:800;color:${ac.text}">${k.name}</span>
+                    <span style="font-family:var(--font-family);font-size:10px;font-weight:700;color:${ac.header};background:rgba(255,255,255,0.6);border-radius:99px;padding:2px 9px;letter-spacing:0.05em;text-transform:uppercase">${TREE_STAGES[stage].label}</span>
                   </button>`;
                 }).join('')}
               </div>`}
