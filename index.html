@@ -578,7 +578,7 @@ function vHome() {
               ? `<p style="text-align:center;color:var(--color-text-secondary);font-family:var(--font-family);font-size:13px;padding:12px 0 20px">No kids yet — log in as parent to add them.</p>`
               : `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px;margin-bottom:28px">
                 ${kids.map((k, i) => {
-                  const ac = KID_ACCENTS[i % 3];
+                  const ac = kidAccent(k);
                   return `<button onclick="go('kid-pin',{pinKidId:'${k.id}'})"
                     style="padding:16px 6px 14px;border-radius:16px;border:1.5px solid ${ac.border};background:${ac.bg};cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:7px;transition:filter 0.15s,transform 0.15s"
                     onmouseenter="this.style.filter='brightness(0.96)';this.style.transform='scale(0.98)'"
@@ -676,7 +676,7 @@ function vParent() {
 function pOverview(db) {
     const pending = db.completions.filter(c => !c.approved && !c.rejected);
     const kidRows = db.kids.map((k, i) => {
-        const ac = KID_ACCENTS[i % 3];
+        const ac = kidAccent(k);
         const kBalance = k.balance || 0;
         return `
         <div class="card flex items-center gap-3">
@@ -793,7 +793,7 @@ function pKids(db) {
         ? `<div class="card text-center py-12" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">👨‍👩‍👧‍👦<br><br>No kids yet. Add one above.</div>`
         : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
           ${db.kids.map((k, i) => {
-            const ac = KID_ACCENTS[i % 3];
+            const ac = kidAccent(k);
             const earned   = weeklyEarned(db, k.id);
             const possible = weeklyPossible(db, k.id);
             const pct      = possible > 0 ? Math.min(100, Math.round(earned / possible * 100)) : 0;
