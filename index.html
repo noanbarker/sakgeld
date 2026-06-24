@@ -3,38 +3,183 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-    <title>Sakgeld</title>
+    <title>Pocket Rocket</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        * { -webkit-tap-highlight-color: transparent; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        .pin-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #059669; transition: background 0.15s; }
-        .pin-dot.filled { background: #059669; }
-        .numpad-btn { height: 64px; font-size: 22px; font-weight: 600; border-radius: 16px; background: white;
-            border: 1px solid #e5e7eb; box-shadow: 0 1px 2px rgba(0,0,0,0.06); transition: background 0.1s; }
-        .numpad-btn:active { background: #f3f4f6; }
-        .tab-active { color: #059669; border-bottom: 2px solid #059669; }
-        .tab-inactive { color: #6b7280; }
-        .card { background: white; border-radius: 16px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-        .sidebar-item { display:flex;align-items:center;gap:12px;width:100%;padding:10px 14px;border-radius:12px;font-size:14px;font-weight:600;transition:background 0.15s;text-align:left; }
-        .sidebar-item.active { background:rgba(255,255,255,0.15);color:white; }
-        .sidebar-item:not(.active) { color:rgba(255,255,255,0.6); }
-        .sidebar-item:not(.active):hover { background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.85); }
-        input, select { outline: none; border: 1.5px solid #e5e7eb; border-radius: 12px; padding: 10px 14px 10px 14px !important;
-            width: 100%; font-size: 15px; transition: border-color 0.15s; }
-        input:focus, select:focus { border-color: #059669; }
-        .btn-primary { background: #059669; color: white; border-radius: 14px; padding: 12px; font-weight: 600;
-            font-size: 16px; width: 100%; transition: opacity 0.15s; }
-        .btn-primary:active { opacity: 0.85; }
-        .btn-outline { border: 1.5px solid #e5e7eb; color: #374151; border-radius: 14px; padding: 12px;
-            font-weight: 600; font-size: 15px; width: 100%; }
-        .badge { display: inline-flex; align-items: center; justify-content: center;
-            background: #ef4444; color: white; font-size: 11px; font-weight: 700;
-            width: 18px; height: 18px; border-radius: 50%; }
+      /* ── Pocket Rocket Design Tokens ─────────────────────────── */
+      :root {
+        --color-blue:           #2563eb;
+        --color-blue-light:     #60a5fa;
+        --color-blue-pale:      #bfdbfe;
+        --color-blue-bg:        #dbeafe;
+        --color-blue-border:    #93c5fd;
+        --color-blue-text:      #1e40af;
+        --color-blue-dark:      #1d4ed8;
+        --color-green:          #16a34a;
+        --color-green-bg:       #dcfce7;
+        --color-green-border:   #86efac;
+        --color-green-text:     #15803d;
+        --color-coral:          #f43f5e;
+        --color-coral-bg:       #ffe4e6;
+        --color-coral-border:   #fca5a5;
+        --color-coral-text:     #be123c;
+        --color-purple:         #7c3aed;
+        --color-text-primary:   #1e293b;
+        --color-text-secondary: #94a3b8;
+        --color-text-muted:     #c8d5e8;
+        --color-background:     #f0f7ff;
+        --color-surface:        #ffffff;
+        --color-border:         #e8edf5;
+        --color-success:        #16a34a;
+        --color-danger:         #f43f5e;
+        --color-warning:        #f59e0b;
+        --gradient-primary:     linear-gradient(132deg, #2563eb 0%, #7c3aed 100%);
+        --gradient-stripe:      linear-gradient(90deg,#2563eb 0%,#2563eb 33.333%,#16a34a 33.333%,#16a34a 66.666%,#f43f5e 66.666%,#f43f5e 100%);
+        --gradient-blob-green:  linear-gradient(135deg,#dcfce7 0%,#bbf7d0 45%,#dbeafe 100%);
+        --gradient-blob-coral:  linear-gradient(135deg,#ffe4e6 0%,#fecaca 55%,#fed7aa 100%);
+        --font-family:          'Nunito', system-ui, sans-serif;
+        --radius-sm:   8px;
+        --radius-md:  14px;
+        --radius-lg:  16px;
+        --radius-xl:  32px;
+        --radius-full:9999px;
+        --shadow-card:          0 24px 64px rgba(37,99,235,0.14), 0 4px 20px rgba(0,0,0,0.07), 0 0 0 1px rgba(37,99,235,0.07);
+        --shadow-button:        0 10px 28px rgba(37,99,235,0.30), 0 2px 8px rgba(0,0,0,0.07);
+        --shadow-button-hover:  0 14px 32px rgba(37,99,235,0.40), 0 2px 8px rgba(0,0,0,0.07);
+        --shadow-sm:            0 2px 10px rgba(0,0,0,0.05);
+        --anim-rocket-duration: 3.6s;
+        --anim-blob-duration:   9s;
+        --anim-blob-duration-2: 11s;
+        --anim-easing:          ease-in-out;
+        --anim-transition-fast: 150ms ease;
+        --anim-transition-base: 200ms ease;
+      }
+
+      @keyframes rocketFloat {
+        0%, 100% { transform: translateY(0px) rotate(-6deg); }
+        50%       { transform: translateY(-14px) rotate(-6deg); }
+      }
+      @keyframes blobMorph {
+        0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+        50%       { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+      }
+
+      * { -webkit-tap-highlight-color: transparent; }
+      body {
+        font-family: var(--font-family);
+        background-color: var(--color-background);
+        color: var(--color-text-primary);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* ── Component classes ────────────────────────────────────── */
+      .pr-card {
+        background: var(--color-surface);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-card);
+        overflow: hidden;
+        position: relative;
+      }
+      .pr-stripe {
+        position: absolute; top:0; left:0; right:0;
+        height: 5px; background: var(--gradient-stripe); z-index: 2;
+      }
+      .pr-blob-top {
+        position:absolute; top:-80px; right:-80px;
+        width:280px; height:280px;
+        background: var(--gradient-blob-green);
+        opacity:0.72; pointer-events:none;
+        animation: blobMorph var(--anim-blob-duration) var(--anim-easing) infinite;
+      }
+      .pr-blob-bottom {
+        position:absolute; bottom:-60px; left:-60px;
+        width:200px; height:200px;
+        background: var(--gradient-blob-coral);
+        opacity:0.68; pointer-events:none;
+        animation: blobMorph var(--anim-blob-duration-2) var(--anim-easing) infinite 2.5s;
+      }
+      .pr-rocket {
+        animation: rocketFloat var(--anim-rocket-duration) var(--anim-easing) infinite;
+      }
+      .pr-btn-primary {
+        width:100%; padding:18px 22px;
+        background: var(--gradient-primary);
+        border:none; border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-button);
+        font-family: var(--font-family);
+        font-size:16px; font-weight:800; color:#fff;
+        cursor:pointer;
+        transition: transform var(--anim-transition-fast), box-shadow var(--anim-transition-fast);
+        display:flex; align-items:center; gap:11px;
+      }
+      .pr-btn-primary:hover  { transform:translateY(-1px); box-shadow:var(--shadow-button-hover); }
+      .pr-btn-primary:active { transform:translateY(0);    box-shadow:var(--shadow-button); }
+      .pr-section-label {
+        font-family: var(--font-family);
+        font-size:10px; font-weight:700;
+        letter-spacing:0.13em; text-transform:uppercase;
+        color: var(--color-text-muted);
+      }
+
+      /* ── Legacy compat ────────────────────────────────────────── */
+      .pin-dot {
+        width:16px; height:16px; border-radius:50%;
+        border:2px solid var(--color-blue); transition:background 0.15s;
+      }
+      .pin-dot.filled { background: var(--color-blue); }
+      .numpad-btn {
+        height:64px; font-size:22px; font-weight:700; font-family:var(--font-family);
+        border-radius:var(--radius-lg); background:var(--color-surface);
+        border:1.5px solid var(--color-border); box-shadow:var(--shadow-sm);
+        transition:background 0.1s; cursor:pointer;
+      }
+      .numpad-btn:active { background:#f1f5f9; }
+      .tab-active   { color:var(--color-blue); border-bottom:2px solid var(--color-blue); }
+      .tab-inactive { color:#6b7280; }
+      .card {
+        background:var(--color-surface); border-radius:var(--radius-lg);
+        padding:16px; box-shadow:var(--shadow-sm);
+      }
+      .sidebar-item {
+        display:flex;align-items:center;gap:12px;width:100%;padding:10px 14px;
+        border-radius:12px;font-size:14px;font-weight:700;font-family:var(--font-family);
+        transition:background 0.15s;text-align:left;
+      }
+      .sidebar-item.active            { background:rgba(255,255,255,0.15);color:white; }
+      .sidebar-item:not(.active)      { color:rgba(255,255,255,0.6); }
+      .sidebar-item:not(.active):hover{ background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.85); }
+      input, select {
+        outline:none; border:1.5px solid var(--color-border);
+        border-radius:var(--radius-md); padding:10px 14px !important;
+        width:100%; font-size:15px; font-family:var(--font-family);
+        transition:border-color 0.15s; color:var(--color-text-primary);
+      }
+      input:focus, select:focus { border-color:var(--color-blue); }
+      .btn-primary {
+        background:var(--gradient-primary); color:white;
+        border-radius:var(--radius-lg); padding:12px;
+        font-weight:800; font-size:16px; width:100%;
+        font-family:var(--font-family); border:none;
+        box-shadow:var(--shadow-button); transition:opacity 0.15s; cursor:pointer;
+      }
+      .btn-primary:active { opacity:0.85; }
+      .btn-outline {
+        border:1.5px solid var(--color-border); color:#374151;
+        border-radius:var(--radius-lg); padding:12px;
+        font-weight:700; font-size:15px; width:100%;
+        font-family:var(--font-family); background:transparent; cursor:pointer;
+      }
+      .badge {
+        display:inline-flex; align-items:center; justify-content:center;
+        background:#ef4444; color:white; font-size:11px; font-weight:700;
+        width:18px; height:18px; border-radius:50%;
+      }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="min-h-screen">
 <div id="app" class="min-h-screen"></div>
 
 <script>
@@ -64,7 +209,7 @@ async function loadCache() {
 }
 
 async function initApp() {
-    document.getElementById('app').innerHTML = '<div class="min-h-screen flex items-center justify-center"><p class="text-gray-400">Loading…</p></div>';
+    document.getElementById('app').innerHTML = '<div class="min-h-screen flex items-center justify-center"><p style="color:var(--color-text-secondary)">Loading…</p></div>';
     const { data: { session } } = await sb.auth.getSession();
     if (session) { currentUser = session.user; await loadCache(); }
     render();
@@ -116,6 +261,18 @@ const CHORE_EMOJIS = [
     '🪣','🏡','💪','⭐','🌟','🎯','🧤','🔧','📦','🍕',
     '🧁','🥗','🪴','🐇','🦜','🌊','🧊','🎒','🖥️','🛋️'
 ];
+
+// ─── KID ACCENT COLORS ───────────────────────────────────────────
+const KID_ACCENTS = [
+    { bg:'#dcfce7', border:'#86efac', text:'#15803d', header:'#16a34a' },
+    { bg:'#ffe4e6', border:'#fca5a5', text:'#be123c', header:'#f43f5e' },
+    { bg:'#dbeafe', border:'#93c5fd', text:'#1e40af', header:'#2563eb' },
+];
+function kidAccent(kid) {
+    const db = DB.load();
+    const idx = db.kids.findIndex(k => k.id === kid.id);
+    return KID_ACCENTS[Math.max(0, idx) % KID_ACCENTS.length];
+}
 
 // ─── UTILS ───────────────────────────────────────────────────────
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
@@ -300,24 +457,61 @@ function toggleDay(d) {
     render();
 }
 
+// ─── ROCKET SVG ──────────────────────────────────────────────────
+function rocketSVG(width = 54, animated = true) {
+    const height = Math.round(width * 72 / 54);
+    return `<svg ${animated ? 'class="pr-rocket"' : ''} width="${width}" height="${height}" viewBox="0 0 54 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="rocket-body" x1="13" y1="5" x2="41" y2="52" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#2563eb"/>
+        </linearGradient>
+        <linearGradient id="rocket-nose" x1="15" y1="5" x2="39" y2="22" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#bfdbfe"/><stop offset="100%" stop-color="#60a5fa"/>
+        </linearGradient>
+        <linearGradient id="rocket-flame" x1="18" y1="52" x2="36" y2="72" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#fbbf24"/>
+          <stop offset="50%" stop-color="#f97316" stop-opacity="0.75"/>
+          <stop offset="100%" stop-color="#ef4444" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <path d="M27 5C19 5 13 19 13 31V52H41V31C41 19 35 5 27 5Z" fill="url(#rocket-body)"/>
+      <path d="M27 5C22 5 17 13 15 22H39C37 13 32 5 27 5Z" fill="url(#rocket-nose)"/>
+      <circle cx="27" cy="33" r="7" fill="rgba(255,255,255,0.5)" stroke="white" stroke-width="1.5"/>
+      <circle cx="25.5" cy="31.5" r="2.5" fill="rgba(255,255,255,0.35)"/>
+      <path d="M13 43L3 57L13 53Z" fill="#1d4ed8"/>
+      <path d="M41 43L51 57L41 53Z" fill="#1d4ed8"/>
+      <path d="M18 52C17 52 14 64 27 72C40 64 37 52 36 52" fill="url(#rocket-flame)"/>
+      <path d="M21 52C21 52 19 62 27 67C35 62 33 52 33 52" fill="#fde68a" opacity="0.5"/>
+    </svg>`;
+}
+
 // ─── AUTH VIEW ───────────────────────────────────────────────────
 function vLogin() {
     return `
-    <div class="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-      <div class="w-full max-w-sm">
-        <div class="text-center mb-8">
-          <div class="text-6xl mb-4">💰</div>
-          <h1 class="text-3xl font-bold text-gray-900">Sakgeld</h1>
-          <p class="text-gray-400 mt-2">Family Allowance Tracker</p>
+    <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
+      <div style="width:100%;max-width:440px">
+        <div class="pr-card" style="padding:52px 40px 44px">
+          <div class="pr-stripe"></div>
+          <div class="pr-blob-top"></div>
+          <div class="pr-blob-bottom"></div>
+          <div style="position:relative;z-index:1">
+            <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:32px">
+              ${rocketSVG(54, true)}
+              <h1 style="font-family:var(--font-family);font-size:30px;font-weight:900;color:#1e293b;letter-spacing:-0.025em;margin-top:20px;margin-bottom:0">Pocket Rocket</h1>
+              <p style="font-family:var(--font-family);font-size:13px;font-weight:600;color:#94a3b8;margin-top:9px">Family Chore &amp; Allowance Tracker</p>
+            </div>
+            <input type="email" id="l-email" placeholder="Email address" class="mb-3"
+              onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()">
+            <input type="password" id="l-pass" placeholder="Password" class="mb-2"
+              onkeydown="if(event.key==='Enter')doSignIn()">
+            <p id="l-err" style="color:#f43f5e;font-size:14px;margin-bottom:12px;min-height:20px"></p>
+            <button onclick="doSignIn()" class="btn-primary mb-3">Sign In</button>
+            <button onclick="doSignUp()" class="btn-outline">Create Account</button>
+            <p style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-muted);text-align:center;margin-top:24px">
+              Your family's data is stored securely in the cloud.
+            </p>
+          </div>
         </div>
-        <input type="email" id="l-email" placeholder="Email address" class="mb-3"
-          onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()">
-        <input type="password" id="l-pass" placeholder="Password" class="mb-2"
-          onkeydown="if(event.key==='Enter')doSignIn()">
-        <p id="l-err" class="text-red-500 text-sm mb-3 h-5"></p>
-        <button onclick="doSignIn()" class="btn-primary mb-3">Sign In</button>
-        <button onclick="doSignUp()" class="btn-outline">Create Account</button>
-        <p class="text-xs text-gray-400 text-center mt-6">Your family's data is stored securely in the cloud.</p>
       </div>
     </div>`;
 }
@@ -344,29 +538,54 @@ async function doSignUp() {
 // ─── VIEWS ───────────────────────────────────────────────────────
 function vHome() {
     const { kids } = DB.load();
+    const cols = Math.min(kids.length, 3) || 1;
     return `
-    <div class="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6">
-      <div class="w-full max-w-2xl">
-        <div class="text-center mb-10">
-          <div class="text-7xl mb-4">💰</div>
-          <h1 class="text-4xl font-bold text-gray-900">Sakgeld</h1>
-          <p class="text-gray-400 mt-2">Family Allowance Tracker</p>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button onclick="goParent()"
-            class="sm:col-span-2 bg-emerald-600 hover:bg-emerald-700 text-white py-5 rounded-2xl text-lg font-semibold shadow-sm flex items-center justify-center gap-2 transition-colors">
-            <span>👨‍💼</span> Parent
-          </button>
-          ${kids.length === 0
-            ? `<p class="sm:col-span-2 text-center text-gray-400 text-sm pt-2">No kids yet — log in as parent to add them.</p>`
-            : kids.map(k => `
-              <button onclick="go('kid-pin',{pinKidId:'${k.id}'})"
-                class="bg-white border-2 border-gray-100 py-5 rounded-2xl text-lg font-semibold text-gray-800 shadow-sm flex items-center justify-center gap-2 hover:border-emerald-200 hover:bg-emerald-50 transition-colors">
-                <span style="font-size:28px">${kidIcon(k)}</span> ${k.name}
-              </button>`).join('')}
-        </div>
-        <div class="text-center mt-8">
-          <button onclick="signOut()" class="text-gray-300 text-xs hover:text-gray-400">Sign out</button>
+    <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
+      <div style="width:100%;max-width:440px">
+        <div class="pr-card" style="padding:52px 40px 44px">
+          <div class="pr-stripe"></div>
+          <div class="pr-blob-top"></div>
+          <div class="pr-blob-bottom"></div>
+          <div style="position:relative;z-index:1">
+            <!-- Logo block -->
+            <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:32px">
+              ${rocketSVG(54, true)}
+              <h1 style="font-family:var(--font-family);font-size:30px;font-weight:900;color:#1e293b;letter-spacing:-0.025em;margin-top:20px;margin-bottom:0">Pocket Rocket</h1>
+              <p style="font-family:var(--font-family);font-size:13px;font-weight:600;color:#94a3b8;margin-top:9px">Family Chore &amp; Allowance Tracker</p>
+            </div>
+            <!-- Who's flying label -->
+            <p class="pr-section-label" style="text-align:center;margin-bottom:13px">Who's flying today?</p>
+            <!-- Parent button -->
+            <button onclick="goParent()" class="pr-btn-primary" style="margin-bottom:10px">
+              <span style="font-size:22px">👨‍💼</span>
+              <span>Parent</span>
+              <span style="flex:1"></span>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M7 5l4 4-4 4" stroke="rgba(255,255,255,0.5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <!-- Kid cards grid -->
+            ${kids.length === 0
+              ? `<p style="text-align:center;color:var(--color-text-secondary);font-family:var(--font-family);font-size:13px;padding:12px 0 20px">No kids yet — log in as parent to add them.</p>`
+              : `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px;margin-bottom:28px">
+                ${kids.map((k, i) => {
+                  const ac = KID_ACCENTS[i % 3];
+                  return `<button onclick="go('kid-pin',{pinKidId:'${k.id}'})"
+                    style="padding:16px 6px 14px;border-radius:16px;border:1.5px solid ${ac.border};background:${ac.bg};cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:7px;transition:filter 0.15s,transform 0.15s"
+                    onmouseenter="this.style.filter='brightness(0.96)';this.style.transform='scale(0.98)'"
+                    onmouseleave="this.style.filter='';this.style.transform=''">
+                    <span style="font-size:28px">${kidIcon(k)}</span>
+                    <span style="font-family:var(--font-family);font-size:13px;font-weight:800;color:${ac.text}">${k.name}</span>
+                  </button>`;
+                }).join('')}
+              </div>`}
+            <!-- Sign out -->
+            <div style="text-align:center">
+              <button onclick="signOut()"
+                style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-muted);cursor:pointer;background:none;border:none;transition:color 0.15s"
+                onmouseenter="this.style.color='#94a3b8'" onmouseleave="this.style.color='var(--color-text-muted)'">
+                Sign out
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>`;
@@ -383,11 +602,13 @@ function vParent() {
         { id: 'settings',  icon: '⚙️', label: 'Settings' },
     ];
     const sidebar = `
-    <aside style="width:220px;min-height:100vh;background:#065f46;display:flex;flex-direction:column;flex-shrink:0" class="hidden md:flex">
-      <div style="padding:28px 20px 20px;border-bottom:1px solid rgba(255,255,255,0.1)">
-        <div style="font-size:28px;margin-bottom:6px">💰</div>
-        <h1 style="color:white;font-size:17px;font-weight:700">Sakgeld</h1>
-        <p style="color:rgba(255,255,255,0.5);font-size:12px;margin-top:2px">Parent Dashboard</p>
+    <aside style="width:220px;min-height:100vh;background:#1e293b;display:flex;flex-direction:column;flex-shrink:0" class="hidden md:flex">
+      <div style="padding:28px 20px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;gap:12px">
+        ${rocketSVG(32, false)}
+        <div>
+          <h1 style="color:white;font-family:var(--font-family);font-size:16px;font-weight:800;line-height:1.2">Pocket Rocket</h1>
+          <p style="color:rgba(255,255,255,0.45);font-size:11px;font-family:var(--font-family);margin-top:2px">Parent Dashboard</p>
+        </div>
       </div>
       <nav style="flex:1;padding:12px">
         ${navItems.map(t => `
@@ -398,24 +619,28 @@ function vParent() {
           </button>`).join('')}
       </nav>
       <div style="padding:16px;border-top:1px solid rgba(255,255,255,0.1)">
-        <button onclick="go('home')" style="color:rgba(255,255,255,0.5);font-size:13px;display:block;margin-bottom:6px">← Home</button>
-        <button onclick="openModal('set-parent-pin')" style="color:rgba(255,255,255,0.5);font-size:13px;display:block;margin-bottom:6px">🔐 Parent PIN</button>
-        <button onclick="signOut()" style="color:rgba(255,255,255,0.3);font-size:12px">Sign out</button>
+        <button onclick="go('home')" style="color:rgba(255,255,255,0.5);font-size:13px;font-family:var(--font-family);display:block;margin-bottom:6px;background:none;border:none;cursor:pointer">← Home</button>
+        <button onclick="openModal('set-parent-pin')" style="color:rgba(255,255,255,0.5);font-size:13px;font-family:var(--font-family);display:block;margin-bottom:6px;background:none;border:none;cursor:pointer">🔐 Parent PIN</button>
+        <button onclick="signOut()" style="color:rgba(255,255,255,0.3);font-size:12px;font-family:var(--font-family);background:none;border:none;cursor:pointer">Sign out</button>
       </div>
     </aside>`;
 
     const mobileHeader = `
-    <div class="md:hidden bg-emerald-700 text-white px-5 pt-8 pb-4 flex justify-between items-center">
-      <h1 class="text-lg font-bold">👨‍💼 Parent Dashboard</h1>
+    <div class="md:hidden text-white px-5 pt-8 pb-4 flex justify-between items-center" style="background:var(--gradient-primary)">
+      <div style="display:flex;align-items:center;gap:10px">
+        ${rocketSVG(28, false)}
+        <h1 style="font-family:var(--font-family);font-size:17px;font-weight:800">Pocket Rocket</h1>
+      </div>
       <div class="flex items-center gap-4">
-        <button onclick="openModal('set-parent-pin')" class="text-emerald-300 text-sm">🔐 PIN</button>
-        <button onclick="go('home')" class="text-emerald-300 text-sm">← Home</button>
+        <button onclick="openModal('set-parent-pin')" style="color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer;font-family:var(--font-family)">🔐 PIN</button>
+        <button onclick="go('home')" style="color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer;font-family:var(--font-family)">← Home</button>
       </div>
     </div>
-    <div class="md:hidden bg-white border-b border-gray-100 flex sticky top-0 z-10">
+    <div class="md:hidden border-b flex sticky top-0 z-10" style="background:var(--color-surface);border-color:var(--color-border)">
       ${navItems.map(t => `
         <button onclick="setTab('${t.id}')"
-          class="flex-1 py-3 text-xs font-semibold relative ${S.tab === t.id ? 'tab-active' : 'tab-inactive'}">
+          class="flex-1 py-3 relative ${S.tab === t.id ? 'tab-active' : 'tab-inactive'}"
+          style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.04em">
           ${t.label}
           ${t.badge ? `<span class="badge absolute top-1.5 right-1">${t.badge}</span>` : ''}
         </button>`).join('')}
@@ -426,7 +651,7 @@ function vParent() {
       ${sidebar}
       <div style="flex:1;display:flex;flex-direction:column;min-width:0">
         ${mobileHeader}
-        <div style="flex:1;overflow:auto;padding:24px 28px;background:#f9fafb">
+        <div style="flex:1;overflow:auto;padding:24px 28px;background:var(--color-background)">
           ${S.tab === 'overview'  ? pOverview(db) :
             S.tab === 'chores'    ? pChores(db) :
             S.tab === 'kids'      ? pKids(db) :
@@ -439,18 +664,19 @@ function vParent() {
 
 function pOverview(db) {
     const pending = db.completions.filter(c => !c.approved && !c.rejected);
-    const kidRows = db.kids.map(k => {
+    const kidRows = db.kids.map((k, i) => {
+        const ac = KID_ACCENTS[i % 3];
         const kBalance = k.balance || 0;
         return `
         <div class="card flex items-center gap-3">
-          <div class="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center text-xl">${kidIcon(k)}</div>
+          <div style="width:40px;height:40px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${kidIcon(k)}</div>
           <div class="flex-1">
-            <p class="font-semibold text-gray-900 text-sm">${k.name}</p>
-            <p class="text-xs text-gray-400">Weekly potential: ${R(weeklyPossible(db, k.id))}</p>
+            <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:14px">${k.name}</p>
+            <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">Weekly potential: ${R(weeklyPossible(db, k.id))}</p>
           </div>
           <div class="text-right">
-            <p class="font-bold text-emerald-600">${R(kBalance)}</p>
-            <button onclick="openModal('payout',{kidId:'${k.id}'})" class="text-xs text-gray-300 underline mt-0.5">pay out</button>
+            <p style="font-family:var(--font-family);font-weight:800;color:${ac.text};font-size:15px">${R(kBalance)}</p>
+            <button onclick="openModal('payout',{kidId:'${k.id}'})" style="font-family:var(--font-family);font-size:11px;color:var(--color-text-muted);text-decoration:underline;cursor:pointer;background:none;border:none;margin-top:2px">pay out</button>
           </div>
         </div>`;
     }).join('');
@@ -461,11 +687,11 @@ function pOverview(db) {
         return `
         <div class="card flex items-center gap-3">
           <div class="flex-1">
-            <p class="font-semibold text-gray-900 text-sm">${chore?.name || 'Deleted chore'}</p>
-            <p class="text-xs text-gray-500">${kid?.name || '?'} · ${R(chore?.value)} · ${dateStr(c.completedAt)}</p>
+            <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:14px">${chore?.name || 'Deleted chore'}</p>
+            <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${kid?.name || '?'} · ${R(chore?.value)} · ${dateStr(c.completedAt)}</p>
           </div>
-          <button onclick="approveChore('${c.id}')" class="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl text-xs font-bold">✓ Approve</button>
-          <button onclick="rejectChore('${c.id}')"  class="bg-red-50 text-red-500 px-3 py-1.5 rounded-xl text-xs font-bold">✗</button>
+          <button onclick="approveChore('${c.id}')" style="background:var(--color-blue-bg);color:var(--color-blue-text);padding:6px 12px;border-radius:12px;font-family:var(--font-family);font-size:12px;font-weight:700;border:none;cursor:pointer">✓ Approve</button>
+          <button onclick="rejectChore('${c.id}')"  style="background:var(--color-coral-bg);color:var(--color-coral-text);padding:6px 12px;border-radius:12px;font-family:var(--font-family);font-size:12px;font-weight:700;border:none;cursor:pointer">✗</button>
         </div>`;
     }).join('');
 
@@ -473,15 +699,15 @@ function pOverview(db) {
     const totalEarned = db.kids.reduce((s, k) => s + weeklyEarned(db, k.id), 0);
     const weeklyCard  = db.kids.length === 0 ? '' : `
     <div class="card mb-5" style="background:linear-gradient(135deg,#1d4ed8,#1e40af);color:white;max-width:60%;margin-left:auto;margin-right:auto">
-      <p class="text-xs font-bold uppercase tracking-wide mb-3" style="color:#bfdbfe">Weekly Payout Summary</p>
+      <p class="pr-section-label" style="color:#bfdbfe;margin-bottom:12px">Weekly Payout Summary</p>
       <div class="flex justify-between items-end mb-3">
         <div>
-          <p style="color:#bfdbfe;font-size:11px">Earned so far this week</p>
-          <p class="text-2xl font-bold">${R(totalEarned)}</p>
+          <p style="color:#bfdbfe;font-size:11px;font-family:var(--font-family)">Earned so far this week</p>
+          <p style="font-family:var(--font-family);font-size:24px;font-weight:800">${R(totalEarned)}</p>
         </div>
         <div class="text-right">
-          <p style="color:#bfdbfe;font-size:11px">Total possible this week</p>
-          <p class="text-2xl font-bold">${R(totalWeekly)}</p>
+          <p style="color:#bfdbfe;font-size:11px;font-family:var(--font-family)">Total possible this week</p>
+          <p style="font-family:var(--font-family);font-size:24px;font-weight:800">${R(totalWeekly)}</p>
         </div>
       </div>
       <div style="background:rgba(255,255,255,0.2);border-radius:99px;height:8px;overflow:hidden">
@@ -491,7 +717,7 @@ function pOverview(db) {
         ${db.kids.map(k => `
           <div class="text-center">
             <p style="font-size:16px">${kidIcon(k)}</p>
-            <p style="font-size:10px;color:#bfdbfe;margin-top:2px">${R(weeklyPossible(db,k.id))}</p>
+            <p style="font-size:10px;color:#bfdbfe;margin-top:2px;font-family:var(--font-family)">${R(weeklyPossible(db,k.id))}</p>
           </div>`).join('')}
       </div>
     </div>`;
@@ -500,18 +726,18 @@ function pOverview(db) {
     ${weeklyCard}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
       <div>
-        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Balances</p>
+        <p class="pr-section-label mb-3">Balances</p>
         <div class="flex flex-col gap-2">
           ${db.kids.length === 0
-            ? `<div class="card text-center text-gray-300 text-sm py-6">No kids added yet.</div>`
+            ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No kids added yet.</div>`
             : kidRows}
         </div>
       </div>
       <div>
-        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Pending Approvals ${pending.length ? `<span class="badge ml-1">${pending.length}</span>` : ''}</p>
+        <p class="pr-section-label mb-3">Pending Approvals ${pending.length ? `<span class="badge ml-1">${pending.length}</span>` : ''}</p>
         <div class="flex flex-col gap-2">
           ${pending.length === 0
-            ? `<div class="card text-center text-gray-300 text-sm py-6">Nothing waiting for approval 🎉</div>`
+            ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">Nothing waiting for approval 🎉</div>`
             : pendingRows}
         </div>
       </div>
@@ -521,25 +747,25 @@ function pOverview(db) {
 function pChores(db) {
     return `
     <div class="flex justify-between items-center mb-4">
-      <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Chores</p>
-      <button onclick="openModal('add-chore')" class="bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold">+ Add Chore</button>
+      <p class="pr-section-label">Chores</p>
+      <button onclick="openModal('add-chore')" class="btn-primary" style="width:auto;padding:8px 16px;font-size:13px">+ Add Chore</button>
     </div>
     ${db.chores.length === 0
-        ? `<div class="card text-center text-gray-300 text-sm py-12">📋<br><br>No chores yet. Add one above.</div>`
+        ? `<div class="card text-center py-12" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">📋<br><br>No chores yet. Add one above.</div>`
         : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           ${db.chores.map(c => {
             const who = choreAssignmentLabel(c, db.kids);
             return `
             <div class="card flex items-center gap-3">
-              <div class="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0">${c.emoji || '⭐'}</div>
+              <div style="width:48px;height:48px;background:var(--color-blue-bg);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">${c.emoji || '⭐'}</div>
               <div class="flex-1 min-w-0">
-                <p class="font-semibold text-gray-900">${c.name}</p>
-                <p class="text-xs text-gray-400 mt-0.5">${who} · ${R(c.value)}</p>
-                <p class="text-xs text-emerald-600 mt-0.5">${choreScheduleLabel(c)}</p>
+                <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary)">${c.name}</p>
+                <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${who} · ${R(c.value)}</p>
+                <p style="font-family:var(--font-family);font-size:12px;color:var(--color-blue);font-weight:600;margin-top:2px">${choreScheduleLabel(c)}</p>
               </div>
               <div class="flex flex-col gap-1 flex-shrink-0">
-                <button onclick="editChore('${c.id}')" class="text-gray-300 p-1.5 rounded-lg text-base hover:bg-gray-100">✏️</button>
-                <button onclick="deleteChore('${c.id}')" class="text-red-200 p-1.5 rounded-lg text-base hover:bg-red-50">🗑️</button>
+                <button onclick="editChore('${c.id}')" style="color:var(--color-text-muted);padding:6px;border-radius:8px;font-size:16px;background:none;border:none;cursor:pointer" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'">✏️</button>
+                <button onclick="deleteChore('${c.id}')" style="color:var(--color-coral);padding:6px;border-radius:8px;font-size:16px;background:none;border:none;cursor:pointer" onmouseenter="this.style.background='var(--color-coral-bg)'" onmouseleave="this.style.background='none'">🗑️</button>
               </div>
             </div>`;
           }).join('')}
@@ -549,40 +775,41 @@ function pChores(db) {
 function pKids(db) {
     return `
     <div class="flex justify-between items-center mb-4">
-      <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Kids</p>
-      <button onclick="openModal('add-kid')" class="bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold">+ Add Kid</button>
+      <p class="pr-section-label">Kids</p>
+      <button onclick="openModal('add-kid')" class="btn-primary" style="width:auto;padding:8px 16px;font-size:13px">+ Add Kid</button>
     </div>
     ${db.kids.length === 0
-        ? `<div class="card text-center text-gray-300 text-sm py-12">👨‍👩‍👧‍👦<br><br>No kids yet. Add one above.</div>`
+        ? `<div class="card text-center py-12" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">👨‍👩‍👧‍👦<br><br>No kids yet. Add one above.</div>`
         : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-          ${db.kids.map(k => {
+          ${db.kids.map((k, i) => {
+            const ac = KID_ACCENTS[i % 3];
             const earned   = weeklyEarned(db, k.id);
             const possible = weeklyPossible(db, k.id);
             const pct      = possible > 0 ? Math.min(100, Math.round(earned / possible * 100)) : 0;
             return `
             <div class="card">
-              <div class="flex items-center gap-3 mb-3">
-                <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-2xl">${kidIcon(k)}</div>
-                <div class="flex-1 min-w-0">
-                  <p class="font-bold text-gray-900">${k.name}</p>
-                  <p class="text-xs text-gray-400">PIN: ${k.pin}</p>
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+                <div style="width:48px;height:48px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px">${kidIcon(k)}</div>
+                <div style="flex:1;min-width:0">
+                  <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary)">${k.name}</p>
+                  <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">PIN: ${k.pin}</p>
                 </div>
-                <div class="flex gap-1">
-                  <button onclick="editKid('${k.id}')" class="text-gray-300 p-1 rounded-lg hover:bg-gray-100">✏️</button>
-                  <button onclick="deleteKid('${k.id}')" class="text-red-200 p-1 rounded-lg hover:bg-red-50">🗑️</button>
+                <div style="display:flex;gap:4px">
+                  <button onclick="editKid('${k.id}')" style="color:var(--color-text-muted);padding:4px;border-radius:8px;background:none;border:none;cursor:pointer" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'">✏️</button>
+                  <button onclick="deleteKid('${k.id}')" style="color:var(--color-coral);padding:4px;border-radius:8px;background:none;border:none;cursor:pointer" onmouseenter="this.style.background='var(--color-coral-bg)'" onmouseleave="this.style.background='none'">🗑️</button>
                 </div>
               </div>
-              <div class="border-t border-gray-50 pt-3">
-                <div class="flex justify-between items-baseline mb-1">
-                  <p class="text-xs text-gray-400">Balance</p>
-                  <p class="font-bold text-emerald-600">${R(k.balance)}</p>
+              <div style="border-top:1px solid var(--color-border);padding-top:12px">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+                  <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">Balance</p>
+                  <p style="font-family:var(--font-family);font-weight:800;color:${ac.text}">${R(k.balance)}</p>
                 </div>
-                <div class="flex justify-between items-baseline mb-2">
-                  <p class="text-xs text-gray-400">This week</p>
-                  <p class="text-xs font-semibold text-gray-600">${R(earned)} / ${R(possible)}</p>
+                <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+                  <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">This week</p>
+                  <p style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-primary)">${R(earned)} / ${R(possible)}</p>
                 </div>
-                <div style="background:#f0fdf4;border-radius:99px;height:6px;overflow:hidden">
-                  <div style="background:#059669;width:${pct}%;height:100%;border-radius:99px"></div>
+                <div style="background:${ac.bg};border-radius:99px;height:6px;overflow:hidden">
+                  <div style="background:${ac.header};width:${pct}%;height:100%;border-radius:99px"></div>
                 </div>
               </div>
             </div>`;
@@ -598,35 +825,35 @@ function pPayouts(db) {
     return `
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div>
-        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4">Record a Cash Payout</p>
+        <p class="pr-section-label mb-4">Record a Cash Payout</p>
         <div class="card">
           <select id="po-kid" class="mb-3">
             <option value="">Select a kid...</option>
             ${db.kids.map(k => `<option value="${k.id}">${k.name} (${R(k.balance)})</option>`).join('')}
           </select>
           <div class="relative mb-3">
-            <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:#9ca3af;font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
-            <input type="number" id="po-amount" placeholder="0.00" step="0.01" min="0" style="padding-left:38px">
+            <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
+            <input type="number" id="po-amount" placeholder="0.00" step="0.01" min="0" style="padding-left:38px !important">
           </div>
           <button onclick="recordPayout()" class="btn-primary">Record Payout</button>
-          <p class="text-xs text-gray-300 mt-3">This deducts the amount from the kid's balance.</p>
+          <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-muted);margin-top:12px">This deducts the amount from the kid's balance.</p>
         </div>
       </div>
       <div>
-        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4">Recent Payouts</p>
+        <p class="pr-section-label mb-4">Recent Payouts</p>
         <div class="flex flex-col gap-2">
           ${recent.length === 0
-            ? `<div class="card text-center text-gray-300 text-sm py-8">No payouts recorded yet.</div>`
+            ? `<div class="card text-center py-8" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No payouts recorded yet.</div>`
             : recent.map(t => {
                 const kid = db.kids.find(k => k.id === t.kidId);
                 return `
                 <div class="card flex items-center gap-3">
-                  <div class="w-9 h-9 bg-blue-50 rounded-full flex items-center justify-center text-lg">💸</div>
+                  <div style="width:36px;height:36px;background:var(--color-blue-bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px">💸</div>
                   <div class="flex-1">
-                    <p class="font-semibold text-gray-900">${kid?.name || '?'}</p>
-                    <p class="text-xs text-gray-400">${dateStr(t.createdAt)}</p>
+                    <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary)">${kid?.name || '?'}</p>
+                    <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${dateStr(t.createdAt)}</p>
                   </div>
-                  <p class="font-bold text-red-400">${R(t.amount)}</p>
+                  <p style="font-family:var(--font-family);font-weight:800;color:var(--color-coral)">${R(t.amount)}</p>
                 </div>`;
               }).join('')}
         </div>
@@ -638,14 +865,14 @@ function pSettings() {
     const currCode = currentUser?.user_metadata?.currency || 'ZAR';
     return `
     <div style="max-width:560px">
-      <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-5">Settings</p>
+      <p class="pr-section-label mb-5">Settings</p>
       <div class="card mb-4">
-        <p class="font-semibold text-gray-900 mb-1">Currency / Value Display</p>
-        <p class="text-sm text-gray-400 mb-4">Choose how values are displayed throughout the app. Select "Points" for a non-monetary reward system.</p>
+        <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);margin-bottom:4px">Currency / Value Display</p>
+        <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">Choose how values are displayed throughout the app. Select "Points" for a non-monetary reward system.</p>
         <select onchange="saveCurrency(this.value)">
           ${CURRENCIES.map(c => `<option value="${c.code}" ${c.code === currCode ? 'selected' : ''}>${c.name}</option>`).join('')}
         </select>
-        <p class="text-xs text-gray-400 mt-3">Preview: <span class="font-bold text-gray-700">${R(25)}</span></p>
+        <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:12px">Preview: <span style="font-weight:800;color:var(--color-text-primary)">${R(25)}</span></p>
       </div>
     </div>`;
 }
@@ -653,22 +880,24 @@ function pSettings() {
 function vKidPin() {
     const db = DB.load();
     const kid = db.kids.find(k => k.id === S.pinKidId);
+    const kidIdx = db.kids.findIndex(k => k.id === S.pinKidId);
+    const ac = KID_ACCENTS[Math.max(0, kidIdx) % 3];
     const dots = [0,1,2,3].map(i =>
-        `<div class="pin-dot ${S.pin.length > i ? 'filled' : ''}"></div>`).join('');
+        `<div class="pin-dot ${S.pin.length > i ? 'filled' : ''}" style="border-color:${ac.header};${S.pin.length>i?'background:'+ac.header:''}"></div>`).join('');
     const keys = [1,2,3,4,5,6,7,8,9,null,0,'⌫'];
     const pad = keys.map(k => k === null
         ? `<div></div>`
         : `<button class="numpad-btn" onclick="pinPress('${k}')">${k}</button>`
     ).join('');
     return `
-    <div class="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6">
-      <button onclick="go('home')" class="text-gray-400 mb-10 text-sm self-start absolute top-6 left-6">← Terug</button>
+    <div class="min-h-screen flex flex-col items-center justify-center p-6" style="background:var(--color-background)">
+      <button onclick="go('home')" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px;background:none;border:none;cursor:pointer;margin-bottom:40px;position:absolute;top:24px;left:24px">← Terug</button>
       <div class="flex flex-col items-center">
-        <div style="font-size:64px;margin-bottom:12px">${kidIcon(kid)}</div>
-        <h2 class="text-3xl font-bold text-gray-900 mb-1">${kid?.name || ''}</h2>
-        <p class="text-gray-400 mb-10">Enter your PIN</p>
-        <div class="flex gap-6 mb-3">${dots}</div>
-        <p id="pin-err" class="text-red-400 text-sm mb-8 h-5"></p>
+        <div style="width:80px;height:80px;background:${ac.bg};border:2px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;margin-bottom:12px">${kidIcon(kid)}</div>
+        <h2 style="font-family:var(--font-family);font-size:28px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${kid?.name || ''}</h2>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);margin-bottom:40px">Enter your PIN</p>
+        <div style="display:flex;gap:24px;margin-bottom:12px">${dots}</div>
+        <p id="pin-err" style="color:var(--color-coral);font-family:var(--font-family);font-size:14px;margin-bottom:32px;min-height:20px"></p>
         <div class="grid grid-cols-3 gap-3 w-72">${pad}</div>
       </div>
     </div>`;
@@ -705,14 +934,14 @@ function vParentPin() {
         : `<button class="numpad-btn" onclick="parentPinPress('${k}')">${k}</button>`
     ).join('');
     return `
-    <div class="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6">
-      <button onclick="go('home')" class="text-gray-400 mb-10 text-sm self-start absolute top-6 left-6">← Terug</button>
+    <div class="min-h-screen flex flex-col items-center justify-center p-6" style="background:var(--color-background)">
+      <button onclick="go('home')" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px;background:none;border:none;cursor:pointer;margin-bottom:40px;position:absolute;top:24px;left:24px">← Terug</button>
       <div class="flex flex-col items-center">
-        <div style="font-size:64px;margin-bottom:12px">👨‍💼</div>
-        <h2 class="text-3xl font-bold text-gray-900 mb-1">Parent</h2>
-        <p class="text-gray-400 mb-10">Enter parent PIN</p>
-        <div class="flex gap-6 mb-3">${dots}</div>
-        <p id="ppin-err" class="text-red-400 text-sm mb-8 h-5"></p>
+        <div style="width:80px;height:80px;background:var(--color-blue-bg);border:2px solid var(--color-blue-border);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;margin-bottom:12px">👨‍💼</div>
+        <h2 style="font-family:var(--font-family);font-size:28px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Parent</h2>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);margin-bottom:40px">Enter parent PIN</p>
+        <div style="display:flex;gap:24px;margin-bottom:12px">${dots}</div>
+        <p id="ppin-err" style="color:var(--color-coral);font-family:var(--font-family);font-size:14px;margin-bottom:32px;min-height:20px"></p>
         <div class="grid grid-cols-3 gap-3 w-72">${pad}</div>
       </div>
     </div>`;
@@ -738,7 +967,8 @@ function vKid() {
     const db = DB.load();
     const kid = db.kids.find(k => k.id === S.kidId);
     if (!kid) { go('home'); return ''; }
-    const today     = new Date().toDateString();
+    const ac       = kidAccent(kid);
+    const today    = new Date().toDateString();
     const allChores = db.chores.filter(c => choreAssignedTo(c, kid.id) && choreIsForToday(c));
     const doneToday = db.completions.filter(c => c.kidId === kid.id && !c.rejected && new Date(c.completedAt).toDateString() === today);
     const doneTodayIds = doneToday.map(c => c.choreId);
@@ -750,97 +980,97 @@ function vKid() {
     const typeIcon  = { payout:'💸', weekly:'📅', chore:'✅', manual:'💰' };
     return `
     <div class="flex flex-col min-h-screen">
-      <div class="bg-emerald-700 text-white px-8 pt-10 pb-8">
+      <div style="background:${ac.header};color:white;padding:40px 32px 32px">
         <div class="max-w-5xl mx-auto">
-          <div class="flex justify-between items-center mb-6">
-            <div class="flex items-center gap-4">
-              <span style="font-size:48px">${kidIcon(kid)}</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+            <div style="display:flex;align-items:center;gap:16px">
+              <div style="width:56px;height:56px;background:rgba(255,255,255,0.2);border:2px solid rgba(255,255,255,0.4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px">${kidIcon(kid)}</div>
               <div>
-                <p class="text-emerald-300 text-sm">Hi there,</p>
-                <h1 class="text-2xl font-bold">${kid.name}</h1>
+                <p style="font-family:var(--font-family);font-size:13px;color:rgba(255,255,255,0.7)">Hi there,</p>
+                <h1 style="font-family:var(--font-family);font-size:22px;font-weight:800">${kid.name}</h1>
               </div>
             </div>
-            <button onclick="go('home')" class="text-emerald-300 text-sm">← Home</button>
+            <button onclick="go('home')" style="font-family:var(--font-family);color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer">← Home</button>
           </div>
-          <div class="flex items-baseline gap-2">
-            <p class="text-5xl font-bold">${R(kid.balance)}</p>
-            <p class="text-emerald-400">current balance</p>
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <p style="font-family:var(--font-family);font-size:48px;font-weight:900;line-height:1">${R(kid.balance)}</p>
+            <p style="font-family:var(--font-family);color:rgba(255,255,255,0.7)">current balance</p>
           </div>
         </div>
       </div>
-      <div class="flex-1 overflow-auto p-6 md:p-8">
+      <div style="flex:1;overflow:auto;padding:24px 32px;background:var(--color-background)">
         <div class="max-w-5xl mx-auto">
         ${(() => {
             const earned   = weeklyEarned(db, kid.id);
             const possible = weeklyPossible(db, kid.id);
             const pct      = possible > 0 ? Math.min(100, Math.round(earned / possible * 100)) : 0;
             return `
-            <div class="card mb-4" style="background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border:1.5px solid #a7f3d0">
-              <div class="flex justify-between items-baseline mb-2">
-                <p class="text-xs font-bold text-emerald-800 uppercase tracking-wide">This week's earnings</p>
-                <p class="text-xs text-emerald-600 font-semibold">${pct}%</p>
+            <div class="card mb-4" style="background:${ac.bg};border:1.5px solid ${ac.border}">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+                <p class="pr-section-label" style="color:${ac.text}">This week's earnings</p>
+                <p style="font-family:var(--font-family);font-size:12px;color:${ac.text};font-weight:600">${pct}%</p>
               </div>
-              <div class="flex items-baseline gap-1 mb-2">
-                <p class="text-2xl font-bold text-emerald-700">${R(earned)}</p>
-                <p class="text-sm text-emerald-500">of ${R(possible)} possible</p>
+              <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:8px">
+                <p style="font-family:var(--font-family);font-size:24px;font-weight:800;color:${ac.header}">${R(earned)}</p>
+                <p style="font-family:var(--font-family);font-size:13px;color:${ac.text}">of ${R(possible)} possible</p>
               </div>
-              <div style="background:#d1fae5;border-radius:99px;height:10px;overflow:hidden">
-                <div style="background:#059669;width:${pct}%;height:100%;border-radius:99px;transition:width 0.4s ease"></div>
+              <div style="background:rgba(255,255,255,0.6);border-radius:99px;height:10px;overflow:hidden">
+                <div style="background:${ac.header};width:${pct}%;height:100%;border-radius:99px;transition:width 0.4s ease"></div>
               </div>
             </div>`;
         })()}
-        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+        <p class="pr-section-label mb-3">
           Today's Chores
-          <span class="ml-1 font-normal text-gray-400 normal-case">&mdash; ${new Date().toLocaleDateString('en-ZA',{weekday:'long', day:'numeric', month:'short'})}</span>
+          <span style="font-family:var(--font-family);font-size:11px;font-weight:600;color:var(--color-text-secondary);letter-spacing:normal;text-transform:none;margin-left:6px">&mdash; ${new Date().toLocaleDateString('en-ZA',{weekday:'long', day:'numeric', month:'short'})}</span>
         </p>
         ${ready.length === 0
-            ? `<div class="card text-center text-gray-300 text-sm py-8 mb-6">🎉 All done for today!</div>`
+            ? `<div class="card text-center py-8 mb-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">🎉 All done for today!</div>`
             : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
               ${ready.map(c => `
                 <div class="card flex items-center gap-4">
-                  <div class="flex-shrink-0 w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center" style="font-size:36px">${c.emoji || '⭐'}</div>
+                  <div style="flex-shrink:0;width:64px;height:64px;background:${ac.bg};border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:32px">${c.emoji || '⭐'}</div>
                   <div class="flex-1 min-w-0">
-                    <p class="font-bold text-gray-900">${c.name}</p>
-                    ${c.description ? `<p class="text-xs text-gray-400 mt-0.5">${c.description}</p>` : ''}
-                    <div class="flex items-center gap-2 mt-1">
-                      <p class="text-emerald-600 font-bold">+ ${R(c.value)}</p>
-                      <span style="font-size:10px;background:#f0fdf4;color:#059669;border-radius:6px;padding:2px 7px;font-weight:600">${choreScheduleLabel(c)}</span>
+                    <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary)">${c.name}</p>
+                    ${c.description ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${c.description}</p>` : ''}
+                    <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+                      <p style="font-family:var(--font-family);color:${ac.header};font-weight:800">+ ${R(c.value)}</p>
+                      <span style="font-size:10px;background:${ac.bg};color:${ac.text};border-radius:6px;padding:2px 7px;font-family:var(--font-family);font-weight:700">${choreScheduleLabel(c)}</span>
                     </div>
                   </div>
                   <button onclick="markDone('${c.id}')"
-                    class="bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex-shrink-0">Done!</button>
+                    class="btn-primary flex-shrink-0" style="width:auto;padding:8px 16px;font-size:13px">Done!</button>
                 </div>`).join('')}
               </div>`}
         ${pending.length > 0 ? `
-          <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 mt-2">Waiting for Approval</p>
+          <p class="pr-section-label mb-3 mt-2">Waiting for Approval</p>
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
             ${pending.map(c => {
               const chore = db.chores.find(x => x.id === c.choreId);
               return `
               <div class="card flex items-center gap-4" style="background:#fffbeb;border:1.5px solid #fde68a">
-                <div class="flex-shrink-0 w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center" style="font-size:36px">${chore?.emoji || '⏳'}</div>
+                <div style="flex-shrink:0;width:64px;height:64px;background:#fef3c7;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:32px">${chore?.emoji || '⏳'}</div>
                 <div class="flex-1 min-w-0">
-                  <p class="font-bold text-amber-900">${chore?.name || 'Deleted chore'}</p>
-                  <p class="text-xs text-amber-600 mt-0.5">Waiting for parent ⏳</p>
-                  <p class="text-emerald-700 font-bold mt-1">+ ${R(chore?.value)}</p>
+                  <p style="font-family:var(--font-family);font-weight:800;color:#92400e">${chore?.name || 'Deleted chore'}</p>
+                  <p style="font-family:var(--font-family);font-size:12px;color:#b45309;margin-top:2px">Waiting for parent ⏳</p>
+                  <p style="font-family:var(--font-family);font-weight:800;color:var(--color-warning);margin-top:4px">+ ${R(chore?.value)}</p>
                 </div>
               </div>`;
             }).join('')}
           </div>` : ''}
-        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 mt-2">History</p>
+        <p class="pr-section-label mb-3 mt-2">History</p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
           ${txns.length === 0
-            ? `<div class="card text-center text-gray-300 text-sm md:col-span-2">No transactions yet.</div>`
+            ? `<div class="card text-center py-6 md:col-span-2" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No transactions yet.</div>`
             : txns.map(t => `
               <div class="card flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full flex items-center justify-center ${t.amount>0 ? 'bg-emerald-50' : 'bg-red-50'}" style="font-size:18px;flex-shrink:0">
+                <div style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;background:${t.amount>0?ac.bg:'var(--color-coral-bg)'}">
                   ${typeIcon[t.type] || '💰'}
                 </div>
                 <div class="flex-1 min-w-0">
-                  <p class="font-medium text-gray-900 truncate">${t.description}</p>
-                  <p class="text-xs text-gray-400">${dateStr(t.createdAt)}</p>
+                  <p style="font-family:var(--font-family);font-weight:600;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.description}</p>
+                  <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${dateStr(t.createdAt)}</p>
                 </div>
-                <p class="font-bold ${t.amount>0 ? 'text-emerald-600' : 'text-red-400'} flex-shrink-0">
+                <p style="font-family:var(--font-family);font-weight:800;flex-shrink:0;color:${t.amount>0?ac.header:'var(--color-coral)'}">
                   ${t.amount>0?'+':''}${R(t.amount)}
                 </p>
               </div>`).join('')}
@@ -860,21 +1090,21 @@ function renderModal() {
     if (type === 'add-kid' || type === 'edit-kid') {
         const e = type === 'edit-kid';
         body = `
-        <h3 class="text-lg font-bold mb-4">${e ? 'Edit' : 'Add'} Kid</h3>
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:16px">${e ? 'Edit' : 'Add'} Kid</h3>
         <input id="k-name" placeholder="Name" value="${data.name||''}" class="mb-3">
         <input id="k-pin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" value="${data.pin||''}" class="mb-4">
-        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Emoji <span style="font-size:20px;margin-left:6px">${S.selectedEmoji || data.emoji || '😀'}</span></p>
-        <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:3px;max-height:150px;overflow-y:auto;border:1.5px solid #e5e7eb;border-radius:12px;padding:8px;margin-bottom:16px">
+        <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Emoji <span style="font-size:20px;margin-left:6px;letter-spacing:0">${S.selectedEmoji || data.emoji || '😀'}</span></p>
+        <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:3px;max-height:150px;overflow-y:auto;border:1.5px solid var(--color-border);border-radius:12px;padding:8px;margin-bottom:16px">
           ${KID_EMOJIS.map(em => {
             const sel = (S.selectedEmoji || data.emoji || '😀') === em;
             return `<button onclick="pickEmoji('${em}')" type="button"
-              style="font-size:20px;width:36px;height:36px;border-radius:8px;border:2px solid ${sel?'#059669':'transparent'};background:${sel?'#ecfdf5':'transparent'}">
+              style="font-size:20px;width:36px;height:36px;border-radius:8px;border:2px solid ${sel?'var(--color-blue)':'transparent'};background:${sel?'var(--color-blue-bg)':'transparent'};cursor:pointer">
               ${em}</button>`;
           }).join('')}
         </div>
-        <div class="flex gap-2 mt-1">
-          <button onclick="closeModal()" class="btn-outline flex-1 py-2.5 text-sm">Cancel</button>
-          <button onclick="${e ? `saveKid('${data.id}')` : 'addKid()'}" class="btn-primary flex-1 py-2.5 text-sm">${e ? 'Save' : 'Add'}</button>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+          <button onclick="${e ? `saveKid('${data.id}')` : 'addKid()'}" class="btn-primary flex-1" style="padding:10px">${e ? 'Save' : 'Add'}</button>
         </div>`;
     }
 
@@ -883,39 +1113,39 @@ function renderModal() {
         const selEmoji = S.selectedEmoji || data.emoji || '⭐';
         const emojiGrid = CHORE_EMOJIS.map(em => `
             <button onclick="pickEmoji('${em}')" type="button"
-                style="font-size:22px;width:42px;height:42px;border-radius:10px;border:2px solid ${em===selEmoji?'#059669':'transparent'};background:${em===selEmoji?'#ecfdf5':'transparent'};transition:all 0.1s">
+                style="font-size:22px;width:42px;height:42px;border-radius:10px;border:2px solid ${em===selEmoji?'var(--color-blue)':'transparent'};background:${em===selEmoji?'var(--color-blue-bg)':'transparent'};transition:all 0.1s;cursor:pointer">
                 ${em}
             </button>`).join('');
         body = `
-        <h3 class="text-lg font-bold mb-3">${e ? 'Edit' : 'Add'} Chore</h3>
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:12px">${e ? 'Edit' : 'Add'} Chore</h3>
         <input id="c-name" placeholder="Chore name" value="${data.name||''}" class="mb-3">
         <input id="c-desc" placeholder="Description (optional)" value="${data.description||''}" class="mb-3">
         <div class="relative mb-3">
-          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:#9ca3af;font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
-          <input id="c-val" type="number" placeholder="Value" value="${data.value||''}" step="0.01" min="0" style="padding-left:38px">
+          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
+          <input id="c-val" type="number" placeholder="Value" value="${data.value||''}" step="0.01" min="0" style="padding-left:38px !important">
         </div>
-        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Assigned to</p>
+        <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Assigned to</p>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
           <button onclick="setAllKids()" type="button"
-            style="padding:6px 12px;border-radius:10px;font-size:13px;font-weight:600;border:2px solid ${S.selectedKids==='all'?'#059669':'#e5e7eb'};background:${S.selectedKids==='all'?'#ecfdf5':'white'};color:${S.selectedKids==='all'?'#059669':'#6b7280'}">
+            style="padding:6px 12px;border-radius:10px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedKids==='all'?'var(--color-blue)':'var(--color-border)'};background:${S.selectedKids==='all'?'var(--color-blue-bg)':'white'};color:${S.selectedKids==='all'?'var(--color-blue)':'#6b7280'};cursor:pointer">
             👨‍👩‍👧‍👦 All kids
           </button>
           ${db.kids.map(k => {
             const sel = Array.isArray(S.selectedKids) && S.selectedKids.includes(k.id);
             return `<button onclick="toggleKidAssignment('${k.id}')" type="button"
-              style="padding:6px 12px;border-radius:10px;font-size:13px;font-weight:600;border:2px solid ${sel?'#059669':'#e5e7eb'};background:${sel?'#ecfdf5':'white'};color:${sel?'#059669':'#6b7280'}">
+              style="padding:6px 12px;border-radius:10px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${sel?'var(--color-blue)':'var(--color-border)'};background:${sel?'var(--color-blue-bg)':'white'};color:${sel?'var(--color-blue)':'#6b7280'};cursor:pointer">
               ${kidIcon(k)} ${k.name}
             </button>`;
           }).join('')}
         </div>
-        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Schedule</p>
-        <div class="flex gap-2 mb-3">
+        <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Schedule</p>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
           <button onclick="setSchedule('daily')" type="button"
-            style="flex:1;padding:8px;border-radius:12px;font-size:13px;font-weight:600;border:2px solid ${S.selectedSchedule==='daily'?'#059669':'#e5e7eb'};background:${S.selectedSchedule==='daily'?'#ecfdf5':'white'};color:${S.selectedSchedule==='daily'?'#059669':'#6b7280'}">
+            style="flex:1;padding:8px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedSchedule==='daily'?'var(--color-blue)':'var(--color-border)'};background:${S.selectedSchedule==='daily'?'var(--color-blue-bg)':'white'};color:${S.selectedSchedule==='daily'?'var(--color-blue)':'#6b7280'};cursor:pointer">
             📅 Daily
           </button>
           <button onclick="setSchedule('weekly')" type="button"
-            style="flex:1;padding:8px;border-radius:12px;font-size:13px;font-weight:600;border:2px solid ${S.selectedSchedule==='weekly'?'#059669':'#e5e7eb'};background:${S.selectedSchedule==='weekly'?'#ecfdf5':'white'};color:${S.selectedSchedule==='weekly'?'#059669':'#6b7280'}">
+            style="flex:1;padding:8px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedSchedule==='weekly'?'var(--color-blue)':'var(--color-border)'};background:${S.selectedSchedule==='weekly'?'var(--color-blue-bg)':'white'};color:${S.selectedSchedule==='weekly'?'var(--color-blue)':'#6b7280'};cursor:pointer">
             📆 Specific days
           </button>
         </div>
@@ -924,62 +1154,62 @@ function renderModal() {
           ${DAYS.map(d => {
             const sel = S.selectedDays.includes(d);
             return `<button onclick="toggleDay('${d}')" type="button"
-              style="padding:6px 0;border-radius:10px;font-size:11px;font-weight:700;border:2px solid ${sel?'#059669':'#e5e7eb'};background:${sel?'#059669':'white'};color:${sel?'white':'#9ca3af'}">
+              style="padding:6px 0;border-radius:10px;font-size:11px;font-weight:700;font-family:var(--font-family);border:2px solid ${sel?'var(--color-blue)':'var(--color-border)'};background:${sel?'var(--color-blue)':'white'};color:${sel?'white':'#9ca3af'};cursor:pointer">
               ${d}
             </button>`;
           }).join('')}
         </div>` : '<div style="margin-bottom:14px"></div>'}
-        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Emoji <span style="font-size:20px;margin-left:6px">${selEmoji}</span></p>
-        <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:4px;max-height:130px;overflow-y:auto;border:1.5px solid #e5e7eb;border-radius:12px;padding:8px;margin-bottom:16px">
+        <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Emoji <span style="font-size:20px;margin-left:6px;letter-spacing:0">${selEmoji}</span></p>
+        <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:4px;max-height:130px;overflow-y:auto;border:1.5px solid var(--color-border);border-radius:12px;padding:8px;margin-bottom:16px">
           ${emojiGrid}
         </div>
-        <div class="flex gap-2">
-          <button onclick="closeModal()" class="btn-outline flex-1 py-2.5 text-sm">Cancel</button>
-          <button onclick="${e ? `saveChore('${data.id}')` : 'addChore()'}" class="btn-primary flex-1 py-2.5 text-sm">${e ? 'Save' : 'Add'}</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+          <button onclick="${e ? `saveChore('${data.id}')` : 'addChore()'}" class="btn-primary flex-1" style="padding:10px">${e ? 'Save' : 'Add'}</button>
         </div>`;
     }
 
     if (type === 'confirm-delete') {
         body = `
-        <h3 class="text-lg font-bold mb-3">Are you sure?</h3>
-        <p class="text-gray-500 text-sm mb-5">${data.msg}</p>
-        <div class="flex gap-2">
-          <button onclick="closeModal()" class="btn-outline flex-1 py-2.5 text-sm">Cancel</button>
-          <button onclick="${data.onConfirm}" class="flex-1 py-2.5 text-sm font-semibold bg-red-500 text-white rounded-2xl">Delete</button>
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:12px">Are you sure?</h3>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:14px;margin-bottom:20px">${data.msg}</p>
+        <div style="display:flex;gap:8px">
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+          <button onclick="${data.onConfirm}" style="flex:1;padding:10px;font-family:var(--font-family);font-size:14px;font-weight:700;background:var(--color-coral);color:white;border:none;border-radius:var(--radius-lg);cursor:pointer">Delete</button>
         </div>`;
     }
 
     if (type === 'set-parent-pin') {
         const hasPin = !!currentUser?.user_metadata?.parent_pin;
         body = `
-        <h3 class="text-lg font-bold mb-1">Parent PIN</h3>
-        <p class="text-gray-400 text-sm mb-4">${hasPin ? '🔐 A PIN is currently set.' : '⚠️ No PIN set — anyone can access the parent dashboard.'}</p>
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Parent PIN</h3>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:14px;margin-bottom:16px">${hasPin ? '🔐 A PIN is currently set.' : '⚠️ No PIN set — anyone can access the parent dashboard.'}</p>
         <input id="pp-pin" placeholder="New 4-digit PIN" maxlength="4" inputmode="numeric" class="mb-4">
-        <div class="flex gap-2">
-          <button onclick="closeModal()" class="btn-outline flex-1 py-2.5 text-sm">Cancel</button>
-          ${hasPin ? `<button onclick="removeParentPin()" class="flex-1 py-2.5 text-sm font-semibold border-1.5 border-red-200 text-red-400 rounded-2xl bg-red-50">Remove</button>` : ''}
-          <button onclick="saveParentPin()" class="btn-primary flex-1 py-2.5 text-sm">Save PIN</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+          ${hasPin ? `<button onclick="removeParentPin()" style="flex:1;padding:10px;font-family:var(--font-family);font-size:14px;font-weight:700;border:1.5px solid var(--color-coral-border);color:var(--color-coral-text);border-radius:var(--radius-lg);background:var(--color-coral-bg);cursor:pointer">Remove</button>` : ''}
+          <button onclick="saveParentPin()" class="btn-primary flex-1" style="padding:10px">Save PIN</button>
         </div>`;
     }
 
     if (type === 'payout') {
         const kid = db.kids.find(k => k.id === data.kidId);
         body = `
-        <h3 class="text-lg font-bold mb-1">Pay Out</h3>
-        <p class="text-gray-400 text-sm mb-4">${kid?.name} · Balance: ${R(kid?.balance)}</p>
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Pay Out</h3>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:14px;margin-bottom:16px">${kid?.name} · Balance: ${R(kid?.balance)}</p>
         <div class="relative mb-4">
-          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:#9ca3af;font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
-          <input type="number" id="m-po-amt" placeholder="0.00" step="0.01" min="0" style="padding-left:38px">
+          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
+          <input type="number" id="m-po-amt" placeholder="0.00" step="0.01" min="0" style="padding-left:38px !important">
         </div>
-        <div class="flex gap-2">
-          <button onclick="closeModal()" class="btn-outline flex-1 py-2.5 text-sm">Cancel</button>
-          <button onclick="doModalPayout('${data.kidId}')" class="btn-primary flex-1 py-2.5 text-sm">Pay Out</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+          <button onclick="doModalPayout('${data.kidId}')" class="btn-primary flex-1" style="padding:10px">Pay Out</button>
         </div>`;
     }
 
     return `
-    <div class="fixed inset-0 bg-black/40 flex items-end justify-center z-50" onclick="if(event.target===this)closeModal()">
-      <div class="bg-white rounded-t-3xl p-6 w-full max-w-sm">${body}</div>
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;justify-content:center;z-index:50" onclick="if(event.target===this)closeModal()">
+      <div style="background:var(--color-surface);border-radius:32px 32px 0 0;padding:28px 24px 36px;width:100%;max-width:440px">${body}</div>
     </div>`;
 }
 
@@ -1164,7 +1394,7 @@ async function removeParentPin() {
 // ─── RENDER ──────────────────────────────────────────────────────
 function render() {
     const toastHtml = S.toast
-        ? `<div class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-sm px-5 py-2.5 rounded-2xl shadow-lg z-50 max-w-xs text-center">${S.toast}</div>`
+        ? `<div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:white;font-family:var(--font-family);font-size:14px;font-weight:600;padding:10px 20px;border-radius:var(--radius-full);box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:99;max-width:320px;text-align:center">${S.toast}</div>`
         : '';
     if (!currentUser) {
         document.getElementById('app').innerHTML = vLogin() + toastHtml;
