@@ -404,13 +404,19 @@ const TREE_STAGES = [
 const DEFAULT_TREE_THRESHOLDS = { t1: 100, t2: 250, t3: 500, t4: 1000 };
 
 function loadTreeThresholds() {
+    const fromMeta = currentUser?.user_metadata?.tree_thresholds;
+    if (fromMeta) return { ...DEFAULT_TREE_THRESHOLDS, ...fromMeta };
     try {
         const s = localStorage.getItem('sprout_tree_thresholds');
         return s ? { ...DEFAULT_TREE_THRESHOLDS, ...JSON.parse(s) } : { ...DEFAULT_TREE_THRESHOLDS };
     } catch { return { ...DEFAULT_TREE_THRESHOLDS }; }
 }
-function saveTreeThresholds(t) {
+async function saveTreeThresholds(t) {
+    const { data, error } = await sb.auth.updateUser({ data: { tree_thresholds: t } });
+    if (error) { toast('❌ Could not save thresholds.'); return false; }
+    if (data?.user) currentUser = data.user;
     localStorage.setItem('sprout_tree_thresholds', JSON.stringify(t));
+    return true;
 }
 function getTreeStage(balance) {
     const t = loadTreeThresholds();
@@ -1354,23 +1360,53 @@ function vKid() {
                         .sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt))
                         .slice(0, 12);
     const typeIcon  = { payout:'💸', weekly:'📅', chore:'✅', manual:'💰' };
+    const treeStageIdx = getTreeStage(kid.balance);
+    const treeThresh   = loadTreeThresholds();
+    const threshArr    = [treeThresh.t1, treeThresh.t2, treeThresh.t3, treeThresh.t4];
+    const nextThresh   = treeStageIdx < 4 ? threshArr[treeStageIdx] : null;
+    const prevThresh   = treeStageIdx > 0 ? (treeStageIdx === 1 ? treeThresh.t1 : treeStageIdx === 2 ? treeThresh.t2 : treeStageIdx === 3 ? treeThresh.t3 : treeThresh.t4) : 0;
+    const stageFloor   = treeStageIdx === 0 ? 0 : threshArr[treeStageIdx - 1];
+    const stagePct     = nextThresh
+        ? Math.min(100, Math.round(((kid.balance - stageFloor) / (nextThresh - stageFloor)) * 100))
+        : 100;
     return `
     <div class="flex flex-col min-h-screen">
-      <div style="background:${ac.header};color:white;padding:40px 32px 32px">
+      <div style="background:${ac.header};color:white;padding:32px 32px 28px;position:relative;overflow:hidden">
         <div class="max-w-5xl mx-auto">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
-            <div style="display:flex;align-items:center;gap:16px">
-              <div style="width:56px;height:56px;background:rgba(255,255,255,0.2);border:2px solid rgba(255,255,255,0.4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px">${kidIcon(kid)}</div>
+          <!-- Top row: avatar/name + home button -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <div style="display:flex;align-items:center;gap:14px">
+              <div style="width:52px;height:52px;background:rgba(255,255,255,0.2);border:2px solid rgba(255,255,255,0.4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px">${kidIcon(kid)}</div>
               <div>
-                <p style="font-family:var(--font-family);font-size:13px;color:rgba(255,255,255,0.7)">Hi there,</p>
-                <h1 style="font-family:var(--font-family);font-size:22px;font-weight:800">${kid.name}</h1>
+                <p style="font-family:var(--font-family);font-size:12px;color:rgba(255,255,255,0.7)">Hi there,</p>
+                <h1 style="font-family:var(--font-family);font-size:20px;font-weight:800">${kid.name}</h1>
               </div>
             </div>
             <button onclick="go('home')" style="font-family:var(--font-family);color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer">← Home</button>
           </div>
-          <div style="display:flex;align-items:baseline;gap:8px">
-            <p style="font-family:var(--font-family);font-size:48px;font-weight:900;line-height:1">${R(kid.balance)}</p>
-            <p style="font-family:var(--font-family);color:rgba(255,255,255,0.7)">current balance</p>
+          <!-- Balance + Tree row -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px">
+            <div>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
+                <p style="font-family:var(--font-family);font-size:44px;font-weight:900;line-height:1">${R(kid.balance)}</p>
+                <p style="font-family:var(--font-family);color:rgba(255,255,255,0.7)">balance</p>
+              </div>
+              ${nextThresh ? `
+              <div>
+                <p style="font-family:var(--font-family);font-size:11px;color:rgba(255,255,255,0.65);margin-bottom:5px">
+                  ${R(Math.max(0, nextThresh - kid.balance))} to unlock <strong>${TREE_STAGES[treeStageIdx + 1]?.label || ''}</strong>
+                </p>
+                <div style="width:140px;background:rgba(255,255,255,0.25);border-radius:99px;height:5px;overflow:hidden">
+                  <div style="background:rgba(255,255,255,0.9);width:${stagePct}%;height:100%;border-radius:99px;transition:width 0.4s ease"></div>
+                </div>
+              </div>` : `
+              <p style="font-family:var(--font-family);font-size:11px;color:rgba(255,255,255,0.75);font-weight:700">🏆 Forest achieved — top tier!</p>`}
+            </div>
+            <!-- Tree stage -->
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0">
+              ${treeStageSVG(treeStageIdx, 80)}
+              <p style="font-family:var(--font-family);font-size:11px;font-weight:800;color:rgba(255,255,255,0.9);letter-spacing:0.04em;text-transform:uppercase">${TREE_STAGES[treeStageIdx].label}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -1767,17 +1803,17 @@ async function doModalPayout(kidId) {
     closeModal(); toast(`${R(amount)} payout recorded for ${k.name}.`);
 }
 
-function saveTreeThresholdsFromUI() {
+async function saveTreeThresholdsFromUI() {
     const vals = ['t1','t2','t3','t4'].map(k => parseFloat(document.getElementById('thresh-'+k)?.value));
     if (vals.some(v => isNaN(v) || v <= 0)) return toast('⚠️ All thresholds must be positive numbers.');
     if (vals[0] >= vals[1] || vals[1] >= vals[2] || vals[2] >= vals[3])
         return toast('⚠️ Each threshold must be higher than the previous one.');
-    saveTreeThresholds({ t1: vals[0], t2: vals[1], t3: vals[2], t4: vals[3] });
-    render(); toast('🌱 Tree thresholds saved!');
+    const ok = await saveTreeThresholds({ t1: vals[0], t2: vals[1], t3: vals[2], t4: vals[3] });
+    if (ok) { render(); toast('🌱 Tree thresholds saved!'); }
 }
-function resetTreeThresholds() {
-    saveTreeThresholds({ ...DEFAULT_TREE_THRESHOLDS });
-    render(); toast('Reset to defaults.');
+async function resetTreeThresholds() {
+    const ok = await saveTreeThresholds({ ...DEFAULT_TREE_THRESHOLDS });
+    if (ok) { render(); toast('Reset to defaults.'); }
 }
 
 async function saveCurrency(code) {
