@@ -1384,29 +1384,32 @@ function vKid() {
             </div>
             <button onclick="go('home')" style="font-family:var(--font-family);color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer">← Home</button>
           </div>
-          <!-- Balance + Tree row -->
-          <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px">
-            <div>
+          <!-- Balance + Tree row (3-column: left content | centre tree | right spacer) -->
+          <div style="display:flex;align-items:flex-end;gap:16px">
+            <!-- Left: balance + progress -->
+            <div style="flex:1">
               <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
                 <p style="font-family:var(--font-family);font-size:44px;font-weight:900;line-height:1">${R(kid.balance)}</p>
                 <p style="font-family:var(--font-family);color:rgba(255,255,255,0.7)">balance</p>
               </div>
               ${nextThresh ? `
               <div>
-                <p style="font-family:var(--font-family);font-size:11px;color:rgba(255,255,255,0.65);margin-bottom:5px">
+                <p style="font-family:var(--font-family);font-size:17px;color:rgba(255,255,255,0.85);margin-bottom:8px;font-weight:600">
                   ${R(Math.max(0, nextThresh - kid.balance))} to unlock <strong>${TREE_STAGES[treeStageIdx + 1]?.label || ''}</strong>
                 </p>
-                <div style="width:140px;background:rgba(255,255,255,0.25);border-radius:99px;height:5px;overflow:hidden">
+                <div style="width:210px;background:rgba(255,255,255,0.25);border-radius:99px;height:8px;overflow:hidden">
                   <div style="background:rgba(255,255,255,0.9);width:${stagePct}%;height:100%;border-radius:99px;transition:width 0.4s ease"></div>
                 </div>
               </div>` : `
-              <p style="font-family:var(--font-family);font-size:11px;color:rgba(255,255,255,0.75);font-weight:700">🏆 Forest achieved — top tier!</p>`}
+              <p style="font-family:var(--font-family);font-size:17px;color:rgba(255,255,255,0.85);font-weight:700">🏆 Forest achieved — top tier!</p>`}
             </div>
-            <!-- Tree stage -->
-            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0">
-              ${treeStageSVG(treeStageIdx, 80)}
-              <p style="font-family:var(--font-family);font-size:11px;font-weight:800;color:rgba(255,255,255,0.9);letter-spacing:0.04em;text-transform:uppercase">${TREE_STAGES[treeStageIdx].label}</p>
+            <!-- Centre: tree -->
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+              ${treeStageSVG(treeStageIdx, 120)}
+              <p style="font-family:var(--font-family);font-size:13px;font-weight:800;color:rgba(255,255,255,0.9);letter-spacing:0.06em;text-transform:uppercase">${TREE_STAGES[treeStageIdx].label}</p>
             </div>
+            <!-- Right spacer (mirrors left to keep tree centred) -->
+            <div style="flex:1"></div>
           </div>
         </div>
       </div>
