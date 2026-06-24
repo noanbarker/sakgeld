@@ -234,6 +234,7 @@ const S = {
     toast: null,
     toastTimer: null,
     selectedEmoji: null,
+    selectedColor: 'blue',
     selectedSchedule: 'daily',
     selectedDays: [],
     selectedKids: 'all',
@@ -263,15 +264,23 @@ const CHORE_EMOJIS = [
 ];
 
 // ─── KID ACCENT COLORS ───────────────────────────────────────────
-const KID_ACCENTS = [
-    { bg:'#dcfce7', border:'#86efac', text:'#15803d', header:'#16a34a' },
-    { bg:'#ffe4e6', border:'#fca5a5', text:'#be123c', header:'#f43f5e' },
-    { bg:'#dbeafe', border:'#93c5fd', text:'#1e40af', header:'#2563eb' },
+const KID_ACCENT_OPTIONS = [
+    { key:'blue',   label:'Blue',   bg:'#dbeafe', border:'#93c5fd', text:'#1e40af', header:'#2563eb' },
+    { key:'coral',  label:'Coral',  bg:'#ffe4e6', border:'#fca5a5', text:'#be123c', header:'#f43f5e' },
+    { key:'green',  label:'Green',  bg:'#dcfce7', border:'#86efac', text:'#15803d', header:'#16a34a' },
+    { key:'purple', label:'Purple', bg:'#ede9fe', border:'#c4b5fd', text:'#5b21b6', header:'#7c3aed' },
+    { key:'amber',  label:'Amber',  bg:'#fef3c7', border:'#fde68a', text:'#92400e', header:'#d97706' },
+    { key:'teal',   label:'Teal',   bg:'#cffafe', border:'#67e8f9', text:'#0e7490', header:'#0891b2' },
 ];
+const KID_ACCENTS = KID_ACCENT_OPTIONS; // fallback cycling
 function kidAccent(kid) {
+    if (kid?.color_key) {
+        const opt = KID_ACCENT_OPTIONS.find(o => o.key === kid.color_key);
+        if (opt) return opt;
+    }
     const db = DB.load();
     const idx = db.kids.findIndex(k => k.id === kid.id);
-    return KID_ACCENTS[Math.max(0, idx) % KID_ACCENTS.length];
+    return KID_ACCENT_OPTIONS[Math.max(0, idx) % KID_ACCENT_OPTIONS.length];
 }
 
 // ─── UTILS ───────────────────────────────────────────────────────
@@ -413,14 +422,16 @@ function choreAssignmentLabel(c, kids) {
 
 function openModal(type, data = {}) {
     const defaultEmoji = (type === 'add-kid' || type === 'edit-kid') ? '😀' : '⭐';
-    S.selectedEmoji    = data.emoji    || defaultEmoji;
-    S.selectedSchedule = data.schedule || 'daily';
-    S.selectedDays     = data.days     ? [...data.days] : [];
+    S.selectedEmoji    = data.emoji     || defaultEmoji;
+    S.selectedColor    = data.color_key || 'blue';
+    S.selectedSchedule = data.schedule  || 'daily';
+    S.selectedDays     = data.days      ? [...data.days] : [];
     S.selectedKids     = !data.assignedTo || data.assignedTo === 'all' ? 'all'
                        : Array.isArray(data.assignedTo) ? [...data.assignedTo]
                        : [data.assignedTo];
     S.modal = { type, data }; render();
 }
+function pickKidColor(key) { snapModalInputs(); S.selectedColor = key; render(); }
 function closeModal() { S.modal = null; render(); }
 
 function snapModalInputs() {
@@ -1093,6 +1104,22 @@ function renderModal() {
         <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:16px">${e ? 'Edit' : 'Add'} Kid</h3>
         <input id="k-name" placeholder="Name" value="${data.name||''}" class="mb-3">
         <input id="k-pin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" value="${data.pin||''}" class="mb-4">
+        <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:10px">Theme Colour</p>
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:20px">
+          ${KID_ACCENT_OPTIONS.map(opt => {
+            const sel = (S.selectedColor || 'blue') === opt.key;
+            return `<button onclick="pickKidColor('${opt.key}')" type="button" title="${opt.label}"
+              style="display:flex;flex-direction:column;align-items:center;gap:5px;border:none;background:none;cursor:pointer;padding:0">
+              <div style="width:40px;height:40px;border-radius:50%;background:${opt.header};
+                box-shadow:${sel ? '0 0 0 3px white,0 0 0 5px '+opt.header : '0 2px 8px rgba(0,0,0,0.15)'};
+                display:flex;align-items:center;justify-content:center;
+                transition:box-shadow 0.15s">
+                ${sel ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : ''}
+              </div>
+              <span style="font-family:var(--font-family);font-size:10px;font-weight:700;color:${sel ? opt.header : 'var(--color-text-muted)'};letter-spacing:0.03em">${opt.label}</span>
+            </button>`;
+          }).join('')}
+        </div>
         <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Emoji <span style="font-size:20px;margin-left:6px;letter-spacing:0">${S.selectedEmoji || data.emoji || '😀'}</span></p>
         <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:3px;max-height:150px;overflow-y:auto;border:1.5px solid var(--color-border);border-radius:12px;padding:8px;margin-bottom:16px">
           ${KID_EMOJIS.map(em => {
@@ -1215,15 +1242,16 @@ function renderModal() {
 
 // ─── ACTIONS ─────────────────────────────────────────────────────
 async function addKid() {
-    const name  = document.getElementById('k-name').value.trim();
-    const pin   = document.getElementById('k-pin').value.trim();
-    const emoji = S.selectedEmoji || '😀';
+    const name      = document.getElementById('k-name').value.trim();
+    const pin       = document.getElementById('k-pin').value.trim();
+    const emoji     = S.selectedEmoji || '😀';
+    const color_key = S.selectedColor || 'blue';
     if (!name)                 return toast('⚠️ Please enter a name.');
     if (!/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits (e.g. 1234).');
     const id = uid();
-    const { error } = await sb.from('kids').insert({ id, user_id: currentUser.id, name, pin, emoji, balance: 0 });
+    const { error } = await sb.from('kids').insert({ id, user_id: currentUser.id, name, pin, emoji, color_key, balance: 0 });
     if (error) return toast('❌ Could not save. Check your connection.');
-    cache.kids.push({ id, name, pin, emoji, balance: 0 });
+    cache.kids.push({ id, name, pin, emoji, color_key, balance: 0 });
     closeModal(); toast(`${name} added! 🎉`);
 }
 function editKid(id) {
@@ -1231,15 +1259,16 @@ function editKid(id) {
     if (k) openModal('edit-kid', { ...k });
 }
 async function saveKid(id) {
-    const name  = document.getElementById('k-name').value.trim();
-    const pin   = document.getElementById('k-pin').value.trim();
-    const emoji = S.selectedEmoji || '😀';
+    const name      = document.getElementById('k-name').value.trim();
+    const pin       = document.getElementById('k-pin').value.trim();
+    const emoji     = S.selectedEmoji || '😀';
+    const color_key = S.selectedColor || 'blue';
     if (!name)                 return toast('⚠️ Please enter a name.');
     if (!/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits (e.g. 1234).');
-    const { error } = await sb.from('kids').update({ name, pin, emoji }).eq('id', id).eq('user_id', currentUser.id);
+    const { error } = await sb.from('kids').update({ name, pin, emoji, color_key }).eq('id', id).eq('user_id', currentUser.id);
     if (error) return toast('❌ Could not save.');
     const k = cache.kids.find(x => x.id === id);
-    if (k) { k.name = name; k.pin = pin; k.emoji = emoji; }
+    if (k) { k.name = name; k.pin = pin; k.emoji = emoji; k.color_key = color_key; }
     closeModal(); toast('Saved!');
 }
 function deleteKid(id) {
