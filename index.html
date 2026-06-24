@@ -905,7 +905,7 @@ function vHome() {
                     onmouseleave="this.style.filter='';this.style.transform=''">
                     <span style="font-size:28px">${kidIcon(k)}</span>
                     <span style="font-family:var(--font-family);font-size:13px;font-weight:800;color:${ac.text}">${k.name}</span>
-                    <span style="font-family:var(--font-family);font-size:10px;font-weight:700;color:${ac.header};background:rgba(255,255,255,0.6);border-radius:99px;padding:2px 9px;letter-spacing:0.05em;text-transform:uppercase">${TREE_STAGES[stage].label}</span>
+                    ${treeStageSVG(stage, 40)}
                   </button>`;
                 }).join('')}
               </div>`}
