@@ -771,6 +771,11 @@ function snapModalInputs() {
         const v = document.getElementById('qt-val');
         if (n) S.modal.data = { ...S.modal.data, name: n.value, value: v?.value };
     }
+    if (t === 'manual-adjustment') {
+        const a = document.getElementById('ma-amount');
+        const d = document.getElementById('ma-desc');
+        if (a) S.modal.data = { ...S.modal.data, amount: a.value, description: d?.value };
+    }
 }
 function pickEmoji(em) { snapModalInputs(); S.selectedEmoji = em; render(); }
 function setSchedule(s) { snapModalInputs(); S.selectedSchedule = s; render(); }
@@ -1071,7 +1076,10 @@ function pOverview(db) {
           </div>
           <div class="text-right">
             <p style="font-family:var(--font-family);font-weight:800;color:${ac.text};font-size:15px">${R(kBalance)}</p>
-            <button onclick="openModal('payout',{kidId:'${k.id}'})" style="font-family:var(--font-family);font-size:11px;color:var(--color-text-muted);text-decoration:underline;cursor:pointer;background:none;border:none;margin-top:2px">pay out</button>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:2px">
+              <button onclick="openModal('payout',{kidId:'${k.id}'})" style="font-family:var(--font-family);font-size:11px;color:var(--color-text-muted);text-decoration:underline;cursor:pointer;background:none;border:none">pay out</button>
+              <button onclick="openModal('manual-adjustment',{kidId:'${k.id}',adjustType:'add'})" style="font-family:var(--font-family);font-size:11px;color:var(--color-green-600);text-decoration:underline;cursor:pointer;background:none;border:none">adjust</button>
+            </div>
           </div>
         </div>`;
     }).join('');
@@ -1137,7 +1145,7 @@ function pOverview(db) {
     <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
       <button onclick="openModal('quick-task')" style="width:auto;padding:9px 18px;font-size:13px;font-weight:700;font-family:var(--font-family);display:flex;align-items:center;gap:6px;background:#fbbf24;color:#92400e;border:none;border-radius:var(--radius-lg);cursor:pointer">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#92400e"/></svg>
-        Quick Task
+        Quick Chore
       </button>
     </div>
     ${weeklyCard}
@@ -1728,9 +1736,36 @@ function renderModal() {
         </div>`;
     }
 
+    if (type === 'manual-adjustment') {
+        const kid = db.kids.find(k => k.id === data.kidId);
+        const isAdd = (data.adjustType || 'add') === 'add';
+        body = `
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Adjust Balance</h3>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:13px;margin-bottom:16px">${kid?.name} · Current balance: <strong>${R(kid?.balance)}</strong></p>
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+          <button onclick="setAdjustType('add')" type="button"
+            style="flex:1;padding:10px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${isAdd ? 'var(--color-green-600)' : 'var(--color-border)'};background:${isAdd ? 'var(--color-green-100)' : 'white'};color:${isAdd ? 'var(--color-green-700)' : '#6b7280'};cursor:pointer">
+            + Add funds
+          </button>
+          <button onclick="setAdjustType('deduct')" type="button"
+            style="flex:1;padding:10px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${!isAdd ? 'var(--color-coral)' : 'var(--color-border)'};background:${!isAdd ? 'var(--color-coral-bg)' : 'white'};color:${!isAdd ? 'var(--color-coral-text)' : '#6b7280'};cursor:pointer">
+            − Deduct funds
+          </button>
+        </div>
+        <div class="relative mb-3">
+          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
+          <input id="ma-amount" type="number" placeholder="Amount" value="${data.amount||''}" step="0.01" min="0" style="padding-left:38px !important">
+        </div>
+        <input id="ma-desc" placeholder="Reason (e.g. Birthday gift, Correction)" value="${data.description||''}" class="mb-4">
+        <div style="display:flex;gap:8px">
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+          <button onclick="saveManualAdjustment('${data.kidId}')" class="btn-primary flex-1" style="padding:10px">${isAdd ? 'Add to Balance' : 'Deduct from Balance'}</button>
+        </div>`;
+    }
+
     if (type === 'quick-task') {
         body = `
-        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Quick Task</h3>
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Quick Chore</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:13px;margin-bottom:16px">Assign a one-off task to a kid for today only — it expires at midnight.</p>
         <input id="qt-name" placeholder="Task name (e.g. Help wash the car)" value="${data.name||''}" class="mb-3">
         <div class="relative mb-4">
@@ -1867,6 +1902,31 @@ async function saveChore(id) {
 }
 function deleteChore(id) {
     openModal('confirm-delete', { msg: 'Delete this chore?', onConfirm: `doDeleteChore('${id}')` });
+}
+function setAdjustType(t) {
+    snapModalInputs();
+    S.modal.data = { ...S.modal.data, adjustType: t };
+    render();
+}
+async function saveManualAdjustment(kidId) {
+    const amount = parseFloat(document.getElementById('ma-amount').value) || 0;
+    const desc   = document.getElementById('ma-desc').value.trim();
+    const isAdd  = (S.modal.data.adjustType || 'add') === 'add';
+    if (amount <= 0) return toast('⚠️ Please enter a valid amount.');
+    if (!desc)       return toast('⚠️ Please enter a reason.');
+    const kid = cache.kids.find(x => x.id === kidId);
+    if (!kid) return;
+    const delta      = isAdd ? amount : -amount;
+    const newBalance = (kid.balance || 0) + delta;
+    const id         = uid();
+    const createdAt  = new Date().toISOString();
+    const { error } = await sb.from('kids').update({ balance: newBalance }).eq('id', kidId).eq('user_id', currentUser.id);
+    if (error) return toast('❌ Could not save. Check your connection.');
+    await sb.from('transactions').insert({ id, user_id: currentUser.id, kid_id: kidId, amount: delta, type: 'manual', description: desc, created_at: createdAt });
+    kid.balance = newBalance;
+    cache.transactions.push({ id, kidId, amount: delta, type: 'manual', description: desc, createdAt });
+    closeModal();
+    toast(isAdd ? `${R(amount)} added to ${kid.name}'s balance.` : `${R(amount)} deducted from ${kid.name}'s balance.`);
 }
 function pickQuickTaskKid(id) {
     snapModalInputs();
