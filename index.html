@@ -2210,7 +2210,7 @@ async function saveBonusMilestone(editId) {
     } else {
         const id = uid(); const createdAt = new Date().toISOString();
         const { error } = await sb.from('bonus_milestones').insert({ id, user_id: currentUser.id, name, threshold, bonus_amount: bonusAmt, assigned_to: assignedTo, claimed_by: [], created_at: createdAt });
-        if (error) return toast('❌ Could not save. Check your connection.');
+        if (error) return toast('❌ ' + (error.message || 'Could not save.'));
         cache.bonusMilestones.push({ id, name, threshold, bonusAmount: bonusAmt, assignedTo, claimedBy: [], createdAt });
         closeModal(); toast('Milestone added! 🌟');
     }
