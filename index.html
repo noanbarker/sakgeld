@@ -572,13 +572,16 @@ function kidAccent(kid) {
 
 // ─── UTILS ───────────────────────────────────────────────────────
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function getCurrencyCode() {
+    return localStorage.getItem('sprout_currency') || currentUser?.user_metadata?.currency || 'ZAR';
+}
 function currSymbol() {
-    const code = currentUser?.user_metadata?.currency || 'ZAR';
+    const code = getCurrencyCode();
     if (code === 'pts') return '';
     return (CURRENCIES.find(c => c.code === code) || { symbol: 'R' }).symbol;
 }
 function R(n) {
-    const code = currentUser?.user_metadata?.currency || 'ZAR';
+    const code = getCurrencyCode();
     if (code === 'pts') return (+(n || 0)).toFixed(0) + ' pts';
     const curr = CURRENCIES.find(c => c.code === code) || { symbol: 'R' };
     const decimals = NO_DECIMAL_CURRENCIES.includes(code) ? 0 : 2;
@@ -1433,7 +1436,7 @@ function pBonuses(db) {
 }
 
 function pSettings() {
-    const currCode = currentUser?.user_metadata?.currency || 'ZAR';
+    const currCode = getCurrencyCode();
     const t = loadTreeThresholds();
     const tiers = [
         { stage: 0, name: 'Seedling',   range: `${R(0)} – ${R(t.t1 - 0.01)}` },
@@ -2367,10 +2370,8 @@ async function resetTreeThresholds() {
     if (ok) { render(); toast('Reset to defaults.'); }
 }
 
-async function saveCurrency(code) {
-    const { data, error } = await sb.auth.updateUser({ data: { currency: code } });
-    if (error) return toast('❌ ' + (error.message || 'Could not save setting.'));
-    if (data?.user) currentUser = data.user;
+function saveCurrency(code) {
+    localStorage.setItem('sprout_currency', code);
     render();
     toast('Currency updated!');
 }
