@@ -91,6 +91,18 @@
         0%, 100% { transform: rotate(-1.5deg); transform-origin: 60px 128px; }
         50%       { transform: rotate(1.5deg);  transform-origin: 60px 128px; }
       }
+      @keyframes logoIconEnter {
+        0%   { opacity: 0; transform: scale(0.6) rotate(-6deg); }
+        100% { opacity: 1; transform: scale(1)   rotate(0deg); }
+      }
+      @keyframes logoIconExit {
+        0%   { opacity: 1; transform: scale(1)   rotate(0deg); }
+        100% { opacity: 0; transform: scale(0.6) rotate(6deg); }
+      }
+      .logo-icon-inner {
+        display: flex; align-items: center; justify-content: center;
+        animation: logoIconEnter 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
+      }
       @keyframes coinBob1 {
         0%, 100% { transform: translateY(0); }
         50%       { transform: translateY(-5px); }
@@ -882,7 +894,7 @@ function vLogin() {
           <div class="pr-blob-bottom"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:32px">
-              ${treeSVG(100, true)}
+              <div id="logo-cycler" style="width:100px;height:114px;display:flex;align-items:center;justify-content:center"></div>
               <h1 style="font-family:var(--font-family);font-size:36px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin-top:18px;margin-bottom:0">Sprout</h1>
               <p style="font-family:var(--font-family);font-size:13px;font-weight:600;color:#86efac;margin-top:9px">Kids Chore &amp; Allowance Tracker</p>
             </div>
@@ -935,7 +947,7 @@ function vHome() {
           <div style="position:relative;z-index:1">
             <!-- Logo block -->
             <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:32px">
-              ${treeSVG(100, true)}
+              <div id="logo-cycler" style="width:100px;height:114px;display:flex;align-items:center;justify-content:center"></div>
               <h1 style="font-family:var(--font-family);font-size:36px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin-top:18px;margin-bottom:0">Sprout</h1>
               <p style="font-family:var(--font-family);font-size:13px;font-weight:600;color:#86efac;margin-top:9px">Kids Chore &amp; Allowance Tracker</p>
             </div>
@@ -2117,17 +2129,41 @@ async function removeParentPin() {
 }
 
 // ─── RENDER ──────────────────────────────────────────────────────
+let _logoCyclerTimer = null;
+function startLogoCycler() {
+    if (_logoCyclerTimer) { clearInterval(_logoCyclerTimer); _logoCyclerTimer = null; }
+    const el = document.getElementById('logo-cycler');
+    if (!el) return;
+    const icons = [0, 1, 2, 3, 4].map(i => treeStageSVG(i, 90));
+    let idx = 0;
+    el.innerHTML = `<div class="logo-icon-inner">${icons[0]}</div>`;
+    _logoCyclerTimer = setInterval(() => {
+        const c = document.getElementById('logo-cycler');
+        if (!c) { clearInterval(_logoCyclerTimer); _logoCyclerTimer = null; return; }
+        const inner = c.querySelector('.logo-icon-inner');
+        if (inner) inner.style.animation = 'logoIconExit 0.35s ease-in forwards';
+        setTimeout(() => {
+            const c2 = document.getElementById('logo-cycler');
+            if (!c2) return;
+            idx = (idx + 1) % icons.length;
+            c2.innerHTML = `<div class="logo-icon-inner">${icons[idx]}</div>`;
+        }, 320);
+    }, 2800);
+}
+
 function render() {
     const toastHtml = S.toast
         ? `<div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:white;font-family:var(--font-family);font-size:14px;font-weight:600;padding:10px 20px;border-radius:var(--radius-full);box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:99;max-width:320px;text-align:center">${S.toast}</div>`
         : '';
     if (!currentUser) {
         document.getElementById('app').innerHTML = vLogin() + toastHtml;
+        setTimeout(startLogoCycler, 50);
         return;
     }
     const views = { home: vHome, parent: vParent, 'kid-pin': vKidPin, kid: vKid, 'parent-pin': vParentPin };
     const html  = (views[S.view] || vHome)();
     document.getElementById('app').innerHTML = html + renderModal() + toastHtml;
+    if (S.view === 'home' || !S.view) setTimeout(startLogoCycler, 50);
 }
 
 initApp();
