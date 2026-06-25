@@ -296,6 +296,9 @@
         /* Card padding */
         .card { padding: 14px !important; }
 
+        /* Weekly summary card: full width on mobile */
+        .sp-weekly-card { max-width: 100% !important; }
+
         /* Modals */
         .modal-sheet { padding: 20px 16px 28px !important; }
       }
@@ -1071,7 +1074,7 @@ function vParent() {
           svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2 L13.4 5.8 Q15.1 6.3 16.6 7.4 L20.5 6.2 L22.3 9.5 L19.4 12.3 Q19.5 12.7 19.5 13 Q19.5 13.3 19.4 13.7 L22.3 16.5 L20.5 19.8 L16.6 18.6 Q15.1 19.7 13.4 20.2 L12 24 L10.6 20.2 Q8.9 19.7 7.4 18.6 L3.5 19.8 L1.7 16.5 L4.6 13.7 Q4.5 13.3 4.5 13 Q4.5 12.7 4.6 12.3 L1.7 9.5 L3.5 6.2 L7.4 7.4 Q8.9 6.3 10.6 5.8Z" fill="#c4b5fd" opacity=".5" stroke="#a78bfa" stroke-width="1.4" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="white" stroke="#a78bfa" stroke-width="1.4"/><circle cx="12" cy="13" r="1.8" fill="#7c3aed"/></svg>` },
     ];
     const sidebar = `
-    <aside style="width:220px;min-height:100vh;background:#14532d;display:flex;flex-direction:column;flex-shrink:0" class="hidden md:flex">
+    <aside style="width:220px;min-height:100vh;background:#14532d;flex-direction:column;flex-shrink:0" class="hidden md:flex">
       <div style="padding:28px 20px 20px;border-bottom:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;gap:12px">
         ${treeSVG(36, false)}
         <div>
@@ -1199,7 +1202,7 @@ function pOverview(db) {
     const totalWeekly = db.kids.reduce((s, k) => s + weeklyPossible(db, k.id), 0);
     const totalEarned = db.kids.reduce((s, k) => s + weeklyEarned(db, k.id), 0);
     const weeklyCard  = db.kids.length === 0 ? '' : `
-    <div class="card mb-5" style="background:linear-gradient(135deg,#16a34a,#14532d);color:white;max-width:60%;margin-left:auto;margin-right:auto">
+    <div class="card sp-weekly-card mb-5" style="background:linear-gradient(135deg,#16a34a,#14532d);color:white;max-width:60%;margin-left:auto;margin-right:auto">
       <p class="pr-section-label" style="color:#86efac;margin-bottom:12px">Weekly Payout Summary</p>
       <div class="flex justify-between items-end mb-3">
         <div>
