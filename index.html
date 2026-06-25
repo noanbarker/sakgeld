@@ -1226,7 +1226,8 @@ function pOverview(db) {
       </div>
     </div>`;
 
-    const missed = db.completions.filter(c => c.missed).sort((a,b) => b.dueDate?.localeCompare(a.dueDate));
+    const missedClearedAt = localStorage.getItem('sprout_missed_cleared_at') || '';
+    const missed = db.completions.filter(c => c.missed && (!missedClearedAt || (c.dueDate || '') > missedClearedAt)).sort((a,b) => b.dueDate?.localeCompare(a.dueDate));
     const missedRows = missed.map(c => {
         const chore = db.chores.find(x => x.id === c.choreId);
         const kid   = db.kids.find(x => x.id === c.kidId);
@@ -1271,7 +1272,10 @@ function pOverview(db) {
     ${missed.length === 0 ? '' : `
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
       <div>
-        <p class="pr-section-label mb-3">Missed Chores <span style="font-family:var(--font-family);font-size:11px;font-weight:600;color:var(--color-text-muted)">(last 7 days)</span></p>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <p class="pr-section-label" style="margin-bottom:0">Missed Chores <span style="font-family:var(--font-family);font-size:11px;font-weight:600;color:var(--color-text-muted)">(last 7 days)</span></p>
+          <button onclick="clearMissedChores()" style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-text-muted);background:none;border:1.5px solid var(--color-border);border-radius:8px;padding:4px 10px;cursor:pointer" onmouseenter="this.style.color='#374151'" onmouseleave="this.style.color='var(--color-text-muted)'">Clear all</button>
+        </div>
         <div class="flex flex-col gap-2">${missedRows}</div>
       </div>
       <div></div>
@@ -2413,6 +2417,12 @@ async function saveTreeThresholdsFromUI() {
 async function resetTreeThresholds() {
     const ok = await saveTreeThresholds({ ...DEFAULT_TREE_THRESHOLDS });
     if (ok) { render(); toast('Reset to defaults.'); }
+}
+
+function clearMissedChores() {
+    const latest = cache.completions.filter(c => c.missed).map(c => c.dueDate || '').sort().pop() || toLocalDateStr(new Date());
+    localStorage.setItem('sprout_missed_cleared_at', latest);
+    render();
 }
 
 function saveCurrency(code) {
