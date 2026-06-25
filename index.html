@@ -277,7 +277,7 @@ async function loadCache() {
     cache = {
         kids: kRes.data || [],
         chores: (cRes.data || []).map(c => ({ ...c, assignedTo: c.assigned_to })),
-        completions: (compRes.data || []).map(c => ({ ...c, choreId: c.chore_id, kidId: c.kid_id, completedAt: c.completed_at })),
+        completions: (compRes.data || []).map(c => ({ ...c, choreId: c.chore_id, kidId: c.kid_id, completedAt: c.completed_at, dueDate: c.due_date || null, missed: c.missed || false })),
         transactions: (txRes.data || []).map(t => ({ ...t, kidId: t.kid_id, createdAt: t.created_at })),
     };
 }
@@ -679,6 +679,44 @@ function choreIsForToday(c) {
     const today = DAYS[(new Date().getDay() + 6) % 7];
     return (c.days || []).includes(today);
 }
+function toLocalDateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function choreIsForDate(c, d) {
+    if (!c.schedule || c.schedule === 'daily') return true;
+    const day = DAYS[(d.getDay() + 6) % 7];
+    return (c.days || []).includes(day);
+}
+async function writeMissedChores(kidId) {
+    const db = DB.load();
+    const inserts = [];
+    for (let ago = 1; ago <= 7; ago++) {
+        const d = new Date();
+        d.setDate(d.getDate() - ago);
+        const due = toLocalDateStr(d);
+        const scheduled = db.chores.filter(c => choreAssignedTo(c, kidId) && choreIsForDate(c, d));
+        for (const chore of scheduled) {
+            const exists = cache.completions.some(c =>
+                c.choreId === chore.id && c.kidId === kidId && c.dueDate === due
+            );
+            if (!exists) {
+                const id = uid();
+                const rec = {
+                    id, user_id: currentUser.id,
+                    chore_id: chore.id, kid_id: kidId,
+                    completed_at: due + 'T23:59:59.000Z',
+                    due_date: due, approved: false, rejected: false, missed: true
+                };
+                inserts.push(rec);
+                cache.completions.push({ id, choreId: chore.id, kidId, completedAt: rec.completed_at, dueDate: due, approved: false, rejected: false, missed: true });
+            }
+        }
+    }
+    if (inserts.length) {
+        await sb.from('completions').insert(inserts);
+        render();
+    }
+}
 function choreAssignedTo(c, kidId) {
     if (!c.assignedTo || c.assignedTo === 'all') return true;
     if (Array.isArray(c.assignedTo)) return c.assignedTo.includes(kidId);
@@ -924,7 +962,7 @@ function vHome() {
 
 function vParent() {
     const db = DB.load();
-    const pending = db.completions.filter(c => !c.approved && !c.rejected).length;
+    const pending = db.completions.filter(c => !c.approved && !c.rejected && !c.missed).length;
     const navItems = [
         { id: 'overview', label: 'Overview', badge: pending,
           activeBg: 'rgba(74,222,128,.15)', activeBorder: 'rgba(74,222,128,.25)',
@@ -1008,7 +1046,7 @@ function vParent() {
 }
 
 function pOverview(db) {
-    const pending = db.completions.filter(c => !c.approved && !c.rejected);
+    const pending = db.completions.filter(c => !c.approved && !c.rejected && !c.missed);
     const kidRows = db.kids.map((k, i) => {
         const ac = kidAccent(k);
         const kBalance = k.balance || 0;
@@ -1067,6 +1105,22 @@ function pOverview(db) {
       </div>
     </div>`;
 
+    const missed = db.completions.filter(c => c.missed).sort((a,b) => b.dueDate?.localeCompare(a.dueDate));
+    const missedRows = missed.map(c => {
+        const chore = db.chores.find(x => x.id === c.choreId);
+        const kid   = db.kids.find(x => x.id === c.kidId);
+        const d = new Date(c.dueDate + 'T12:00:00');
+        const label = d.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' });
+        return `
+        <div class="card flex items-center gap-3" style="border-left:3px solid #fca5a5">
+          <div class="flex-1">
+            <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:14px">${chore?.name || 'Deleted chore'}</p>
+            <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${kid?.name || '?'} · ${label} · ${R(chore?.value || 0)} not earned</p>
+          </div>
+          <span style="font-family:var(--font-family);font-size:11px;font-weight:700;color:#f43f5e;background:#fff1f2;padding:4px 10px;border-radius:20px">Missed</span>
+        </div>`;
+    }).join('');
+
     return `
     ${weeklyCard}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
@@ -1086,7 +1140,12 @@ function pOverview(db) {
             : pendingRows}
         </div>
       </div>
-    </div>`;
+    </div>
+    ${missed.length === 0 ? '' : `
+    <div class="mt-6">
+      <p class="pr-section-label mb-3">Missed Chores <span style="font-family:var(--font-family);font-size:11px;font-weight:600;color:var(--color-text-muted)">(last 7 days)</span></p>
+      <div class="flex flex-col gap-2">${missedRows}</div>
+    </div>`}`;
 }
 
 function pChores(db) {
@@ -1309,7 +1368,9 @@ function checkPin() {
     const db = DB.load();
     const kid = db.kids.find(k => k.id === S.pinKidId);
     if (kid && S.pin === kid.pin) {
-        S.kidId = S.pinKidId; S.pin = ''; go('kid');
+        const kidId = S.pinKidId;
+        S.kidId = kidId; S.pin = ''; go('kid');
+        writeMissedChores(kidId);
     } else {
         const el = document.getElementById('pin-err');
         if (el) el.textContent = 'Wrong PIN. Try again.';
@@ -1366,8 +1427,12 @@ function vKid() {
     if (!kid) { go('home'); return ''; }
     const ac       = kidAccent(kid);
     const today    = new Date().toDateString();
+    const todayDate = toLocalDateStr(new Date());
     const allChores = db.chores.filter(c => choreAssignedTo(c, kid.id) && choreIsForToday(c));
-    const doneToday = db.completions.filter(c => c.kidId === kid.id && !c.rejected && new Date(c.completedAt).toDateString() === today);
+    const doneToday = db.completions.filter(c =>
+        c.kidId === kid.id && !c.rejected && !c.missed &&
+        (c.dueDate ? c.dueDate === todayDate : new Date(c.completedAt).toDateString() === today)
+    );
     const doneTodayIds = doneToday.map(c => c.choreId);
     const pending   = doneToday.filter(c => !c.approved);
     const ready     = allChores.filter(c => !doneTodayIds.includes(c.id));
@@ -1782,10 +1847,12 @@ async function rejectChore(cid) {
 }
 async function markDone(choreId) {
     const id = uid();
-    const completedAt = new Date().toISOString();
-    const { error } = await sb.from('completions').insert({ id, user_id: currentUser.id, chore_id: choreId, kid_id: S.kidId, completed_at: completedAt, approved: false, rejected: false });
+    const now = new Date();
+    const completedAt = now.toISOString();
+    const dueDate = toLocalDateStr(now);
+    const { error } = await sb.from('completions').insert({ id, user_id: currentUser.id, chore_id: choreId, kid_id: S.kidId, completed_at: completedAt, due_date: dueDate, approved: false, rejected: false, missed: false });
     if (error) return toast('❌ Could not save. Check your connection.');
-    cache.completions.push({ id, choreId, kidId: S.kidId, completedAt, approved: false, rejected: false });
+    cache.completions.push({ id, choreId, kidId: S.kidId, completedAt, dueDate, approved: false, rejected: false, missed: false });
     toast('Marked as done! Waiting for parent to approve. ⏳');
 }
 async function recordPayout() {
