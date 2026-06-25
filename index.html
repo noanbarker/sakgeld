@@ -741,7 +741,7 @@ function openModal(type, data = {}) {
     S.selectedSchedule = data.schedule  || 'daily';
     S.selectedDays     = data.days      ? [...data.days] : [];
     if (type === 'quick-task') {
-        S.selectedKids = null;
+        S.selectedKids = [];
     } else {
         S.selectedKids = !data.assignedTo || data.assignedTo === 'all' ? 'all'
                        : Array.isArray(data.assignedTo) ? [...data.assignedTo]
@@ -1741,13 +1741,20 @@ function renderModal() {
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
           ${db.kids.length === 0
             ? `<p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-muted)">No kids added yet.</p>`
-            : db.kids.map(k => {
-                const sel = S.selectedKids === k.id;
-                return `<button onclick="pickQuickTaskKid('${k.id}')" type="button"
-                  style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? 'var(--color-green-600)' : 'var(--color-border)'};background:${sel ? 'var(--color-green-100)' : 'white'};color:${sel ? 'var(--color-green-700)' : '#6b7280'};cursor:pointer;display:flex;align-items:center;gap:6px">
-                  <span style="font-size:18px">${kidIcon(k)}</span> ${k.name}
-                </button>`;
-              }).join('')}
+            : (() => {
+                const allSel = S.selectedKids === 'all';
+                return `<button onclick="setAllKids()" type="button"
+                  style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${allSel ? 'var(--color-green-600)' : 'var(--color-border)'};background:${allSel ? 'var(--color-green-100)' : 'white'};color:${allSel ? 'var(--color-green-700)' : '#6b7280'};cursor:pointer">
+                  👨‍👩‍👧‍👦 All kids
+                </button>` +
+                db.kids.map(k => {
+                  const sel = Array.isArray(S.selectedKids) && S.selectedKids.includes(k.id);
+                  return `<button onclick="pickQuickTaskKid('${k.id}')" type="button"
+                    style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? 'var(--color-green-600)' : 'var(--color-border)'};background:${sel ? 'var(--color-green-100)' : 'white'};color:${sel ? 'var(--color-green-700)' : '#6b7280'};cursor:pointer;display:flex;align-items:center;gap:6px">
+                    <span style="font-size:18px">${kidIcon(k)}</span> ${k.name}
+                  </button>`;
+                }).join('');
+              })()}
         </div>
         <div style="display:flex;gap:8px">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
@@ -1863,20 +1870,24 @@ function deleteChore(id) {
 }
 function pickQuickTaskKid(id) {
     snapModalInputs();
-    S.selectedKids = S.selectedKids === id ? null : id;
+    if (S.selectedKids === 'all') { S.selectedKids = [id]; render(); return; }
+    const arr = Array.isArray(S.selectedKids) ? [...S.selectedKids] : [];
+    const i = arr.indexOf(id);
+    if (i === -1) arr.push(id); else arr.splice(i, 1);
+    S.selectedKids = arr;
     render();
 }
 async function addQuickTask() {
-    const name  = document.getElementById('qt-name').value.trim();
-    const val   = parseFloat(document.getElementById('qt-val').value) || 0;
-    const kidId = S.selectedKids;
-    if (!name)  return toast('⚠️ Please enter a task name.');
-    if (!kidId) return toast('⚠️ Please select a kid.');
+    const name      = document.getElementById('qt-name').value.trim();
+    const val       = parseFloat(document.getElementById('qt-val').value) || 0;
+    const assignedTo = S.selectedKids;
+    if (!name) return toast('⚠️ Please enter a task name.');
+    if (!assignedTo || (Array.isArray(assignedTo) && assignedTo.length === 0)) return toast('⚠️ Please select at least one kid.');
     const expiresOn = toLocalDateStr(new Date());
     const id = uid();
-    const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: '', value: val, assigned_to: kidId, emoji: '⭐', schedule: 'daily', days: [], one_off: true, expires_on: expiresOn });
+    const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: '', value: val, assigned_to: assignedTo, emoji: '⭐', schedule: 'daily', days: [], one_off: true, expires_on: expiresOn });
     if (error) return toast('❌ Could not save. Check your connection.');
-    cache.chores.push({ id, name, description: '', value: val, assignedTo: kidId, emoji: '⭐', schedule: 'daily', days: [], oneOff: true, expiresOn });
+    cache.chores.push({ id, name, description: '', value: val, assignedTo, emoji: '⭐', schedule: 'daily', days: [], oneOff: true, expiresOn });
     closeModal(); toast('Quick task assigned! 🎯');
 }
 async function doDeleteChore(id) {
