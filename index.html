@@ -949,6 +949,7 @@ async function doSignUp() {
 // ─── VIEWS ───────────────────────────────────────────────────────
 function vHome() {
     const { kids } = DB.load();
+    kids.sort((a, b) => a.name.localeCompare(b.name));
     const cols = Math.min(kids.length, 3) || 1;
     return `
     <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
@@ -1605,7 +1606,7 @@ function vKid() {
     const txns      = db.transactions.filter(t => t.kidId === kid.id)
                         .sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt))
                         .slice(0, 12);
-    const typeIcon  = { payout:'💸', weekly:'📅', chore:'✅', manual:'💰' };
+    const typeIcon  = { payout:'💸', weekly:'📅', chore:'✅', manual:'💰', bonus:'🌟' };
     const treeStageIdx = getTreeStage(kid.balance);
     const treeThresh   = loadTreeThresholds();
     const threshArr    = [treeThresh.t1, treeThresh.t2, treeThresh.t3, treeThresh.t4];
@@ -1718,6 +1719,54 @@ function vKid() {
               </div>`;
             }).join('')}
           </div>` : ''}
+        ${(() => {
+            const milestones = (db.bonusMilestones || []).filter(m =>
+                m.assignedTo === 'all' || (Array.isArray(m.assignedTo) && m.assignedTo.includes(kid.id))
+            );
+            if (!milestones.length) return '';
+            const achieved = milestones.filter(m => (m.claimedBy || []).some(c => c.kidId === kid.id));
+            const upcoming = milestones.filter(m => !(m.claimedBy || []).some(c => c.kidId === kid.id))
+                                       .sort((a, b) => a.threshold - b.threshold);
+            const upcomingCards = upcoming.map(m => {
+                const pct = Math.min(100, Math.round((kid.balance / m.threshold) * 100));
+                const stillNeeds = Math.max(0, m.threshold - kid.balance);
+                return `
+                <div class="card" style="border:1.5px solid #fed7aa">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+                    <div>
+                      <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">${m.name || 'Balance Milestone'}</p>
+                      <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">Save ${R(m.threshold)} to unlock</p>
+                    </div>
+                    <span style="font-family:var(--font-family);font-size:16px;font-weight:900;color:#f97316;flex-shrink:0;margin-left:12px">+${R(m.bonusAmount)}</span>
+                  </div>
+                  <div style="background:#fed7aa;border-radius:99px;height:8px;overflow:hidden;margin-bottom:6px">
+                    <div style="background:#f97316;width:${pct}%;height:100%;border-radius:99px;transition:width 0.4s ease"></div>
+                  </div>
+                  <p style="font-family:var(--font-family);font-size:11px;font-weight:600;color:#92400e">
+                    ${stillNeeds > 0 ? `${R(stillNeeds)} to go · ${pct}% there` : 'Threshold reached!'}
+                  </p>
+                </div>`;
+            }).join('');
+            const achievedCards = achieved.map(m => {
+                const claim = (m.claimedBy || []).find(c => c.kidId === kid.id);
+                const claimDate = claim ? new Date(claim.claimedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+                return `
+                <div class="card flex items-center gap-3" style="background:#f0fdf4;border:1.5px solid #bbf7d0">
+                  <div style="width:40px;height:40px;background:#dcfce7;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🌟</div>
+                  <div class="flex-1 min-w-0">
+                    <p style="font-family:var(--font-family);font-weight:800;color:#15803d;font-size:13px">${m.name || 'Balance Milestone'}</p>
+                    <p style="font-family:var(--font-family);font-size:11px;color:#16a34a;margin-top:1px">Earned on ${claimDate}</p>
+                  </div>
+                  <p style="font-family:var(--font-family);font-weight:900;color:#16a34a;font-size:15px;flex-shrink:0">+${R(m.bonusAmount)}</p>
+                </div>`;
+            }).join('');
+            return `
+            <p class="pr-section-label mb-3 mt-2">Bonuses</p>
+            <div class="flex flex-col gap-2 mb-6">
+              ${upcomingCards}
+              ${achievedCards}
+            </div>`;
+        })()}
         <p class="pr-section-label mb-3 mt-2">History</p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
           ${txns.length === 0
