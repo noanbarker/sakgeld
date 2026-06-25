@@ -275,22 +275,24 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentUser = null;
-let cache = { kids: [], chores: [], completions: [], transactions: [] };
+let cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [] };
 const DB = { load: () => cache };
 
 async function loadCache() {
     const uid = currentUser.id;
-    const [kRes, cRes, compRes, txRes] = await Promise.all([
+    const [kRes, cRes, compRes, txRes, bmRes] = await Promise.all([
         sb.from('kids').select('*').eq('user_id', uid),
         sb.from('chores').select('*').eq('user_id', uid),
         sb.from('completions').select('*').eq('user_id', uid),
         sb.from('transactions').select('*').eq('user_id', uid),
+        sb.from('bonus_milestones').select('*').eq('user_id', uid),
     ]);
     cache = {
         kids: kRes.data || [],
         chores: (cRes.data || []).map(c => ({ ...c, assignedTo: c.assigned_to, oneOff: c.one_off || false, expiresOn: c.expires_on || null })),
         completions: (compRes.data || []).map(c => ({ ...c, choreId: c.chore_id, kidId: c.kid_id, completedAt: c.completed_at, dueDate: c.due_date || null, missed: c.missed || false })),
         transactions: (txRes.data || []).map(t => ({ ...t, kidId: t.kid_id, createdAt: t.created_at })),
+        bonusMilestones: (bmRes.data || []).map(m => ({ ...m, assignedTo: m.assigned_to, bonusAmount: m.bonus_amount, claimedBy: m.claimed_by || [] })),
     };
 }
 
@@ -302,7 +304,7 @@ async function initApp() {
     sb.auth.onAuthStateChange(async (event, session) => {
         currentUser = session?.user || null;
         if (currentUser) { await loadCache(); }
-        else { cache = { kids: [], chores: [], completions: [], transactions: [] }; S.view = 'home'; }
+        else { cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [] }; S.view = 'home'; }
         render();
     });
 }
@@ -754,6 +756,11 @@ function openModal(type, data = {}) {
     S.selectedDays     = data.days      ? [...data.days] : [];
     if (type === 'quick-task') {
         S.selectedKids = [];
+    } else if (type === 'add-bonus') {
+        S.selectedKids = 'all';
+    } else if (type === 'edit-bonus') {
+        const m = (cache.bonusMilestones || []).find(x => x.id === data.milestoneId);
+        S.selectedKids = m ? (m.assignedTo === 'all' ? 'all' : Array.isArray(m.assignedTo) ? [...m.assignedTo] : [m.assignedTo]) : 'all';
     } else {
         S.selectedKids = !data.assignedTo || data.assignedTo === 'all' ? 'all'
                        : Array.isArray(data.assignedTo) ? [...data.assignedTo]
@@ -1005,6 +1012,9 @@ function vParent() {
         { id: 'payouts', label: 'Payouts',
           activeBg: 'rgba(251,191,36,.15)', activeBorder: 'rgba(251,191,36,.30)',
           svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9.5" fill="#fbbf24"/><circle cx="12" cy="12" r="7.5" fill="#fde68a"/><path d="M12 5.5 L12 18.5" stroke="#b45309" stroke-width="1.6" stroke-linecap="round"/><path d="M9 7.5 Q9 6 12 6 Q15 6 15 8.5 Q15 11 12 11.5 Q9 12 9 14.5 Q9 17.5 12 17.5 Q15 17.5 15 16" stroke="#b45309" stroke-width="1.6" stroke-linecap="round" fill="none"/><circle cx="8" cy="8" r="1.5" fill="white" opacity=".5"/></svg>` },
+        { id: 'bonuses', label: 'Bonuses',
+          activeBg: 'rgba(251,146,60,.15)', activeBorder: 'rgba(251,146,60,.30)',
+          svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3 L13.8 8.2 L19.3 8.2 L14.9 11.5 L16.6 16.8 L12 13.5 L7.4 16.8 L9.1 11.5 L4.7 8.2 L10.2 8.2Z" fill="#fb923c"/><path d="M20 3 L20.5 4.5 L22 5 L20.5 5.5 L20 7 L19.5 5.5 L18 5 L19.5 4.5Z" fill="#fbbf24"/><path d="M4 14.5 L4.4 15.7 L5.6 16.1 L4.4 16.5 L4 17.7 L3.6 16.5 L2.4 16.1 L3.6 15.7Z" fill="#fbbf24" opacity=".9"/></svg>` },
         { id: 'settings', label: 'Settings',
           activeBg: 'rgba(196,181,253,.15)', activeBorder: 'rgba(167,139,250,.30)',
           svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2 L13.4 5.8 Q15.1 6.3 16.6 7.4 L20.5 6.2 L22.3 9.5 L19.4 12.3 Q19.5 12.7 19.5 13 Q19.5 13.3 19.4 13.7 L22.3 16.5 L20.5 19.8 L16.6 18.6 Q15.1 19.7 13.4 20.2 L12 24 L10.6 20.2 Q8.9 19.7 7.4 18.6 L3.5 19.8 L1.7 16.5 L4.6 13.7 Q4.5 13.3 4.5 13 Q4.5 12.7 4.6 12.3 L1.7 9.5 L3.5 6.2 L7.4 7.4 Q8.9 6.3 10.6 5.8Z" fill="#c4b5fd" opacity=".5" stroke="#a78bfa" stroke-width="1.4" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="white" stroke="#a78bfa" stroke-width="1.4"/><circle cx="12" cy="13" r="1.8" fill="#7c3aed"/></svg>` },
@@ -1067,6 +1077,7 @@ function vParent() {
           ${S.tab === 'overview'  ? pOverview(db) :
             S.tab === 'chores'    ? pChores(db) :
             S.tab === 'kids'      ? pKids(db) :
+            S.tab === 'bonuses'   ? pBonuses(db) :
             S.tab === 'settings'  ? pSettings() :
                                     pPayouts(db)}
         </div>
@@ -1329,6 +1340,89 @@ function pPayouts(db) {
         </div>
       </div>
     </div>`;
+}
+
+function pBonuses(db) {
+    const milestones = db.bonusMilestones || [];
+    const bonusHistory = db.transactions
+        .filter(t => t.type === 'bonus')
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 20);
+
+    const milestoneCards = milestones.map(m => {
+        const affectedKids = db.kids.filter(k =>
+            m.assignedTo === 'all' || (Array.isArray(m.assignedTo) && m.assignedTo.includes(k.id))
+        );
+        const kidRows = affectedKids.map(k => {
+            const claim = (m.claimedBy || []).find(c => c.kidId === k.id);
+            const ac = kidAccent(k);
+            const claimDate = claim ? new Date(claim.claimedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : null;
+            return `
+            <div style="display:flex;align-items:center;gap:8px;padding:5px 0">
+              <div style="width:24px;height:24px;background:${ac.bg};border:1px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">${kidIcon(k)}</div>
+              <span style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-primary);flex:1">${k.name}</span>
+              ${claim
+                ? `<span style="font-family:var(--font-family);font-size:10px;font-weight:700;background:#dcfce7;color:#16a34a;padding:3px 9px;border-radius:99px">✓ Claimed ${claimDate}</span>`
+                : `<span style="font-family:var(--font-family);font-size:10px;font-weight:600;color:var(--color-text-muted);background:var(--color-background);padding:3px 9px;border-radius:99px">Not reached</span>`}
+            </div>`;
+        }).join('');
+
+        return `
+        <div class="card">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            <div style="width:44px;height:44px;background:#fff7ed;border:1.5px solid #fed7aa;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 3 L13.8 8.2 L19.3 8.2 L14.9 11.5 L16.6 16.8 L12 13.5 L7.4 16.8 L9.1 11.5 L4.7 8.2 L10.2 8.2Z" fill="#fb923c"/><path d="M20 3 L20.5 4.5 L22 5 L20.5 5.5 L20 7 L19.5 5.5 L18 5 L19.5 4.5Z" fill="#fbbf24"/></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">${m.name || 'Balance Milestone'}</p>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap">
+                <span style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">Reach</span>
+                <span style="font-family:var(--font-family);font-size:15px;font-weight:800;color:var(--color-text-primary)">${R(m.threshold)}</span>
+                <span style="color:var(--color-text-muted);font-size:14px">→</span>
+                <span style="font-family:var(--font-family);font-size:15px;font-weight:800;color:var(--color-green-600)">+${R(m.bonusAmount)}</span>
+                <span style="font-family:var(--font-family);font-size:11px;font-weight:700;color:#f97316;background:#fff7ed;padding:2px 8px;border-radius:99px">bonus</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:2px;flex-shrink:0">
+              <button onclick="openModal('edit-bonus',{milestoneId:'${m.id}'})" style="color:var(--color-text-muted);padding:6px;border-radius:8px;font-size:15px;background:none;border:none;cursor:pointer" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'">✏️</button>
+              <button onclick="deleteBonusMilestone('${m.id}')" style="color:var(--color-coral);padding:6px;border-radius:8px;font-size:15px;background:none;border:none;cursor:pointer" onmouseenter="this.style.background='var(--color-coral-bg)'" onmouseleave="this.style.background='none'">🗑️</button>
+            </div>
+          </div>
+          ${affectedKids.length > 0 ? `
+          <div style="border-top:1px solid var(--color-border);margin-top:12px;padding-top:8px">
+            ${kidRows}
+          </div>` : ''}
+        </div>`;
+    }).join('');
+
+    const historyRows = bonusHistory.map(t => {
+        const kid = db.kids.find(k => k.id === t.kidId);
+        const ac = kid ? kidAccent(kid) : { bg: '#f1f5f9', border: '#e2e8f0', text: '#64748b' };
+        return `
+        <div class="card flex items-center gap-3">
+          ${kid ? `<div style="width:36px;height:36px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${kidIcon(kid)}</div>` : ''}
+          <div class="flex-1 min-w-0">
+            <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:13px">${t.description}</p>
+            <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary);margin-top:1px">${kid?.name || '?'} · ${dateStr(t.createdAt)}</p>
+          </div>
+          <p style="font-family:var(--font-family);font-weight:800;color:var(--color-green-600);font-size:14px;flex-shrink:0">+${R(t.amount)}</p>
+        </div>`;
+    }).join('');
+
+    return `
+    <div class="flex justify-between items-center mb-2">
+      <p class="pr-section-label">Bonus Milestones</p>
+      <button onclick="openModal('add-bonus')" class="btn-primary" style="width:auto;padding:8px 16px;font-size:13px">+ Add Milestone</button>
+    </div>
+    <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:20px">When a kid's balance reaches a threshold, they automatically receive the bonus — once per milestone.</p>
+    ${milestones.length === 0
+        ? `<div class="card text-center py-12" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">🌟<br><br>No milestones yet.<br>Add one to reward your kids for saving!</div>`
+        : `<div class="flex flex-col gap-3 mb-6">${milestoneCards}</div>`}
+    ${bonusHistory.length > 0 ? `
+    <div class="mt-2">
+      <p class="pr-section-label mb-3">Bonus History</p>
+      <div class="flex flex-col gap-2">${historyRows}</div>
+    </div>` : ''}`;
 }
 
 function pSettings() {
@@ -1850,6 +1944,45 @@ function renderModal() {
         </div>`;
     }
 
+    if (type === 'add-bonus' || type === 'edit-bonus') {
+        const m = type === 'edit-bonus' ? (db.bonusMilestones || []).find(x => x.id === data.milestoneId) : null;
+        const isEdit = !!m;
+        const kidBtns = db.kids.map(k => {
+            const sel = S.selectedKids === 'all' || (Array.isArray(S.selectedKids) && S.selectedKids.includes(k.id));
+            const ac = kidAccent(k);
+            return `<button onclick="pickBonusKid('${k.id}')" type="button"
+              style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? ac.border : 'var(--color-border)'};background:${sel ? ac.bg : 'white'};color:${sel ? ac.text : '#6b7280'};cursor:pointer;display:flex;align-items:center;gap:6px">
+              <span style="font-size:18px">${kidIcon(k)}</span>${k.name}
+            </button>`;
+        }).join('');
+        body = `
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${isEdit ? 'Edit' : 'Add'} Bonus Milestone</h3>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:13px;margin-bottom:16px">Set a savings target and the bonus a kid earns when they reach it.</p>
+        <input id="bm-name" placeholder="Name (optional, e.g. First Saver)" value="${m?.name || ''}" class="mb-3">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+          <div>
+            <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:6px">Balance target (${currSymbol()})</p>
+            <input id="bm-threshold" type="number" placeholder="e.g. 50" value="${m?.threshold || ''}" step="0.01" min="0">
+          </div>
+          <div>
+            <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:6px">Bonus amount (${currSymbol()})</p>
+            <input id="bm-bonus" type="number" placeholder="e.g. 10" value="${m?.bonusAmount || ''}" step="0.01" min="0">
+          </div>
+        </div>
+        <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Assign to</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
+          <button onclick="setAllKids()" type="button"
+            style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedKids === 'all' ? 'var(--color-green-600)' : 'var(--color-border)'};background:${S.selectedKids === 'all' ? 'var(--color-green-100)' : 'white'};color:${S.selectedKids === 'all' ? 'var(--color-green-700)' : '#6b7280'};cursor:pointer">
+            👨‍👩‍👧‍👦 All kids
+          </button>
+          ${kidBtns}
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+          <button onclick="saveBonusMilestone(${isEdit ? `'${m.id}'` : 'null'})" class="btn-primary flex-1" style="padding:10px">${isEdit ? 'Save Changes' : 'Add Milestone'}</button>
+        </div>`;
+    }
+
     return `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;justify-content:center;z-index:50" onclick="if(event.target===this)closeModal()">
       <div style="background:var(--color-surface);border-radius:32px 32px 0 0;padding:28px 24px 36px;width:100%;max-width:440px">${body}</div>
@@ -1965,6 +2098,7 @@ async function saveManualAdjustment(kidId) {
     cache.transactions.push({ id, kidId, amount: delta, type: 'manual', description: desc, createdAt });
     closeModal();
     toast(isAdd ? `${R(amount)} added to ${kid.name}'s balance.` : `${R(amount)} deducted from ${kid.name}'s balance.`);
+    if (isAdd) await checkBonusMilestones(kidId, newBalance);
 }
 function pickQuickTaskKid(id) {
     snapModalInputs();
@@ -1995,6 +2129,77 @@ async function doDeleteChore(id) {
     closeModal(); render();
 }
 
+function pickBonusKid(id) {
+    snapModalInputs();
+    if (S.selectedKids === 'all') { S.selectedKids = [id]; render(); return; }
+    const arr = Array.isArray(S.selectedKids) ? [...S.selectedKids] : [];
+    const i = arr.indexOf(id);
+    if (i === -1) arr.push(id); else arr.splice(i, 1);
+    S.selectedKids = arr;
+    render();
+}
+async function saveBonusMilestone(editId) {
+    const name      = document.getElementById('bm-name').value.trim();
+    const threshold = parseFloat(document.getElementById('bm-threshold').value) || 0;
+    const bonusAmt  = parseFloat(document.getElementById('bm-bonus').value) || 0;
+    const assignedTo = S.selectedKids;
+    if (threshold <= 0) return toast('⚠️ Please enter a balance target.');
+    if (bonusAmt  <= 0) return toast('⚠️ Please enter a bonus amount.');
+    if (!assignedTo || (Array.isArray(assignedTo) && assignedTo.length === 0)) return toast('⚠️ Please select at least one kid.');
+    if (editId && editId !== 'null') {
+        const m = cache.bonusMilestones.find(x => x.id === editId);
+        if (!m) return;
+        await sb.from('bonus_milestones').update({ name, threshold, bonus_amount: bonusAmt, assigned_to: assignedTo }).eq('id', editId).eq('user_id', currentUser.id);
+        m.name = name; m.threshold = threshold; m.bonusAmount = bonusAmt; m.assignedTo = assignedTo;
+        closeModal(); toast('Milestone updated.');
+    } else {
+        const id = uid(); const createdAt = new Date().toISOString();
+        const { error } = await sb.from('bonus_milestones').insert({ id, user_id: currentUser.id, name, threshold, bonus_amount: bonusAmt, assigned_to: assignedTo, claimed_by: [], created_at: createdAt });
+        if (error) return toast('❌ Could not save. Check your connection.');
+        cache.bonusMilestones.push({ id, name, threshold, bonusAmount: bonusAmt, assignedTo, claimedBy: [], createdAt });
+        closeModal(); toast('Milestone added! 🌟');
+    }
+}
+async function deleteBonusMilestone(id) {
+    openModal('confirm-delete', { msg: 'Delete this bonus milestone? Kids who already claimed it keep their bonus.', onConfirm: `doDeleteBonusMilestone('${id}')` });
+}
+async function doDeleteBonusMilestone(id) {
+    const { error } = await sb.from('bonus_milestones').delete().eq('id', id).eq('user_id', currentUser.id);
+    if (error) return toast('❌ Could not delete.');
+    cache.bonusMilestones = cache.bonusMilestones.filter(x => x.id !== id);
+    closeModal(); render();
+}
+async function checkBonusMilestones(kidId, newBalance) {
+    const eligible = (cache.bonusMilestones || []).filter(m => {
+        const applies = m.assignedTo === 'all' || (Array.isArray(m.assignedTo) && m.assignedTo.includes(kidId));
+        const claimed = (m.claimedBy || []).some(c => c.kidId === kidId);
+        return applies && !claimed && newBalance >= m.threshold;
+    });
+    if (!eligible.length) return;
+    const kid = cache.kids.find(k => k.id === kidId);
+    if (!kid) return;
+    const now = new Date().toISOString();
+    let bonusTotal = 0;
+    const txInserts = [];
+    for (const m of eligible) {
+        const newClaimed = [...(m.claimedBy || []), { kidId, claimedAt: now }];
+        await sb.from('bonus_milestones').update({ claimed_by: newClaimed }).eq('id', m.id).eq('user_id', currentUser.id);
+        m.claimedBy = newClaimed;
+        bonusTotal += m.bonusAmount;
+        const txId = uid();
+        txInserts.push({ id: txId, user_id: currentUser.id, kid_id: kidId, amount: m.bonusAmount, type: 'bonus', description: `Bonus: ${m.name || 'Balance milestone'} (${R(m.threshold)})`, created_at: now });
+        cache.transactions.push({ id: txId, kidId, amount: m.bonusAmount, type: 'bonus', description: `Bonus: ${m.name || 'Balance milestone'} (${R(m.threshold)})`, createdAt: now });
+    }
+    if (bonusTotal > 0) {
+        const finalBalance = kid.balance + bonusTotal;
+        await sb.from('kids').update({ balance: finalBalance }).eq('id', kidId).eq('user_id', currentUser.id);
+        kid.balance = finalBalance;
+        await sb.from('transactions').insert(txInserts);
+        toast(`🎉 ${kid.name} earned ${eligible.length > 1 ? eligible.length + ' bonuses' : 'a bonus'}: +${R(bonusTotal)}!`);
+        render();
+    }
+}
+
 async function approveChore(cid) {
     const comp  = cache.completions.find(x => x.id === cid);
     if (!comp) return;
@@ -2010,6 +2215,7 @@ async function approveChore(cid) {
         await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, kid_id: kid.id, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt });
         kid.balance = newBalance;
         cache.transactions.push({ id: txId, kidId: kid.id, amount: chore.value, type: 'chore', description: chore.name, createdAt: txCreatedAt });
+        await checkBonusMilestones(kid.id, newBalance);
     }
     toast(`✓ Approved! ${R(chore?.value)} added to ${kid?.name}.`);
 }
@@ -2035,6 +2241,7 @@ async function approveAllForKid(kidId) {
         const newBalance = (kid.balance || 0) + totalAdded;
         await sb.from('kids').update({ balance: newBalance }).eq('id', kidId).eq('user_id', currentUser.id);
         kid.balance = newBalance;
+        await checkBonusMilestones(kidId, newBalance);
     }
     if (txInserts.length) {
         await sb.from('transactions').insert(txInserts);
