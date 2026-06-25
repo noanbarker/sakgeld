@@ -1191,9 +1191,12 @@ function pOverview(db) {
       </div>
     </div>
     ${missed.length === 0 ? '' : `
-    <div class="mt-6">
-      <p class="pr-section-label mb-3">Missed Chores <span style="font-family:var(--font-family);font-size:11px;font-weight:600;color:var(--color-text-muted)">(last 7 days)</span></p>
-      <div class="flex flex-col gap-2">${missedRows}</div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+      <div>
+        <p class="pr-section-label mb-3">Missed Chores <span style="font-family:var(--font-family);font-size:11px;font-weight:600;color:var(--color-text-muted)">(last 7 days)</span></p>
+        <div class="flex flex-col gap-2">${missedRows}</div>
+      </div>
+      <div></div>
     </div>`}`;
 }
 
