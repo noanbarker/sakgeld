@@ -263,6 +263,42 @@
         background:#ef4444; color:white; font-size:11px; font-weight:700;
         width:18px; height:18px; border-radius:50%;
       }
+
+      /* ── Mobile overrides ────────────────────────────── */
+      @media (max-width: 640px) {
+
+        /* Parent dashboard content area */
+        .sp-tab-content { padding: 14px 16px !important; }
+
+        /* Mobile tab bar — show icon only, hide text label */
+        .sp-mob-tab { display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 2px !important; }
+        .sp-mob-tab-svg { display:flex; }
+        .sp-mob-tab-svg svg { width:18px; height:18px; }
+        .sp-mob-tab-label { font-size:8px !important; letter-spacing:0 !important; }
+
+        /* Kid view: tighten header padding */
+        .sp-kid-header { padding: 20px 16px 18px !important; }
+
+        /* Kid view: shrink the balance number */
+        .sp-kid-balance { font-size: 32px !important; }
+
+        /* Kid view: hide the right spacer, shrink the tree */
+        .sp-kid-spacer { display: none !important; }
+        .sp-kid-tree { flex: 0 0 auto !important; }
+        .sp-kid-tree svg { width: 80px !important; height: 80px !important; }
+
+        /* Kid view: let the progress bar stretch */
+        .sp-kid-progress-bar { width: 100% !important; max-width: 240px !important; }
+
+        /* Kid content area */
+        .sp-kid-content { padding: 16px 14px !important; }
+
+        /* Card padding */
+        .card { padding: 14px !important; }
+
+        /* Modals */
+        .modal-sheet { padding: 20px 16px 28px !important; }
+      }
     </style>
 </head>
 <body class="min-h-screen">
@@ -299,7 +335,12 @@ async function loadCache() {
 async function initApp() {
     document.getElementById('app').innerHTML = '<div class="min-h-screen flex items-center justify-center"><p style="color:var(--color-text-secondary)">Loading…</p></div>';
     const { data: { session } } = await sb.auth.getSession();
-    if (session) { currentUser = session.user; await loadCache(); }
+    if (session) {
+        currentUser = session.user;
+        const savedCurrency = session.user?.user_metadata?.currency;
+        if (savedCurrency) localStorage.setItem('sprout_currency', savedCurrency);
+        await loadCache();
+    }
     render();
     sb.auth.onAuthStateChange(async (event, session) => {
         currentUser = session?.user || null;
@@ -1071,9 +1112,10 @@ function vParent() {
     <div class="md:hidden border-b flex sticky top-0 z-10" style="background:var(--color-surface);border-color:var(--color-border)">
       ${navItems.map(t => `
         <button onclick="setTab('${t.id}')"
-          class="flex-1 py-3 relative ${S.tab === t.id ? 'tab-active' : 'tab-inactive'}"
+          class="sp-mob-tab flex-1 py-3 relative ${S.tab === t.id ? 'tab-active' : 'tab-inactive'}"
           style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.04em">
-          ${t.label}
+          <span class="sp-mob-tab-svg">${t.svg}</span>
+          <span class="sp-mob-tab-label">${t.label}</span>
           ${t.badge ? `<span class="badge absolute top-1.5 right-1">${t.badge}</span>` : ''}
         </button>`).join('')}
     </div>`;
@@ -1083,7 +1125,7 @@ function vParent() {
       ${sidebar}
       <div style="flex:1;display:flex;flex-direction:column;min-width:0">
         ${mobileHeader}
-        <div style="flex:1;overflow:auto;padding:24px 28px;background:var(--color-background)">
+        <div class="sp-tab-content" style="flex:1;overflow:auto;padding:24px 28px;background:var(--color-background)">
           ${S.tab === 'overview'  ? pOverview(db) :
             S.tab === 'chores'    ? pChores(db) :
             S.tab === 'kids'      ? pKids(db) :
@@ -1621,7 +1663,7 @@ function vKid() {
         : 100;
     return `
     <div class="flex flex-col min-h-screen">
-      <div style="background:${ac.header};color:white;padding:32px 32px 28px;position:relative;overflow:hidden">
+      <div class="sp-kid-header" style="background:${ac.header};color:white;padding:32px 32px 28px;position:relative;overflow:hidden">
         <div class="max-w-5xl mx-auto">
           <!-- Top row: avatar/name + home button -->
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
@@ -1639,7 +1681,7 @@ function vKid() {
             <!-- Left: balance + progress -->
             <div style="flex:1">
               <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
-                <p style="font-family:var(--font-family);font-size:44px;font-weight:900;line-height:1">${R(kid.balance)}</p>
+                <p class="sp-kid-balance" style="font-family:var(--font-family);font-size:44px;font-weight:900;line-height:1">${R(kid.balance)}</p>
                 <p style="font-family:var(--font-family);color:rgba(255,255,255,0.7)">balance</p>
               </div>
               ${nextThresh ? `
@@ -1647,23 +1689,23 @@ function vKid() {
                 <p style="font-family:var(--font-family);font-size:17px;color:rgba(255,255,255,0.85);margin-bottom:8px;font-weight:600">
                   ${R(Math.max(0, nextThresh - kid.balance))} to unlock <strong>${TREE_STAGES[treeStageIdx + 1]?.label || ''}</strong>
                 </p>
-                <div style="width:210px;background:rgba(255,255,255,0.25);border-radius:99px;height:8px;overflow:hidden">
+                <div class="sp-kid-progress-bar" style="width:210px;background:rgba(255,255,255,0.25);border-radius:99px;height:8px;overflow:hidden">
                   <div style="background:rgba(255,255,255,0.9);width:${stagePct}%;height:100%;border-radius:99px;transition:width 0.4s ease"></div>
                 </div>
               </div>` : `
               <p style="font-family:var(--font-family);font-size:17px;color:rgba(255,255,255,0.85);font-weight:700">🏆 Forest achieved — top tier!</p>`}
             </div>
             <!-- Centre: tree -->
-            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+            <div class="sp-kid-tree" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
               ${treeStageSVG(treeStageIdx, 120)}
               <p style="font-family:var(--font-family);font-size:13px;font-weight:800;color:rgba(255,255,255,0.9);letter-spacing:0.06em;text-transform:uppercase">${TREE_STAGES[treeStageIdx].label}</p>
             </div>
             <!-- Right spacer (mirrors left to keep tree centred) -->
-            <div style="flex:1"></div>
+            <div class="sp-kid-spacer" style="flex:1"></div>
           </div>
         </div>
       </div>
-      <div style="flex:1;overflow:auto;padding:24px 32px;background:var(--color-background)">
+      <div class="sp-kid-content" style="flex:1;overflow:auto;padding:24px 32px;background:var(--color-background)">
         <div class="max-w-5xl mx-auto">
         ${(() => {
             const earned   = weeklyEarned(db, kid.id);
@@ -2043,7 +2085,7 @@ function renderModal() {
 
     return `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;justify-content:center;z-index:50" onclick="if(event.target===this)closeModal()">
-      <div style="background:var(--color-surface);border-radius:32px 32px 0 0;padding:28px 24px 36px;width:100%;max-width:440px">${body}</div>
+      <div class="modal-sheet" style="background:var(--color-surface);border-radius:32px 32px 0 0;padding:28px 24px 36px;width:100%;max-width:440px">${body}</div>
     </div>`;
 }
 
@@ -2374,6 +2416,9 @@ function saveCurrency(code) {
     localStorage.setItem('sprout_currency', code);
     render();
     toast('Currency updated!');
+    sb.auth.updateUser({ data: { currency: code } }).then(({ data }) => {
+        if (data?.user) currentUser = data.user;
+    });
 }
 
 async function saveParentPin() {
