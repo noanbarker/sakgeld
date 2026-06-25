@@ -276,7 +276,7 @@ async function loadCache() {
     ]);
     cache = {
         kids: kRes.data || [],
-        chores: (cRes.data || []).map(c => ({ ...c, assignedTo: c.assigned_to })),
+        chores: (cRes.data || []).map(c => ({ ...c, assignedTo: c.assigned_to, oneOff: c.one_off || false, expiresOn: c.expires_on || null })),
         completions: (compRes.data || []).map(c => ({ ...c, choreId: c.chore_id, kidId: c.kid_id, completedAt: c.completed_at, dueDate: c.due_date || null, missed: c.missed || false })),
         transactions: (txRes.data || []).map(t => ({ ...t, kidId: t.kid_id, createdAt: t.created_at })),
     };
@@ -662,19 +662,21 @@ function weeklyEarned(db, kidId) {
 }
 function weeklyPossible(db, kidId) {
     return db.chores
-        .filter(c => choreAssignedTo(c, kidId))
+        .filter(c => choreAssignedTo(c, kidId) && !c.oneOff)
         .reduce((s, c) => {
             const freq = (!c.schedule || c.schedule === 'daily') ? 7 : (c.days || []).length;
             return s + (c.value * freq);
         }, 0);
 }
 function choreScheduleLabel(c) {
+    if (c.oneOff) return 'Today only';
     if (!c.schedule || c.schedule === 'daily') return 'Daily';
     if (!c.days || c.days.length === 0) return 'No days set';
     if (c.days.length === 7) return 'Daily';
     return c.days.join(', ');
 }
 function choreIsForToday(c) {
+    if (c.oneOff) return c.expiresOn === toLocalDateStr(new Date());
     if (!c.schedule || c.schedule === 'daily') return true;
     const today = DAYS[(new Date().getDay() + 6) % 7];
     return (c.days || []).includes(today);
@@ -683,6 +685,7 @@ function toLocalDateStr(d) {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 function choreIsForDate(c, d) {
+    if (c.oneOff) return c.expiresOn === toLocalDateStr(d);
     if (!c.schedule || c.schedule === 'daily') return true;
     const day = DAYS[(d.getDay() + 6) % 7];
     return (c.days || []).includes(day);
@@ -737,9 +740,13 @@ function openModal(type, data = {}) {
     S.selectedColor    = data.color_key || 'blue';
     S.selectedSchedule = data.schedule  || 'daily';
     S.selectedDays     = data.days      ? [...data.days] : [];
-    S.selectedKids     = !data.assignedTo || data.assignedTo === 'all' ? 'all'
+    if (type === 'quick-task') {
+        S.selectedKids = null;
+    } else {
+        S.selectedKids = !data.assignedTo || data.assignedTo === 'all' ? 'all'
                        : Array.isArray(data.assignedTo) ? [...data.assignedTo]
                        : [data.assignedTo];
+    }
     S.modal = { type, data }; render();
 }
 function pickKidColor(key) { snapModalInputs(); S.selectedColor = key; render(); }
@@ -758,6 +765,11 @@ function snapModalInputs() {
         const n = document.getElementById('k-name');
         const p = document.getElementById('k-pin');
         if (n) S.modal.data = { ...S.modal.data, name: n.value, pin: p?.value };
+    }
+    if (t === 'quick-task') {
+        const n = document.getElementById('qt-name');
+        const v = document.getElementById('qt-val');
+        if (n) S.modal.data = { ...S.modal.data, name: n.value, value: v?.value };
     }
 }
 function pickEmoji(em) { snapModalInputs(); S.selectedEmoji = em; render(); }
@@ -1122,6 +1134,12 @@ function pOverview(db) {
     }).join('');
 
     return `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <button onclick="openModal('quick-task')" class="btn-primary" style="width:auto;padding:9px 18px;font-size:13px;display:flex;align-items:center;gap:6px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="white"/></svg>
+        Quick Task
+      </button>
+    </div>
     ${weeklyCard}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
       <div>
@@ -1149,15 +1167,17 @@ function pOverview(db) {
 }
 
 function pChores(db) {
+    const todayDate = toLocalDateStr(new Date());
+    const visibleChores = db.chores.filter(c => !c.oneOff || c.expiresOn === todayDate);
     return `
     <div class="flex justify-between items-center mb-4">
       <p class="pr-section-label">Chores</p>
       <button onclick="openModal('add-chore')" class="btn-primary" style="width:auto;padding:8px 16px;font-size:13px">+ Add Chore</button>
     </div>
-    ${db.chores.length === 0
+    ${visibleChores.length === 0
         ? `<div class="card text-center py-12" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">📋<br><br>No chores yet. Add one above.</div>`
         : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          ${db.chores.map(c => {
+          ${visibleChores.map(c => {
             const who = choreAssignmentLabel(c, db.kids);
             return `
             <div class="card flex items-center gap-3">
@@ -1708,6 +1728,33 @@ function renderModal() {
         </div>`;
     }
 
+    if (type === 'quick-task') {
+        body = `
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Quick Task</h3>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:13px;margin-bottom:16px">Assign a one-off task to a kid for today only — it expires at midnight.</p>
+        <input id="qt-name" placeholder="Task name (e.g. Help wash the car)" value="${data.name||''}" class="mb-3">
+        <div class="relative mb-4">
+          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
+          <input id="qt-val" type="number" placeholder="Reward" value="${data.value||''}" step="0.01" min="0" style="padding-left:38px !important">
+        </div>
+        <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Assign to</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
+          ${db.kids.length === 0
+            ? `<p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-muted)">No kids added yet.</p>`
+            : db.kids.map(k => {
+                const sel = S.selectedKids === k.id;
+                return `<button onclick="pickQuickTaskKid('${k.id}')" type="button"
+                  style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? 'var(--color-green-600)' : 'var(--color-border)'};background:${sel ? 'var(--color-green-100)' : 'white'};color:${sel ? 'var(--color-green-700)' : '#6b7280'};cursor:pointer;display:flex;align-items:center;gap:6px">
+                  <span style="font-size:18px">${kidIcon(k)}</span> ${k.name}
+                </button>`;
+              }).join('')}
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+          <button onclick="addQuickTask()" class="btn-primary flex-1" style="padding:10px">Assign Task</button>
+        </div>`;
+    }
+
     if (type === 'payout') {
         const kid = db.kids.find(k => k.id === data.kidId);
         body = `
@@ -1813,6 +1860,24 @@ async function saveChore(id) {
 }
 function deleteChore(id) {
     openModal('confirm-delete', { msg: 'Delete this chore?', onConfirm: `doDeleteChore('${id}')` });
+}
+function pickQuickTaskKid(id) {
+    snapModalInputs();
+    S.selectedKids = S.selectedKids === id ? null : id;
+    render();
+}
+async function addQuickTask() {
+    const name  = document.getElementById('qt-name').value.trim();
+    const val   = parseFloat(document.getElementById('qt-val').value) || 0;
+    const kidId = S.selectedKids;
+    if (!name)  return toast('⚠️ Please enter a task name.');
+    if (!kidId) return toast('⚠️ Please select a kid.');
+    const expiresOn = toLocalDateStr(new Date());
+    const id = uid();
+    const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: '', value: val, assigned_to: kidId, emoji: '⭐', schedule: 'daily', days: [], one_off: true, expires_on: expiresOn });
+    if (error) return toast('❌ Could not save. Check your connection.');
+    cache.chores.push({ id, name, description: '', value: val, assignedTo: kidId, emoji: '⭐', schedule: 'daily', days: [], oneOff: true, expiresOn });
+    closeModal(); toast('Quick task assigned! 🎯');
 }
 async function doDeleteChore(id) {
     const { error } = await sb.from('chores').delete().eq('id', id).eq('user_id', currentUser.id);
