@@ -1063,7 +1063,7 @@ function pRecon(db) {
         const bankBal = bankVal !== '' ? parseFloat(bankVal) : null;
         const diff = bankBal !== null ? bankBal - appBal : null;
         const diffColor = diff === null ? '#94a3b8' : diff === 0 ? '#16a34a' : diff > 0 ? '#f59e0b' : '#f43f5e';
-        const diffLabel = diff === null ? '—' : diff === 0 ? '✓ Balanced' : diff > 0 ? `+${R(diff)} bank ahead` : `${R(diff)} app ahead`;
+        const diffLabel = diff === null ? '—' : diff === 0 ? '✓ Balanced' : diff > 0 ? `+${R(diff)} more in bank` : `${R(Math.abs(diff))} less in bank`;
 
         return `
         <div class="card" style="display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;gap:12px;padding:16px 20px">
@@ -1094,7 +1094,7 @@ function pRecon(db) {
             </div>
           </div>
           <!-- Difference -->
-          <div style="text-align:right">
+          <div id="recon-diff-${k.id}" style="text-align:right">
             <p style="font-family:var(--font-family);font-weight:800;font-size:15px;color:${diffColor}">${diffLabel}</p>
             <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-muted);margin-top:2px">${diff === null ? 'Enter bank balance' : diff === 0 ? 'App matches bank' : 'Bank vs app'}</p>
           </div>
@@ -1131,7 +1131,7 @@ function pRecon(db) {
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
         ${rows}
       </div>
-      ${summary}
+      <div id="recon-summary">${summary}</div>
       <div style="margin-top:12px;text-align:right">
         <button onclick="reconClear()" style="font-family:var(--font-family);font-size:12px;color:var(--color-text-muted);text-decoration:underline;background:none;border:none;cursor:pointer">Clear all bank balances</button>
       </div>
@@ -1142,7 +1142,35 @@ function reconUpdate(kidId, value) {
     const saved = JSON.parse(localStorage.getItem('sprout_recon') || '{}');
     saved[kidId] = value;
     localStorage.setItem('sprout_recon', JSON.stringify(saved));
-    render();
+
+    const db = DB.load();
+    const kid = db.kids.find(k => k.id === kidId);
+    if (!kid) return;
+
+    // Update this kid's diff in-place
+    const appBal = kid.balance || 0;
+    const bankBal = value !== '' ? parseFloat(value) : null;
+    const diff = (bankBal !== null && !isNaN(bankBal)) ? bankBal - appBal : null;
+    const diffColor = diff === null ? '#94a3b8' : diff === 0 ? '#16a34a' : diff > 0 ? '#f59e0b' : '#f43f5e';
+    const diffLabel = diff === null ? '—' : diff === 0 ? '✓ Balanced' : diff > 0 ? `+${R(diff)} more in bank` : `${R(Math.abs(diff))} less in bank`;
+    const diffSub = diff === null ? 'Enter bank balance' : diff === 0 ? 'App matches bank' : 'Bank vs app';
+    const el = document.getElementById(`recon-diff-${kidId}`);
+    if (el) el.innerHTML = `<p style="font-family:var(--font-family);font-weight:800;font-size:15px;color:${diffColor}">${diffLabel}</p><p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-muted);margin-top:2px">${diffSub}</p>`;
+
+    // Update summary in-place
+    const sortedKids = [...db.kids].sort((a, b) => a.name.localeCompare(b.name));
+    const allEntered = sortedKids.every(k => saved[k.id] !== undefined && saved[k.id] !== '');
+    const summaryEl = document.getElementById('recon-summary');
+    if (summaryEl) {
+        if (allEntered) {
+            const totalApp = sortedKids.reduce((s, k) => s + (k.balance || 0), 0);
+            const totalBank = sortedKids.reduce((s, k) => s + parseFloat(saved[k.id] || 0), 0);
+            const totalDiff = totalBank - totalApp;
+            summaryEl.innerHTML = `<div class="card" style="background:linear-gradient(132deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;padding:16px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:center"><div><p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#86efac">Total in app</p><p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d">${R(totalApp)}</p></div><div><p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#86efac">Total in bank</p><p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d">${R(totalBank)}</p></div><div style="text-align:right"><p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#86efac">Difference</p><p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:${totalDiff === 0 ? '#16a34a' : '#f43f5e'}">${totalDiff === 0 ? '✓ All balanced' : R(totalDiff)}</p></div></div>`;
+        } else {
+            summaryEl.innerHTML = '';
+        }
+    }
 }
 
 function reconClear() {
