@@ -966,8 +966,7 @@ function vLogin() {
           <div class="pr-stripe"></div>
           <div class="pr-blob-top"></div>
           <div class="pr-blob-bottom"></div>
-          <div id="chore-cycler-left" style="position:absolute;top:82px;right:14px;z-index:3;display:flex;flex-direction:column;align-items:center;gap:4px"></div>
-          <div id="chore-cycler-right" style="position:absolute;top:114px;left:12px;z-index:3;display:flex;flex-direction:column;align-items:center;gap:4px"></div>
+          <div id="chore-cycler-area" style="position:absolute;top:5px;left:0;right:0;height:200px;pointer-events:none;z-index:2;overflow:visible"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:32px">
               <div id="logo-cycler" style="width:120px;height:137px;display:flex;align-items:center;justify-content:center"></div>
@@ -1021,8 +1020,7 @@ function vHome() {
           <div class="pr-stripe"></div>
           <div class="pr-blob-top"></div>
           <div class="pr-blob-bottom"></div>
-          <div id="chore-cycler-left" style="position:absolute;top:82px;right:14px;z-index:3;display:flex;flex-direction:column;align-items:center;gap:4px"></div>
-          <div id="chore-cycler-right" style="position:absolute;top:114px;left:12px;z-index:3;display:flex;flex-direction:column;align-items:center;gap:4px"></div>
+          <div id="chore-cycler-area" style="position:absolute;top:5px;left:0;right:0;height:200px;pointer-events:none;z-index:2;overflow:visible"></div>
           <div style="position:relative;z-index:1">
             <!-- Logo block -->
             <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:32px">
@@ -2621,37 +2619,70 @@ function startLogoCycler() {
     }, 2800);
 }
 
-let _choreCyclerTimer = null;
+let _choreCyclerTimers = [];
 function startChoreCyclers() {
-    if (_choreCyclerTimer) { clearInterval(_choreCyclerTimer); _choreCyclerTimer = null; }
+    _choreCyclerTimers.forEach(t => clearTimeout(t) || clearInterval(t));
+    _choreCyclerTimers = [];
+    const area = document.getElementById('chore-cycler-area');
+    if (!area) return;
     const keys = Object.keys(CHORE_ICONS).map(Number).filter(n => n !== 37);
-    let leftIdx = 0;
-    let rightIdx = Math.floor(keys.length / 2);
-    function setCycler(elId, iconKey) {
-        const el = document.getElementById(elId);
-        if (!el) return;
-        const name = CHORE_ICON_NAMES[iconKey] || '';
-        el.innerHTML = `<div class="logo-icon-inner" style="display:flex;flex-direction:column;align-items:center;gap:3px">
-            <div style="width:42px;height:42px;background:rgba(255,255,255,0.75);border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(22,163,74,0.13)">${choreIconSVG(iconKey, 28)}</div>
-            <span style="font-family:var(--font-family);font-size:8px;font-weight:800;color:#15803d;text-align:center;max-width:52px;line-height:1.2">${name}</span>
+    const COUNT = 4;
+    const iconW = 54, iconH = 64;
+
+    function randomPos() {
+        const aW = Math.max(area.closest('.pr-card')?.offsetWidth || 0, 400);
+        const aH = area.offsetHeight || 200;
+        const treeCX = aW / 2;
+        const treeCY = 120;
+        let x, y, dx, dy, tries = 0;
+        do {
+            x = 8 + Math.random() * (aW - iconW - 16);
+            y = 10 + Math.random() * (aH - iconH - 10);
+            dx = x + iconW / 2 - treeCX;
+            dy = y + iconH / 2 - treeCY;
+            tries++;
+        } while (Math.sqrt(dx*dx + dy*dy) < 90 && tries < 40);
+        return { x: Math.round(x), y: Math.round(y) };
+    }
+
+    function renderIcon(id, key, pos) {
+        const name = CHORE_ICON_NAMES[key] || '';
+        return `<div id="${id}" class="logo-icon-inner" style="position:absolute;left:${pos.x}px;top:${pos.y}px;display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="width:42px;height:42px;background:rgba(255,255,255,0.82);border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(22,163,74,0.14)">${choreIconSVG(key, 28)}</div>
+            <span style="font-family:var(--font-family);font-size:8px;font-weight:800;color:#15803d;text-align:center;max-width:54px;line-height:1.2">${name}</span>
         </div>`;
     }
-    setCycler('chore-cycler-left', keys[leftIdx]);
-    setCycler('chore-cycler-right', keys[rightIdx]);
-    _choreCyclerTimer = setInterval(() => {
-        const left = document.getElementById('chore-cycler-left');
-        const right = document.getElementById('chore-cycler-right');
-        if (!left && !right) { clearInterval(_choreCyclerTimer); _choreCyclerTimer = null; return; }
-        [left, right].forEach(el => {
-            if (el) { const inner = el.querySelector('.logo-icon-inner'); if (inner) inner.style.animation = 'logoIconExit 0.35s ease-in forwards'; }
-        });
-        setTimeout(() => {
-            leftIdx = (leftIdx + 3) % keys.length;
-            rightIdx = (rightIdx + 3) % keys.length;
-            setCycler('chore-cycler-left', keys[leftIdx]);
-            setCycler('chore-cycler-right', keys[rightIdx]);
-        }, 320);
-    }, 2200);
+
+    area.innerHTML = '';
+    for (let i = 0; i < COUNT; i++) {
+        const id = `chore-float-${i}`;
+        const key = keys[Math.floor(Math.random() * keys.length)];
+        area.insertAdjacentHTML('beforeend', renderIcon(id, key, randomPos()));
+
+        const cycleInterval = 2000 + i * 350 + Math.random() * 600;
+        const startDelay = i * 500 + Math.random() * 300;
+
+        const t = setTimeout(() => {
+            const iv = setInterval(() => {
+                const el = document.getElementById(id);
+                if (!el) { clearInterval(iv); return; }
+                el.style.animation = 'logoIconExit 0.35s ease-in forwards';
+                const st = setTimeout(() => {
+                    const a = document.getElementById('chore-cycler-area');
+                    if (!a) return;
+                    const newKey = keys[Math.floor(Math.random() * keys.length)];
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = renderIcon(id, newKey, randomPos());
+                    const existing = document.getElementById(id);
+                    if (existing) existing.replaceWith(tmp.firstChild);
+                    else a.insertAdjacentHTML('beforeend', renderIcon(id, newKey, randomPos()));
+                }, 340);
+                _choreCyclerTimers.push(st);
+            }, cycleInterval);
+            _choreCyclerTimers.push(iv);
+        }, startDelay);
+        _choreCyclerTimers.push(t);
+    }
 }
 
 function render() {
