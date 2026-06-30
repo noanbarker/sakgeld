@@ -2035,7 +2035,7 @@ function renderModal() {
         const e = type === 'edit-chore';
         const selIcon = S.selectedEmoji || data.emoji || '1';
         const selIconNum = parseInt(selIcon);
-        const selIconName = (selIconNum >= 1 && selIconNum <= 35) ? CHORE_ICON_NAMES[selIconNum] : (selIcon || '⭐');
+        const selIconName = CHORE_ICON_NAMES[selIconNum] || (selIcon || '⭐');
         const iconGrid = Object.keys(CHORE_ICONS).map(num => {
             const n = parseInt(num);
             const isSel = String(n) === String(selIcon) || n === selIconNum;
