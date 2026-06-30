@@ -2626,22 +2626,38 @@ function startChoreCyclers() {
     const area = document.getElementById('chore-cycler-area');
     if (!area) return;
     const keys = Object.keys(CHORE_ICONS).map(Number).filter(n => n !== 37);
-    const COUNT = 4;
+    const COUNT = 3;
     const iconW = 54, iconH = 64;
+    const MIN_GAP = 80; // minimum px between icon centres
+    const positions = [null, null, null]; // track current pos of each slot
 
-    function randomPos() {
-        const aW = Math.max(area.closest('.pr-card')?.offsetWidth || 0, 400);
+    function getAreaW() { return Math.max(area.closest('.pr-card')?.offsetWidth || 0, 400); }
+
+    function clashesTree(x, y, aW) {
+        const dx = x + iconW / 2 - aW / 2;
+        const dy = y + iconH / 2 - 120;
+        return Math.sqrt(dx*dx + dy*dy) < 90;
+    }
+
+    function clashesOthers(x, y, skipIdx) {
+        const cx = x + iconW / 2, cy = y + iconH / 2;
+        return positions.some((p, idx) => {
+            if (idx === skipIdx || !p) return false;
+            const dx = cx - (p.x + iconW / 2);
+            const dy = cy - (p.y + iconH / 2);
+            return Math.sqrt(dx*dx + dy*dy) < MIN_GAP;
+        });
+    }
+
+    function randomPos(skipIdx) {
+        const aW = getAreaW();
         const aH = area.offsetHeight || 200;
-        const treeCX = aW / 2;
-        const treeCY = 120;
-        let x, y, dx, dy, tries = 0;
+        let x, y, tries = 0;
         do {
             x = 8 + Math.random() * (aW - iconW - 16);
             y = 10 + Math.random() * (aH - iconH - 10);
-            dx = x + iconW / 2 - treeCX;
-            dy = y + iconH / 2 - treeCY;
             tries++;
-        } while (Math.sqrt(dx*dx + dy*dy) < 90 && tries < 40);
+        } while ((clashesTree(x, y, aW) || clashesOthers(x, y, skipIdx)) && tries < 60);
         return { x: Math.round(x), y: Math.round(y) };
     }
 
@@ -2656,11 +2672,12 @@ function startChoreCyclers() {
     area.innerHTML = '';
     for (let i = 0; i < COUNT; i++) {
         const id = `chore-float-${i}`;
-        const key = keys[Math.floor(Math.random() * keys.length)];
-        area.insertAdjacentHTML('beforeend', renderIcon(id, key, randomPos()));
+        const pos = randomPos(i);
+        positions[i] = pos;
+        area.insertAdjacentHTML('beforeend', renderIcon(id, keys[Math.floor(Math.random() * keys.length)], pos));
 
-        const cycleInterval = 2000 + i * 350 + Math.random() * 600;
-        const startDelay = i * 500 + Math.random() * 300;
+        const cycleInterval = 2200 + i * 400 + Math.random() * 600;
+        const startDelay = i * 600 + Math.random() * 300;
 
         const t = setTimeout(() => {
             const iv = setInterval(() => {
@@ -2670,12 +2687,14 @@ function startChoreCyclers() {
                 const st = setTimeout(() => {
                     const a = document.getElementById('chore-cycler-area');
                     if (!a) return;
+                    const newPos = randomPos(i);
+                    positions[i] = newPos;
                     const newKey = keys[Math.floor(Math.random() * keys.length)];
                     const tmp = document.createElement('div');
-                    tmp.innerHTML = renderIcon(id, newKey, randomPos());
+                    tmp.innerHTML = renderIcon(id, newKey, newPos);
                     const existing = document.getElementById(id);
                     if (existing) existing.replaceWith(tmp.firstChild);
-                    else a.insertAdjacentHTML('beforeend', renderIcon(id, newKey, randomPos()));
+                    else a.insertAdjacentHTML('beforeend', renderIcon(id, newKey, newPos));
                 }, 340);
                 _choreCyclerTimers.push(st);
             }, cycleInterval);
