@@ -724,9 +724,19 @@ function weeklyEarned(db, kidId) {
         .reduce((s, t) => s + t.amount, 0);
 }
 function weeklyPossible(db, kidId) {
+    const mon = weekStart();
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    const monStr = toLocalDateStr(mon);
+    const sunStr = toLocalDateStr(sun);
+
     return db.chores
-        .filter(c => choreAssignedTo(c, kidId) && !c.oneOff)
+        .filter(c => choreAssignedTo(c, kidId))
         .reduce((s, c) => {
+            if (c.oneOff) {
+                // Include ad hoc chores that fall within the current week
+                const exp = c.expiresOn || '';
+                return (exp >= monStr && exp <= sunStr) ? s + c.value : s;
+            }
             const freq = (!c.schedule || c.schedule === 'daily') ? 7 : (c.days || []).length;
             return s + (c.value * freq);
         }, 0);
