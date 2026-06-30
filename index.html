@@ -966,9 +966,11 @@ function vLogin() {
           <div class="pr-stripe"></div>
           <div class="pr-blob-top"></div>
           <div class="pr-blob-bottom"></div>
+          <div id="chore-cycler-left" style="position:absolute;top:22px;left:20px;z-index:3;display:flex;flex-direction:column;align-items:center;gap:4px"></div>
+          <div id="chore-cycler-right" style="position:absolute;top:22px;right:20px;z-index:3;display:flex;flex-direction:column;align-items:center;gap:4px"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:32px">
-              <div id="logo-cycler" style="width:100px;height:114px;display:flex;align-items:center;justify-content:center"></div>
+              <div id="logo-cycler" style="width:120px;height:137px;display:flex;align-items:center;justify-content:center"></div>
               <h1 style="font-family:var(--font-family);font-size:36px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin-top:18px;margin-bottom:0">Sprout</h1>
               <p style="font-family:var(--font-family);font-size:13px;font-weight:600;color:#86efac;margin-top:9px">Kids Chore &amp; Allowance Tracker</p>
             </div>
@@ -1019,10 +1021,12 @@ function vHome() {
           <div class="pr-stripe"></div>
           <div class="pr-blob-top"></div>
           <div class="pr-blob-bottom"></div>
+          <div id="chore-cycler-left" style="position:absolute;top:22px;left:20px;z-index:3;display:flex;flex-direction:column;align-items:center;gap:4px"></div>
+          <div id="chore-cycler-right" style="position:absolute;top:22px;right:20px;z-index:3;display:flex;flex-direction:column;align-items:center;gap:4px"></div>
           <div style="position:relative;z-index:1">
             <!-- Logo block -->
             <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:32px">
-              <div id="logo-cycler" style="width:100px;height:114px;display:flex;align-items:center;justify-content:center"></div>
+              <div id="logo-cycler" style="width:120px;height:137px;display:flex;align-items:center;justify-content:center"></div>
               <h1 style="font-family:var(--font-family);font-size:36px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin-top:18px;margin-bottom:0">Sprout</h1>
               <p style="font-family:var(--font-family);font-size:13px;font-weight:600;color:#86efac;margin-top:9px">Kids Chore &amp; Allowance Tracker</p>
             </div>
@@ -2600,7 +2604,7 @@ function startLogoCycler() {
     if (_logoCyclerTimer) { clearInterval(_logoCyclerTimer); _logoCyclerTimer = null; }
     const el = document.getElementById('logo-cycler');
     if (!el) return;
-    const icons = [0, 1, 2, 3, 4].map(i => treeStageSVG(i, 90));
+    const icons = [0, 1, 2, 3, 4].map(i => treeStageSVG(i, 108));
     let idx = 0;
     el.innerHTML = `<div class="logo-icon-inner">${icons[0]}</div>`;
     _logoCyclerTimer = setInterval(() => {
@@ -2617,19 +2621,52 @@ function startLogoCycler() {
     }, 2800);
 }
 
+let _choreCyclerTimer = null;
+function startChoreCyclers() {
+    if (_choreCyclerTimer) { clearInterval(_choreCyclerTimer); _choreCyclerTimer = null; }
+    const keys = Object.keys(CHORE_ICONS).map(Number).filter(n => n !== 37);
+    let leftIdx = 0;
+    let rightIdx = Math.floor(keys.length / 2);
+    function setCycler(elId, iconKey) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        const name = CHORE_ICON_NAMES[iconKey] || '';
+        el.innerHTML = `<div class="logo-icon-inner" style="display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="width:42px;height:42px;background:rgba(255,255,255,0.75);border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(22,163,74,0.13)">${choreIconSVG(iconKey, 28)}</div>
+            <span style="font-family:var(--font-family);font-size:8px;font-weight:800;color:#15803d;text-align:center;max-width:52px;line-height:1.2">${name}</span>
+        </div>`;
+    }
+    setCycler('chore-cycler-left', keys[leftIdx]);
+    setCycler('chore-cycler-right', keys[rightIdx]);
+    _choreCyclerTimer = setInterval(() => {
+        const left = document.getElementById('chore-cycler-left');
+        const right = document.getElementById('chore-cycler-right');
+        if (!left && !right) { clearInterval(_choreCyclerTimer); _choreCyclerTimer = null; return; }
+        [left, right].forEach(el => {
+            if (el) { const inner = el.querySelector('.logo-icon-inner'); if (inner) inner.style.animation = 'logoIconExit 0.35s ease-in forwards'; }
+        });
+        setTimeout(() => {
+            leftIdx = (leftIdx + 3) % keys.length;
+            rightIdx = (rightIdx + 3) % keys.length;
+            setCycler('chore-cycler-left', keys[leftIdx]);
+            setCycler('chore-cycler-right', keys[rightIdx]);
+        }, 320);
+    }, 2200);
+}
+
 function render() {
     const toastHtml = S.toast
         ? `<div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:white;font-family:var(--font-family);font-size:14px;font-weight:600;padding:10px 20px;border-radius:var(--radius-full);box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:99;max-width:320px;text-align:center">${S.toast}</div>`
         : '';
     if (!currentUser) {
         document.getElementById('app').innerHTML = vLogin() + toastHtml;
-        setTimeout(startLogoCycler, 50);
+        setTimeout(() => { startLogoCycler(); startChoreCyclers(); }, 50);
         return;
     }
     const views = { home: vHome, parent: vParent, 'kid-pin': vKidPin, kid: vKid, 'parent-pin': vParentPin };
     const html  = (views[S.view] || vHome)();
     document.getElementById('app').innerHTML = html + renderModal() + toastHtml;
-    if (S.view === 'home' || !S.view) setTimeout(startLogoCycler, 50);
+    if (S.view === 'home' || !S.view) setTimeout(() => { startLogoCycler(); startChoreCyclers(); }, 50);
 }
 
 initApp();
