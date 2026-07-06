@@ -56,11 +56,11 @@
         --color-purple:      #7c3aed;
         /* Neutrals */
         --color-text-primary:   #1e293b;
-        --color-text-secondary: #94a3b8;
-        --color-text-muted:     #94a3b8;
-        --color-background:     #f0fdf4;
+        --color-text-secondary: #64748b;
+        --color-text-muted:     #64748b;
+        --color-background:     #f6faf7;
         --color-surface:        #ffffff;
-        --color-border:         #e8edf5;
+        --color-border:         #e5ece7;
         --color-success:        #16a34a;
         --color-danger:         #f43f5e;
         --color-warning:        #fbbf24;
@@ -79,7 +79,7 @@
         --shadow-card:         0 24px 64px rgba(22,163,74,0.13), 0 4px 20px rgba(0,0,0,0.06), 0 0 0 1px rgba(22,163,74,0.08);
         --shadow-button:       0 10px 28px rgba(22,163,74,0.38), 0 2px 8px rgba(0,0,0,0.07);
         --shadow-button-hover: 0 14px 32px rgba(22,163,74,0.50), 0 2px 8px rgba(0,0,0,0.07);
-        --shadow-sm:           0 2px 10px rgba(0,0,0,0.05);
+        --shadow-sm:           0 1px 3px rgba(15,40,25,0.07);
         --anim-blob-duration:  10s;
         --anim-blob-duration-2:13s;
         --anim-easing:         ease-in-out;
@@ -206,9 +206,27 @@
       .pr-btn-primary:active { transform:translateY(0);    box-shadow:var(--shadow-button); }
       .pr-section-label {
         font-family: var(--font-family);
-        font-size:10px; font-weight:700;
-        letter-spacing:0.14em; text-transform:uppercase;
+        font-size:11px; font-weight:800;
+        letter-spacing:0.08em; text-transform:uppercase;
         color: var(--color-text-muted);
+      }
+      .chip-btn {
+        font-family:var(--font-family); font-size:12px; font-weight:700;
+        border-radius:9999px; padding:5px 12px; cursor:pointer;
+        border:1.5px solid var(--color-border); background:var(--color-surface);
+        color:var(--color-text-secondary); transition:border-color .12s,color .12s;
+      }
+      .chip-btn:hover { border-color:var(--color-green-500); color:var(--color-green-700); }
+      .icon-btn {
+        width:30px; height:30px; border-radius:8px; border:none; background:none;
+        cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+        color:var(--color-text-muted); transition:background .12s,color .12s;
+      }
+      .icon-btn:hover { background:var(--color-green-50); color:var(--color-green-700); }
+      .icon-btn.danger:hover { background:var(--color-coral-bg); color:var(--color-coral-text); }
+      .stat-card {
+        background:var(--color-surface); border:1px solid var(--color-border);
+        border-radius:var(--radius-md); box-shadow:var(--shadow-sm); padding:16px 18px;
       }
 
       /* ── Legacy compat ────────────────────────────────────────── */
@@ -227,7 +245,8 @@
       .tab-active   { color:var(--color-green-600); border-bottom:2px solid var(--color-green-600); }
       .tab-inactive { color:#6b7280; }
       .card {
-        background:var(--color-surface); border-radius:var(--radius-lg);
+        background:var(--color-surface); border-radius:var(--radius-md);
+        border:1px solid var(--color-border);
         padding:16px; box-shadow:var(--shadow-sm);
       }
       .sidebar-item {
@@ -260,8 +279,8 @@
       }
       .badge {
         display:inline-flex; align-items:center; justify-content:center;
-        background:#ef4444; color:white; font-size:11px; font-weight:700;
-        width:18px; height:18px; border-radius:50%;
+        background:#f59e0b; color:white; font-size:11px; font-weight:800;
+        min-width:18px; height:18px; border-radius:9999px; padding:0 5px;
       }
 
       /* ── Mobile overrides ────────────────────────────── */
@@ -444,6 +463,29 @@ const CHORE_ICON_NAMES = {
   32:'Wash Lunchboxes', 33:'Tidy Lounge', 34:'Wipe Table',
   35:'Bring in Washing', 36:'Pack Firewood', 37:'Custom', 38:'Garden Work', 39:'DIY'
 };
+
+// ─── UI LINE ICONS (consistent stroke icons for controls) ────────
+const UI_ICON_PATHS = {
+  pencil: '<path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
+  trash:  '<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>',
+  check:  '<path d="M20 6L9 17l-5-5"/>',
+  cross:  '<path d="M18 6L6 18M6 6l12 12"/>',
+  lock:   '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  coin:   '<circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5h3.75a1.75 1.75 0 0 1 0 3.5h-2.5a1.75 1.75 0 0 0 0 3.5H14.5"/>',
+  star:   '<path d="M12 3l2.1 5.6 5.9.3-4.6 3.8 1.5 5.8L12 15.3 7.1 18.5l1.5-5.8L4 8.9l5.9-.3z"/>',
+  grid:   '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  list:   '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+  users:  '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  scale:  '<path d="M3 6h13M3 12h13M3 18h9"/><path d="M16 16l2 2 4-4"/>',
+  gear:   '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  eye:    '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+  zap:    '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>',
+  plus:   '<path d="M12 5v14M5 12h14"/>',
+  home:   '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+};
+function uiIcon(name, size = 16, stroke = 2) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round">${UI_ICON_PATHS[name] || ''}</svg>`;
+}
 
 function choreIconSVG(key, size = 44) {
     const num = parseInt(key);
@@ -970,7 +1012,7 @@ function vLogin() {
             <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:32px">
               <div id="logo-cycler" style="width:120px;height:137px;display:flex;align-items:center;justify-content:center"></div>
               <h1 style="font-family:var(--font-family);font-size:36px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin-top:18px;margin-bottom:0">Sprout</h1>
-              <p style="font-family:var(--font-family);font-size:13px;font-weight:600;color:#86efac;margin-top:9px">Kids Chore &amp; Allowance Tracker</p>
+              <p style="font-family:var(--font-family);font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-top:9px">Kids Chore &amp; Allowance Tracker</p>
             </div>
             <input type="email" id="l-email" placeholder="Email address" class="mb-3"
               onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()">
@@ -1024,11 +1066,11 @@ function vHome() {
             <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:32px">
               <div id="logo-cycler" style="width:120px;height:137px;display:flex;align-items:center;justify-content:center"></div>
               <h1 style="font-family:var(--font-family);font-size:36px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin-top:18px;margin-bottom:0">Sprout</h1>
-              <p style="font-family:var(--font-family);font-size:13px;font-weight:600;color:#86efac;margin-top:9px">Kids Chore &amp; Allowance Tracker</p>
+              <p style="font-family:var(--font-family);font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-top:9px">Kids Chore &amp; Allowance Tracker</p>
             </div>
             <!-- Parent button -->
             <button onclick="goParent()" class="pr-btn-primary" style="margin-bottom:10px">
-              <span style="font-size:22px">🌳</span>
+              <span style="display:inline-flex">${uiIcon('users', 19)}</span>
               <span>Parent</span>
               <span style="flex:1"></span>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M7 5l4 4-4 4" stroke="rgba(255,255,255,0.5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1121,15 +1163,15 @@ function pRecon(db) {
     const summary = allEntered ? `
         <div class="card" style="background:linear-gradient(132deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;padding:16px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:center">
           <div>
-            <p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#86efac">Total in app</p>
+            <p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total in app</p>
             <p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d">${R(totalApp)}</p>
           </div>
           <div>
-            <p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#86efac">Total in bank</p>
+            <p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total in bank</p>
             <p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d">${R(totalBank)}</p>
           </div>
           <div style="text-align:right">
-            <p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#86efac">Difference</p>
+            <p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Difference</p>
             <p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:${totalDiff === 0 ? '#16a34a' : '#f43f5e'}">${totalDiff === 0 ? '✓ All balanced' : R(totalDiff)}</p>
           </div>
         </div>` : '';
@@ -1178,7 +1220,7 @@ function reconUpdate(kidId, value) {
             const totalApp = sortedKids.reduce((s, k) => s + (k.balance || 0), 0);
             const totalBank = sortedKids.reduce((s, k) => s + parseFloat(saved[k.id] || 0), 0);
             const totalDiff = totalBank - totalApp;
-            summaryEl.innerHTML = `<div class="card" style="background:linear-gradient(132deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;padding:16px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:center"><div><p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#86efac">Total in app</p><p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d">${R(totalApp)}</p></div><div><p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#86efac">Total in bank</p><p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d">${R(totalBank)}</p></div><div style="text-align:right"><p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#86efac">Difference</p><p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:${totalDiff === 0 ? '#16a34a' : '#f43f5e'}">${totalDiff === 0 ? '✓ All balanced' : R(totalDiff)}</p></div></div>`;
+            summaryEl.innerHTML = `<div class="card" style="background:linear-gradient(132deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;padding:16px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:center"><div><p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total in app</p><p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d">${R(totalApp)}</p></div><div><p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total in bank</p><p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d">${R(totalBank)}</p></div><div style="text-align:right"><p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Difference</p><p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:${totalDiff === 0 ? '#16a34a' : '#f43f5e'}">${totalDiff === 0 ? '✓ All balanced' : R(totalDiff)}</p></div></div>`;
         } else {
             summaryEl.innerHTML = '';
         }
@@ -1194,27 +1236,13 @@ function vParent() {
     const db = DB.load();
     const pending = db.completions.filter(c => !c.approved && !c.rejected && !c.missed).length;
     const navItems = [
-        { id: 'overview', label: 'Overview', badge: pending,
-          activeBg: 'rgba(74,222,128,.15)', activeBorder: 'rgba(74,222,128,.25)',
-          svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="9" height="9" rx="2.5" fill="#4ade80"/><rect x="13" y="2" width="9" height="9" rx="2.5" fill="#4ade80" opacity=".6"/><rect x="2" y="13" width="9" height="9" rx="2.5" fill="#4ade80" opacity=".6"/><rect x="13" y="13" width="9" height="9" rx="2.5" fill="#4ade80" opacity=".45"/><rect x="15" y="19" width="2" height="3" rx="1" fill="#14532d"/><rect x="18" y="17" width="2" height="5" rx="1" fill="#14532d"/><circle cx="16" cy="16" r="2.5" fill="#22c55e"/><circle cx="19" cy="15" r="2" fill="#16a34a"/></svg>` },
-        { id: 'chores', label: 'Chores',
-          activeBg: 'rgba(244,63,94,.15)', activeBorder: 'rgba(244,63,94,.30)',
-          svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="3" fill="none" stroke="#f43f5e" stroke-width="1.5"/><circle cx="6.5" cy="8" r="2" fill="#f43f5e"/><path d="M5.2 8 L6.2 9.4 L8.8 6.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="10.5" y1="8" x2="19" y2="8" stroke="#f43f5e" stroke-width="1.5" stroke-linecap="round"/><circle cx="6.5" cy="13" r="2" fill="none" stroke="#fca5a5" stroke-width="1.2"/><line x1="10.5" y1="13" x2="19" y2="13" stroke="#fca5a5" stroke-width="1.2" stroke-linecap="round" opacity=".6"/><circle cx="6.5" cy="18" r="2" fill="none" stroke="#fca5a5" stroke-width="1.2"/><line x1="10.5" y1="18" x2="17" y2="18" stroke="#fca5a5" stroke-width="1.2" stroke-linecap="round" opacity=".5"/></svg>` },
-        { id: 'kids', label: 'Kids',
-          activeBg: 'rgba(96,165,250,.15)', activeBorder: 'rgba(96,165,250,.30)',
-          svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="7" r="2.8" fill="#93c5fd" opacity=".8"/><path d="M2 21 Q2 13 5 13 Q8 13 8 21Z" fill="#93c5fd" opacity=".8"/><circle cx="12" cy="5.5" r="3.2" fill="#60a5fa"/><path d="M8.5 22 Q8.5 13 12 13 Q15.5 13 15.5 22Z" fill="#60a5fa"/><circle cx="19" cy="7" r="2.8" fill="#93c5fd" opacity=".8"/><path d="M16 21 Q16 13 19 13 Q22 13 22 21Z" fill="#93c5fd" opacity=".8"/></svg>` },
-        { id: 'payouts', label: 'Payouts',
-          activeBg: 'rgba(251,191,36,.15)', activeBorder: 'rgba(251,191,36,.30)',
-          svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9.5" fill="#fbbf24"/><circle cx="12" cy="12" r="7.5" fill="#fde68a"/><text x="12" y="16.5" text-anchor="middle" font-size="14" font-weight="900" fill="#b45309" font-family="Georgia,serif">$</text></svg>` },
-        { id: 'bonuses', label: 'Bonuses',
-          activeBg: 'rgba(251,146,60,.15)', activeBorder: 'rgba(251,146,60,.30)',
-          svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3 L13.8 8.2 L19.3 8.2 L14.9 11.5 L16.6 16.8 L12 13.5 L7.4 16.8 L9.1 11.5 L4.7 8.2 L10.2 8.2Z" fill="#fb923c"/><path d="M20 3 L20.5 4.5 L22 5 L20.5 5.5 L20 7 L19.5 5.5 L18 5 L19.5 4.5Z" fill="#fbbf24"/><path d="M4 14.5 L4.4 15.7 L5.6 16.1 L4.4 16.5 L4 17.7 L3.6 16.5 L2.4 16.1 L3.6 15.7Z" fill="#fbbf24" opacity=".9"/></svg>` },
-        { id: 'recon', label: 'Recon',
-          activeBg: 'rgba(56,189,248,.15)', activeBorder: 'rgba(56,189,248,.30)',
-          svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="3" fill="none" stroke="#38bdf8" stroke-width="1.5"/><line x1="6" y1="8" x2="18" y2="8" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round" opacity=".5"/><line x1="6" y1="12" x2="18" y2="12" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round" opacity=".5"/><line x1="6" y1="16" x2="14" y2="16" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round" opacity=".5"/><circle cx="19" cy="16" r="3.5" fill="#38bdf8"/><path d="M17.8 16 L18.8 17 L20.5 15.2" stroke="white" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>` },
-        { id: 'settings', label: 'Settings',
-          activeBg: 'rgba(196,181,253,.15)', activeBorder: 'rgba(167,139,250,.30)',
-          svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2 L13.4 5.8 Q15.1 6.3 16.6 7.4 L20.5 6.2 L22.3 9.5 L19.4 12.3 Q19.5 12.7 19.5 13 Q19.5 13.3 19.4 13.7 L22.3 16.5 L20.5 19.8 L16.6 18.6 Q15.1 19.7 13.4 20.2 L12 24 L10.6 20.2 Q8.9 19.7 7.4 18.6 L3.5 19.8 L1.7 16.5 L4.6 13.7 Q4.5 13.3 4.5 13 Q4.5 12.7 4.6 12.3 L1.7 9.5 L3.5 6.2 L7.4 7.4 Q8.9 6.3 10.6 5.8Z" fill="#c4b5fd" opacity=".5" stroke="#a78bfa" stroke-width="1.4" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="white" stroke="#a78bfa" stroke-width="1.4"/><circle cx="12" cy="13" r="1.8" fill="#7c3aed"/></svg>` },
+        { id: 'overview', label: 'Overview', badge: pending, svg: uiIcon('grid', 18) },
+        { id: 'chores',   label: 'Chores',   svg: uiIcon('list', 18) },
+        { id: 'kids',     label: 'Kids',     svg: uiIcon('users', 18) },
+        { id: 'payouts',  label: 'Payouts',  svg: uiIcon('coin', 18) },
+        { id: 'bonuses',  label: 'Bonuses',  svg: uiIcon('star', 18) },
+        { id: 'recon',    label: 'Recon',    svg: uiIcon('scale', 18) },
+        { id: 'settings', label: 'Settings', svg: uiIcon('gear', 18) },
     ];
     const sidebar = `
     <aside style="width:220px;min-height:100vh;background:#14532d;flex-direction:column;flex-shrink:0" class="hidden md:flex">
@@ -1228,7 +1256,7 @@ function vParent() {
       <nav style="flex:1;padding:12px">
         ${navItems.map(t => {
           const isActive = S.tab === t.id;
-          const activeStyle = isActive ? `background:${t.activeBg};border-color:${t.activeBorder};color:white;` : '';
+          const activeStyle = isActive ? 'background:rgba(255,255,255,.12);color:white;' : '';
           return `
           <button onclick="setTab('${t.id}')" class="sidebar-item ${isActive ? 'active' : ''}" style="margin-bottom:4px;${activeStyle}">
             ${t.svg}
@@ -1239,7 +1267,7 @@ function vParent() {
       </nav>
       <div style="padding:16px;border-top:1px solid rgba(255,255,255,0.1)">
         <button onclick="go('home')" style="color:rgba(255,255,255,0.5);font-size:13px;font-family:var(--font-family);display:block;margin-bottom:6px;background:none;border:none;cursor:pointer">← Home</button>
-        <button onclick="openModal('set-parent-pin')" style="color:rgba(255,255,255,0.5);font-size:13px;font-family:var(--font-family);display:block;margin-bottom:6px;background:none;border:none;cursor:pointer">🔐 Parent PIN</button>
+        <button onclick="openModal('set-parent-pin')" style="color:rgba(255,255,255,0.5);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('lock', 13)} Parent PIN</button>
         <button onclick="signOut()" style="color:rgba(255,255,255,0.3);font-size:12px;font-family:var(--font-family);background:none;border:none;cursor:pointer">Sign out</button>
       </div>
     </aside>`;
@@ -1251,7 +1279,7 @@ function vParent() {
         <h1 style="font-family:var(--font-family);font-size:18px;font-weight:900;letter-spacing:-0.02em">Sprout</h1>
       </div>
       <div class="flex items-center gap-4">
-        <button onclick="openModal('set-parent-pin')" style="color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer;font-family:var(--font-family)">🔐 PIN</button>
+        <button onclick="openModal('set-parent-pin')" style="color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer;font-family:var(--font-family);display:flex;align-items:center;gap:5px">${uiIcon('lock', 13)} PIN</button>
         <button onclick="go('home')" style="color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer;font-family:var(--font-family)">← Home</button>
       </div>
     </div>
@@ -1299,9 +1327,9 @@ function pOverview(db) {
           </div>
           <div class="text-right">
             <p style="font-family:var(--font-family);font-weight:800;color:${ac.text};font-size:15px">${R(kBalance)}</p>
-            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:2px">
-              <button onclick="openModal('payout',{kidId:'${k.id}'})" style="font-family:var(--font-family);font-size:11px;color:var(--color-text-muted);text-decoration:underline;cursor:pointer;background:none;border:none">pay out</button>
-              <button onclick="openModal('manual-adjustment',{kidId:'${k.id}',adjustType:'add'})" style="font-family:var(--font-family);font-size:11px;color:var(--color-green-600);text-decoration:underline;cursor:pointer;background:none;border:none">adjust</button>
+            <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px">
+              <button onclick="openModal('payout',{kidId:'${k.id}'})" class="chip-btn">Pay out</button>
+              <button onclick="openModal('manual-adjustment',{kidId:'${k.id}',adjustType:'add'})" class="chip-btn">Adjust</button>
             </div>
           </div>
         </div>`;
@@ -1324,8 +1352,8 @@ function pOverview(db) {
                 <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:13px">${chore?.name || 'Deleted chore'}</p>
                 <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary);margin-top:1px">${R(chore?.value)} · ${dateStr(c.completedAt)}</p>
               </div>
-              <button onclick="approveChore('${c.id}')" style="background:var(--color-green-100);color:var(--color-green-700);padding:5px 10px;border-radius:10px;font-family:var(--font-family);font-size:11px;font-weight:700;border:none;cursor:pointer;flex-shrink:0">✓</button>
-              <button onclick="rejectChore('${c.id}')"  style="background:var(--color-coral-bg);color:var(--color-coral-text);padding:5px 10px;border-radius:10px;font-family:var(--font-family);font-size:11px;font-weight:700;border:none;cursor:pointer;flex-shrink:0">✗</button>
+              <button onclick="approveChore('${c.id}')" title="Approve" style="background:var(--color-green-100);color:var(--color-green-700);padding:6px 11px;border-radius:8px;border:none;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center">${uiIcon('check', 13, 3)}</button>
+              <button onclick="rejectChore('${c.id}')" title="Reject" style="background:var(--color-coral-bg);color:var(--color-coral-text);padding:6px 11px;border-radius:8px;border:none;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center">${uiIcon('cross', 13, 3)}</button>
             </div>`;
         }).join('');
         return `
@@ -1336,7 +1364,7 @@ function pOverview(db) {
               <p style="font-family:var(--font-family);font-weight:800;color:${ac.text};font-size:13px">${k.name}</p>
               <p style="font-family:var(--font-family);font-size:11px;color:${ac.text};opacity:0.75">${comps.length} task${comps.length > 1 ? 's' : ''} · ${R(total)} total</p>
             </div>
-            <button onclick="approveAllForKid('${k.id}')" style="background:${ac.header};color:white;padding:6px 12px;border-radius:10px;font-family:var(--font-family);font-size:11px;font-weight:800;border:none;cursor:pointer;flex-shrink:0">✓ Approve All</button>
+            <button onclick="approveAllForKid('${k.id}')" style="background:${ac.header};color:white;padding:6px 12px;border-radius:8px;font-family:var(--font-family);font-size:11px;font-weight:800;border:none;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;gap:5px">${uiIcon('check', 11, 3)} Approve all</button>
           </div>
           <div style="display:flex;flex-direction:column;gap:2px;padding:6px">
             ${rows}
@@ -1344,30 +1372,34 @@ function pOverview(db) {
         </div>`;
     }).join('');
 
-    const totalWeekly = db.kids.reduce((s, k) => s + weeklyPossible(db, k.id), 0);
-    const totalEarned = db.kids.reduce((s, k) => s + weeklyEarned(db, k.id), 0);
+    const totalWeekly   = db.kids.reduce((s, k) => s + weeklyPossible(db, k.id), 0);
+    const totalEarned   = db.kids.reduce((s, k) => s + weeklyEarned(db, k.id), 0);
+    const totalBalances = db.kids.reduce((s, k) => s + (k.balance || 0), 0);
+    const pendingValue  = pending.reduce((s, c) => { const ch = db.chores.find(x => x.id === c.choreId); return s + (ch?.value || 0); }, 0);
+    const weekPct       = totalWeekly > 0 ? Math.min(100, Math.round(totalEarned / totalWeekly * 100)) : 0;
     const weeklyCard  = db.kids.length === 0 ? '' : `
-    <div class="card sp-weekly-card mb-5" style="background:linear-gradient(135deg,#16a34a,#14532d);color:white;max-width:60%;margin-left:auto;margin-right:auto">
-      <p class="pr-section-label" style="color:#86efac;margin-bottom:12px">Weekly Payout Summary</p>
-      <div class="flex justify-between items-end mb-3">
-        <div>
-          <p style="color:#86efac;font-size:11px;font-family:var(--font-family)">Earned so far this week</p>
-          <p style="font-family:var(--font-family);font-size:24px;font-weight:800">${R(totalEarned)}</p>
-        </div>
-        <div class="text-right">
-          <p style="color:#86efac;font-size:11px;font-family:var(--font-family)">Total possible this week</p>
-          <p style="font-family:var(--font-family);font-size:24px;font-weight:800">${R(totalWeekly)}</p>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div class="stat-card">
+        <p class="pr-section-label">Earned this week</p>
+        <p style="font-family:var(--font-family);font-size:24px;font-weight:800;color:var(--color-green-700);margin-top:4px">${R(totalEarned)}</p>
+        <div style="background:var(--color-green-100);border-radius:99px;height:6px;overflow:hidden;margin-top:10px">
+          <div style="background:var(--color-green-500);width:${weekPct}%;height:100%;border-radius:99px"></div>
         </div>
       </div>
-      <div style="background:rgba(255,255,255,0.2);border-radius:99px;height:8px;overflow:hidden">
-        <div style="background:white;width:${totalWeekly>0?Math.min(100,Math.round(totalEarned/totalWeekly*100)):0}%;height:100%;border-radius:99px"></div>
+      <div class="stat-card">
+        <p class="pr-section-label">Possible this week</p>
+        <p style="font-family:var(--font-family);font-size:24px;font-weight:800;color:var(--color-text-primary);margin-top:4px">${R(totalWeekly)}</p>
+        <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:8px">Across ${db.kids.length} kid${db.kids.length === 1 ? '' : 's'}</p>
       </div>
-      <div class="flex justify-center gap-8 mt-3" style="border-top:1px solid rgba(255,255,255,0.15);padding-top:10px">
-        ${db.kids.map(k => `
-          <div class="text-center">
-            <p style="font-size:16px">${kidIcon(k)}</p>
-            <p style="font-size:10px;color:#86efac;margin-top:2px;font-family:var(--font-family)">${R(weeklyPossible(db,k.id))}</p>
-          </div>`).join('')}
+      <div class="stat-card">
+        <p class="pr-section-label">Pending approvals</p>
+        <p style="font-family:var(--font-family);font-size:24px;font-weight:800;color:var(--color-gold-800);margin-top:4px">${pending.length}</p>
+        <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:8px">Worth ${R(pendingValue)}</p>
+      </div>
+      <div class="stat-card">
+        <p class="pr-section-label">Total balances</p>
+        <p style="font-family:var(--font-family);font-size:24px;font-weight:800;color:var(--color-text-primary);margin-top:4px">${R(totalBalances)}</p>
+        <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:8px">Held for the kids</p>
       </div>
     </div>`;
 
@@ -1390,8 +1422,8 @@ function pOverview(db) {
 
     return `
     <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-      <button onclick="openModal('quick-task')" style="width:auto;padding:9px 18px;font-size:13px;font-weight:700;font-family:var(--font-family);display:flex;align-items:center;gap:6px;background:#fbbf24;color:#92400e;border:none;border-radius:var(--radius-lg);cursor:pointer">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#92400e"/></svg>
+      <button onclick="openModal('quick-task')" class="btn-primary" style="width:auto;padding:9px 18px;font-size:13px;display:flex;align-items:center;gap:6px">
+        ${uiIcon('zap', 14)}
         Quick Chore
       </button>
     </div>
@@ -1449,8 +1481,8 @@ function pChores(db) {
                 <p style="font-family:var(--font-family);font-size:12px;color:var(--color-green-600);font-weight:600;margin-top:2px">${choreScheduleLabel(c)}</p>
               </div>
               <div class="flex flex-col gap-1 flex-shrink-0">
-                <button onclick="editChore('${c.id}')" style="color:var(--color-text-muted);padding:6px;border-radius:8px;font-size:16px;background:none;border:none;cursor:pointer" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'">✏️</button>
-                <button onclick="deleteChore('${c.id}')" style="color:var(--color-coral);padding:6px;border-radius:8px;font-size:16px;background:none;border:none;cursor:pointer" onmouseenter="this.style.background='var(--color-coral-bg)'" onmouseleave="this.style.background='none'">🗑️</button>
+                <button onclick="editChore('${c.id}')" title="Edit" class="icon-btn">${uiIcon('pencil', 15)}</button>
+                <button onclick="deleteChore('${c.id}')" title="Delete" class="icon-btn danger">${uiIcon('trash', 15)}</button>
               </div>
             </div>`;
           }).join('')}
@@ -1477,11 +1509,13 @@ function pKids(db) {
                 <div style="width:48px;height:48px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px">${kidIcon(k)}</div>
                 <div style="flex:1;min-width:0">
                   <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary)">${k.name}</p>
-                  <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">PIN: ${k.pin}</p>
+                  <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);display:flex;align-items:center;gap:5px">PIN: <span id="pin-val-${k.id}">••••</span>
+                    <button onclick="const el=document.getElementById('pin-val-${k.id}');el.textContent=el.textContent==='••••'?'${k.pin}':'••••'" title="Show/hide PIN" style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);padding:0;display:inline-flex">${uiIcon('eye', 13)}</button>
+                  </p>
                 </div>
                 <div style="display:flex;gap:4px">
-                  <button onclick="editKid('${k.id}')" style="color:var(--color-text-muted);padding:4px;border-radius:8px;background:none;border:none;cursor:pointer" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'">✏️</button>
-                  <button onclick="deleteKid('${k.id}')" style="color:var(--color-coral);padding:4px;border-radius:8px;background:none;border:none;cursor:pointer" onmouseenter="this.style.background='var(--color-coral-bg)'" onmouseleave="this.style.background='none'">🗑️</button>
+                  <button onclick="editKid('${k.id}')" title="Edit" class="icon-btn">${uiIcon('pencil', 15)}</button>
+                  <button onclick="deleteKid('${k.id}')" title="Delete" class="icon-btn danger">${uiIcon('trash', 15)}</button>
                 </div>
               </div>
               <div style="border-top:1px solid var(--color-border);padding-top:12px">
@@ -1533,7 +1567,7 @@ function pPayouts(db) {
                 const kid = db.kids.find(k => k.id === t.kidId);
                 return `
                 <div class="card flex items-center gap-3">
-                  <div style="width:36px;height:36px;background:var(--color-blue-bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px">💸</div>
+                  <div style="width:36px;height:36px;background:var(--color-gold-50);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--color-gold-800)">${uiIcon('coin', 17)}</div>
                   <div class="flex-1">
                     <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary)">${kid?.name || '?'}</p>
                     <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${dateStr(t.createdAt)}</p>
@@ -1588,8 +1622,8 @@ function pBonuses(db) {
               </div>
             </div>
             <div style="display:flex;gap:2px;flex-shrink:0">
-              <button onclick="openModal('edit-bonus',{milestoneId:'${m.id}'})" style="color:var(--color-text-muted);padding:6px;border-radius:8px;font-size:15px;background:none;border:none;cursor:pointer" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='none'">✏️</button>
-              <button onclick="deleteBonusMilestone('${m.id}')" style="color:var(--color-coral);padding:6px;border-radius:8px;font-size:15px;background:none;border:none;cursor:pointer" onmouseenter="this.style.background='var(--color-coral-bg)'" onmouseleave="this.style.background='none'">🗑️</button>
+              <button onclick="openModal('edit-bonus',{milestoneId:'${m.id}'})" title="Edit" class="icon-btn">${uiIcon('pencil', 15)}</button>
+              <button onclick="deleteBonusMilestone('${m.id}')" title="Delete" class="icon-btn danger">${uiIcon('trash', 15)}</button>
             </div>
           </div>
           ${affectedKids.length > 0 ? `
@@ -1675,7 +1709,7 @@ function pSettings() {
         </div>
 
         <!-- Threshold editors -->
-        <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:12px">Set Thresholds</p>
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:12px">Set Thresholds</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
           ${[
             { key:'t1', label:'Seedling → Sapling', val: t.t1 },
@@ -2000,7 +2034,7 @@ function renderModal() {
         <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:16px">${e ? 'Edit' : 'Add'} Kid</h3>
         <input id="k-name" placeholder="Name" value="${data.name||''}" class="mb-3">
         <input id="k-pin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" value="${data.pin||''}" class="mb-4">
-        <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:10px">Theme Colour</p>
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:10px">Theme Colour</p>
         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:20px">
           ${KID_ACCENT_OPTIONS.map(opt => {
             const sel = (S.selectedColor || 'blue') === opt.key;
@@ -2016,7 +2050,7 @@ function renderModal() {
             </button>`;
           }).join('')}
         </div>
-        <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Emoji <span style="font-size:20px;margin-left:6px;letter-spacing:0">${S.selectedEmoji || data.emoji || '😀'}</span></p>
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Emoji <span style="font-size:20px;margin-left:6px;letter-spacing:0">${S.selectedEmoji || data.emoji || '😀'}</span></p>
         <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:3px;max-height:150px;overflow-y:auto;border:1.5px solid var(--color-border);border-radius:12px;padding:8px;margin-bottom:16px">
           ${KID_EMOJIS.map(em => {
             const sel = (S.selectedEmoji || data.emoji || '😀') === em;
@@ -2052,7 +2086,7 @@ function renderModal() {
           <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
           <input id="c-val" type="number" placeholder="Value" value="${data.value||''}" step="0.01" min="0" style="padding-left:38px !important">
         </div>
-        <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Assigned to</p>
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Assigned to</p>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
           <button onclick="setAllKids()" type="button"
             style="padding:6px 12px;border-radius:10px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedKids==='all'?'var(--color-green-600)':'var(--color-border)'};background:${S.selectedKids==='all'?'var(--color-green-100)':'white'};color:${S.selectedKids==='all'?'var(--color-green-700)':'#6b7280'};cursor:pointer">
@@ -2066,7 +2100,7 @@ function renderModal() {
             </button>`;
           }).join('')}
         </div>
-        <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Schedule</p>
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Schedule</p>
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <button onclick="setSchedule('daily')" type="button"
             style="flex:1;padding:8px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedSchedule==='daily'?'var(--color-green-600)':'var(--color-border)'};background:${S.selectedSchedule==='daily'?'var(--color-green-100)':'white'};color:${S.selectedSchedule==='daily'?'var(--color-green-700)':'#6b7280'};cursor:pointer">
@@ -2087,7 +2121,7 @@ function renderModal() {
             </button>`;
           }).join('')}
         </div>` : '<div style="margin-bottom:14px"></div>'}
-        <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:4px">Chore Icon <span style="font-size:11px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--color-green-700);margin-left:6px">${selIconName}</span></p>
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:4px">Chore Icon <span style="font-size:11px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--color-green-700);margin-left:6px">${selIconName}</span></p>
         <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;max-height:180px;overflow-y:auto;border:1.5px solid var(--color-border);border-radius:12px;padding:6px;margin-bottom:16px">
           ${iconGrid}
         </div>
@@ -2156,7 +2190,7 @@ function renderModal() {
           <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
           <input id="qt-val" type="number" placeholder="Reward" value="${data.value||''}" step="0.01" min="0" style="padding-left:38px !important">
         </div>
-        <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Assign to</p>
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Assign to</p>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
           ${db.kids.length === 0
             ? `<p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-muted)">No kids added yet.</p>`
@@ -2213,15 +2247,15 @@ function renderModal() {
         <input id="bm-name" placeholder="Name (optional, e.g. First Saver)" value="${m?.name ?? data.name ?? ''}" class="mb-3">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
           <div>
-            <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:6px">Balance target (${currSymbol()})</p>
+            <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:6px">Balance target (${currSymbol()})</p>
             <input id="bm-threshold" type="number" placeholder="e.g. 50" value="${m?.threshold ?? data.threshold ?? ''}" step="0.01" min="0">
           </div>
           <div>
-            <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:6px">Bonus amount (${currSymbol()})</p>
+            <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:6px">Bonus amount (${currSymbol()})</p>
             <input id="bm-bonus" type="number" placeholder="e.g. 10" value="${m?.bonusAmount ?? data.bonusAmount ?? ''}" step="0.01" min="0">
           </div>
         </div>
-        <p style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Assign to</p>
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Assign to</p>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
           <button onclick="setAllKids()" type="button"
             style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedKids === 'all' ? 'var(--color-green-600)' : 'var(--color-border)'};background:${S.selectedKids === 'all' ? 'var(--color-green-100)' : 'white'};color:${S.selectedKids === 'all' ? 'var(--color-green-700)' : '#6b7280'};cursor:pointer">
