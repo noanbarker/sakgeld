@@ -361,6 +361,8 @@ async function initApp() {
         currentUser = session.user;
         const savedCurrency = session.user?.user_metadata?.currency;
         if (savedCurrency) localStorage.setItem('sprout_currency', savedCurrency);
+        const savedMissedClearedAt = session.user?.user_metadata?.missed_cleared_at;
+        if (savedMissedClearedAt) localStorage.setItem('sprout_missed_cleared_at', savedMissedClearedAt);
         await loadCache();
     }
     render();
@@ -373,6 +375,7 @@ async function initApp() {
 }
 
 async function signOut() { await sb.auth.signOut(); }
+function toggleHistory() { S.historyOpen = !S.historyOpen; render(); }
 
 // ─── STATE ───────────────────────────────────────────────────────
 const S = {
@@ -389,7 +392,8 @@ const S = {
     selectedSchedule: 'daily',
     selectedDays: [],
     selectedKids: 'all',
-    parentPin: ''
+    parentPin: '',
+    historyOpen: false
 };
 
 // ─── KID EMOJIS ──────────────────────────────────────────────────
@@ -1627,7 +1631,9 @@ function pOverview(db) {
     </div>`;
 
     const missedClearedAt = localStorage.getItem('sprout_missed_cleared_at') || '';
-    const missed = db.completions.filter(c => c.missed && (!missedClearedAt || (c.dueDate || '') > missedClearedAt)).sort((a,b) => b.dueDate?.localeCompare(a.dueDate));
+    const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = toLocalDateStr(sevenDaysAgo);
+    const missed = db.completions.filter(c => c.missed && (c.dueDate || '') >= sevenDaysAgoStr && (!missedClearedAt || (c.dueDate || '') > missedClearedAt)).sort((a,b) => b.dueDate?.localeCompare(a.dueDate));
     const missedRows = missed.map(c => {
         const chore = db.chores.find(x => x.id === c.choreId);
         const kid   = db.kids.find(x => x.id === c.kidId);
@@ -2058,8 +2064,7 @@ function vKid() {
     const pending   = doneToday.filter(c => !c.approved);
     const ready     = allChores.filter(c => !doneTodayIds.includes(c.id));
     const txns      = db.transactions.filter(t => t.kidId === kid.id)
-                        .sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt))
-                        .slice(0, 12);
+                        .sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt));
     const typeIcon  = { payout:'💸', weekly:'📅', chore:'✅', manual:'💰', bonus:'🌟' };
     const treeStageIdx = getTreeStage(kid.balance);
     const treeThresh   = loadTreeThresholds();
@@ -2221,24 +2226,28 @@ function vKid() {
               ${achievedCards}
             </div>`;
         })()}
-        <p class="pr-section-label mb-3 mt-2">History</p>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;margin-top:8px">
+          <p class="pr-section-label" style="margin-bottom:0">History</p>
+          <button onclick="toggleHistory()" style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-text-muted);background:none;border:1.5px solid var(--color-border);border-radius:8px;padding:4px 10px;cursor:pointer">${S.historyOpen ? 'Hide history' : 'Show history'}</button>
+        </div>
+        ${S.historyOpen ? `
+        <div class="flex flex-col gap-2">
           ${txns.length === 0
-            ? `<div class="card text-center py-6 md:col-span-2" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No transactions yet.</div>`
+            ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No transactions yet.</div>`
             : txns.map(t => `
-              <div class="card flex items-center gap-3">
-                <div style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;background:${t.amount>0?ac.bg:'var(--color-coral-bg)'}">
+              <div class="card flex items-center gap-2" style="padding:8px 12px">
+                <div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:${t.amount>0?ac.bg:'var(--color-coral-bg)'}">
                   ${typeIcon[t.type] || '💰'}
                 </div>
                 <div class="flex-1 min-w-0">
-                  <p style="font-family:var(--font-family);font-weight:600;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.description}</p>
-                  <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${dateStr(t.createdAt)}</p>
+                  <p style="font-family:var(--font-family);font-weight:600;color:var(--color-text-primary);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.description}</p>
+                  <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary)">${dateStr(t.createdAt)}</p>
                 </div>
-                <p style="font-family:var(--font-family);font-weight:800;flex-shrink:0;color:${t.amount>0?ac.header:'var(--color-coral)'}">
+                <p style="font-family:var(--font-family);font-weight:800;font-size:13px;flex-shrink:0;color:${t.amount>0?ac.header:'var(--color-coral)'}">
                   ${t.amount>0?'+':''}${R(t.amount)}
                 </p>
               </div>`).join('')}
-        </div>
+        </div>` : ''}
         </div>
       </div>
     </div>`;
@@ -2824,6 +2833,9 @@ async function resetTreeThresholds() {
 function clearMissedChores() {
     const latest = cache.completions.filter(c => c.missed).map(c => c.dueDate || '').sort().pop() || toLocalDateStr(new Date());
     localStorage.setItem('sprout_missed_cleared_at', latest);
+    sb.auth.updateUser({ data: { missed_cleared_at: latest } }).then(({ data }) => {
+        if (data?.user) currentUser = data.user;
+    });
     render();
 }
 
