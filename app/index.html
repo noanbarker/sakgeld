@@ -242,8 +242,8 @@
         border-radius:12px;font-size:14px;font-weight:700;font-family:var(--font-family);
         transition:background 0.15s;text-align:left;
       }
-      .sidebar-item                   { color:rgba(255,255,255,0.65); border:1px solid transparent; }
-      .sidebar-item:not(.active):hover{ background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.85); }
+      .sidebar-item                   { color:#475569; border:1px solid transparent; }
+      .sidebar-item:not(.active):hover{ background:rgba(22,163,74,0.08);color:#14532d; }
       input, select {
         outline:none; border:1.5px solid var(--color-border);
         border-radius:var(--radius-md); padding:10px 14px !important;
@@ -1528,18 +1528,18 @@ function vParent() {
         { id: 'settings', label: 'Settings', svg: uiIcon('gear', 18) },
     ];
     const sidebar = `
-    <aside style="width:220px;min-height:100vh;background:#14532d;flex-direction:column;flex-shrink:0" class="hidden md:flex">
-      <div style="padding:28px 20px 20px;border-bottom:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;gap:12px">
-        ${treeSVG(36, false)}
+    <aside style="width:220px;min-height:100vh;background:#f6faf7;flex-direction:column;flex-shrink:0;border-right:1px solid var(--color-border)" class="hidden md:flex">
+      <div style="padding:28px 20px 20px;border-bottom:1px solid var(--color-border);display:flex;align-items:center;gap:12px">
+        ${treeSVG(36, false, true)}
         <div>
-          <h1 style="color:white;font-family:var(--font-family);font-size:18px;font-weight:900;line-height:1.1;letter-spacing:-0.02em">Sprout</h1>
-          <p style="color:rgba(255,255,255,0.5);font-size:11px;font-family:var(--font-family);margin-top:2px">Parent Dashboard</p>
+          <h1 style="color:#14532d;font-family:var(--font-family);font-size:18px;font-weight:900;line-height:1.1;letter-spacing:-0.02em">Sprout</h1>
+          <p style="color:var(--color-text-secondary);font-size:11px;font-family:var(--font-family);margin-top:2px">Parent Dashboard</p>
         </div>
       </div>
       <nav style="flex:1;padding:12px">
         ${navItems.map(t => {
           const isActive = S.tab === t.id;
-          const activeStyle = isActive ? 'background:rgba(255,255,255,.12);color:white;' : '';
+          const activeStyle = isActive ? 'background:rgba(22,163,74,.12);color:#14532d;' : '';
           return `
           <button onclick="setTab('${t.id}')" class="sidebar-item ${isActive ? 'active' : ''}" style="margin-bottom:4px;${activeStyle}">
             ${t.svg}
@@ -1548,10 +1548,10 @@ function vParent() {
           </button>`;
         }).join('')}
       </nav>
-      <div style="padding:16px;border-top:1px solid rgba(255,255,255,0.1)">
-        <button onclick="go('home')" style="color:rgba(255,255,255,0.5);font-size:13px;font-family:var(--font-family);display:block;margin-bottom:6px;background:none;border:none;cursor:pointer">← Home</button>
-        <button onclick="openModal('set-parent-pin')" style="color:rgba(255,255,255,0.5);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('lock', 13)} Parent PIN</button>
-        <button onclick="signOut()" style="color:rgba(255,255,255,0.3);font-size:12px;font-family:var(--font-family);background:none;border:none;cursor:pointer">Sign out</button>
+      <div style="padding:16px;border-top:1px solid var(--color-border)">
+        <button onclick="go('home')" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:block;margin-bottom:6px;background:none;border:none;cursor:pointer">← Home</button>
+        <button onclick="openModal('set-parent-pin')" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('lock', 13)} Parent PIN</button>
+        <button onclick="signOut()" style="color:#94a3b8;font-size:12px;font-family:var(--font-family);background:none;border:none;cursor:pointer">Sign out</button>
       </div>
     </aside>`;
 
