@@ -91,18 +91,6 @@
         0%, 100% { transform: rotate(-1.5deg); transform-origin: 60px 128px; }
         50%       { transform: rotate(1.5deg);  transform-origin: 60px 128px; }
       }
-      @keyframes logoIconEnter {
-        0%   { opacity: 0; transform: scale(0.6) rotate(-6deg); }
-        100% { opacity: 1; transform: scale(1)   rotate(0deg); }
-      }
-      @keyframes logoIconExit {
-        0%   { opacity: 1; transform: scale(1)   rotate(0deg); }
-        100% { opacity: 0; transform: scale(0.6) rotate(6deg); }
-      }
-      .logo-icon-inner {
-        display: flex; align-items: center; justify-content: center;
-        animation: logoIconEnter 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
-      }
       @keyframes coinBob1 {
         0%, 100% { transform: translateY(0); }
         50%       { transform: translateY(-5px); }
@@ -1264,7 +1252,21 @@ function toggleDay(d) {
 }
 
 // ─── TREE SVG (Sprout logo) ───────────────────────────────────────
-function treeSVG(width = 100, animated = true) {
+function treeSVG(width = 100, animated = true, light = false) {
+    if (light) {
+        const height = Math.round(width * 64 / 82);
+        return `<svg ${animated ? 'class="sp-tree-logo"' : ''} width="${width}" height="${height}" viewBox="0 0 82 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="4" y="45" width="11" height="13" rx="4" fill="#bbf7d0"/>
+  <rect x="20" y="36" width="11" height="22" rx="4" fill="#4ade80"/>
+  <rect x="36" y="26" width="11" height="32" rx="4" fill="#16a34a"/>
+  <rect x="52" y="16" width="11" height="42" rx="4" fill="#a16207"/>
+  <circle cx="58" cy="12" r="12" fill="#16a34a"/>
+  <circle cx="47.5" cy="16.5" r="7.5" fill="#4ade80"/>
+  <circle cx="71.5" cy="22.5" r="9.5" fill="#fde68a"/>
+  <circle cx="71.5" cy="22.5" r="7.5" fill="#fbbf24"/>
+  <text x="71.5" y="25.5" text-anchor="middle" font-family="Nunito, sans-serif" font-weight="900" font-size="8" fill="#92400e">$</text>
+</svg>`;
+    }
     const height = Math.round(width * 56 / 68);
     return `<svg ${animated ? 'class="sp-tree-logo"' : ''} width="${width}" height="${height}" viewBox="0 0 68 56" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect x="2" y="40" width="10" height="11" rx="4" fill="#ffffff" opacity="0.35"/>
@@ -1289,9 +1291,10 @@ function vLogin() {
           <div class="pr-blob-bottom"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:32px">
-              <div id="logo-cycler" style="width:120px;height:137px;display:flex;align-items:center;justify-content:center"></div>
-              <h1 style="font-family:var(--font-family);font-size:36px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin-top:18px;margin-bottom:0">Sprout</h1>
-              <p style="font-family:var(--font-family);font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-top:9px">Kids Chore &amp; Allowance Tracker</p>
+              <div style="position:relative;width:100%;min-height:70px">
+                <div style="position:absolute;left:20px;top:50%;transform:translateY(-50%)">${treeSVG(90, false, true)}</div>
+                <h1 style="font-family:var(--font-family);font-size:36px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin:0;text-align:center">Sprout</h1>
+              </div>
             </div>
             <input type="email" id="l-email" placeholder="Email address" class="mb-3"
               onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()">
@@ -1343,9 +1346,10 @@ function vHome() {
           <div style="position:relative;z-index:1">
             <!-- Logo block -->
             <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:32px">
-              <div id="logo-cycler" style="width:120px;height:137px;display:flex;align-items:center;justify-content:center"></div>
-              <h1 style="font-family:var(--font-family);font-size:36px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin-top:18px;margin-bottom:0">Sprout</h1>
-              <p style="font-family:var(--font-family);font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-top:9px">Kids Chore &amp; Allowance Tracker</p>
+              <div style="position:relative;width:100%;min-height:70px">
+                <div style="position:absolute;left:20px;top:50%;transform:translateY(-50%)">${treeSVG(90, false, true)}</div>
+                <h1 style="font-family:var(--font-family);font-size:36px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin:0;text-align:center">Sprout</h1>
+              </div>
             </div>
             <!-- Parent button -->
             <button onclick="goParent()" class="pr-btn-primary" style="margin-bottom:10px">
@@ -2916,42 +2920,17 @@ async function removeParentPin() {
 }
 
 // ─── RENDER ──────────────────────────────────────────────────────
-let _logoCyclerTimer = null;
-function startLogoCycler() {
-    if (_logoCyclerTimer) { clearInterval(_logoCyclerTimer); _logoCyclerTimer = null; }
-    const el = document.getElementById('logo-cycler');
-    if (!el) return;
-    const icons = [0, 1, 2, 3, 4].map(i => treeStageSVG(i, 108));
-    let idx = 0;
-    el.innerHTML = `<div class="logo-icon-inner">${icons[0]}</div>`;
-    _logoCyclerTimer = setInterval(() => {
-        const c = document.getElementById('logo-cycler');
-        if (!c) { clearInterval(_logoCyclerTimer); _logoCyclerTimer = null; return; }
-        const inner = c.querySelector('.logo-icon-inner');
-        if (inner) inner.style.animation = 'logoIconExit 0.35s ease-in forwards';
-        setTimeout(() => {
-            const c2 = document.getElementById('logo-cycler');
-            if (!c2) return;
-            idx = (idx + 1) % icons.length;
-            c2.innerHTML = `<div class="logo-icon-inner">${icons[idx]}</div>`;
-        }, 320);
-    }, 2800);
-}
-
-
 function render() {
     const toastHtml = S.toast
         ? `<div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:white;font-family:var(--font-family);font-size:14px;font-weight:600;padding:10px 20px;border-radius:var(--radius-full);box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:99;max-width:320px;text-align:center">${S.toast}</div>`
         : '';
     if (!currentUser) {
         document.getElementById('app').innerHTML = vLogin() + toastHtml;
-        setTimeout(startLogoCycler, 50);
         return;
     }
     const views = { home: vHome, parent: vParent, 'kid-pin': vKidPin, kid: vKid, 'parent-pin': vParentPin };
     const html  = (views[S.view] || vHome)();
     document.getElementById('app').innerHTML = html + renderModal() + toastHtml;
-    if (S.view === 'home' || !S.view) setTimeout(startLogoCycler, 50);
 }
 
 initApp();
