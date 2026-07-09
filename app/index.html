@@ -318,7 +318,17 @@
 // ─── SUPABASE ────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://ptwrlkzoreogggrjjsro.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0d3Jsa3pvcmVvZ2dncmpqc3JvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxOTE2MjMsImV4cCI6MjA5Nzc2NzYyM30.1Anwz7skk2_1_n_iG0iDqMFwFVvh-HTDevHMEoi67pE';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// Keep parents signed in for as long as possible: save the session to this
+// device's durable storage (survives the device being switched off) and renew
+// the login automatically in the background so they don't have to sign in again.
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    storage: window.localStorage,
+    detectSessionInUrl: true
+  }
+});
 
 let currentUser = null;
 let cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [] };
