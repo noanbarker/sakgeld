@@ -826,7 +826,9 @@ function uiIcon(name, size = 16, stroke = 2) {
 
 function choreIconSVG(key, size = 44) {
     const num = parseInt(key);
-    const idx = (num >= 1 && num <= 39) ? num : 1;
+    // Fall back to the "Custom" icon (37) for unknown/legacy keys (e.g. older
+    // quick tasks saved with a '⭐'), rather than misleadingly showing Make Bed.
+    const idx = (num >= 1 && num <= 39) ? num : 37;
     const svg = CHORE_ICONS[idx];
     if (size === 44) return svg;
     return svg.replace(/width="44" height="44"/, `width="${size}" height="${size}"`);
@@ -2697,9 +2699,9 @@ async function addQuickTask() {
     if (!assignedTo || (Array.isArray(assignedTo) && assignedTo.length === 0)) return toast('⚠️ Please select at least one kid.');
     const expiresOn = toLocalDateStr(new Date());
     const id = uid();
-    const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: '', value: val, assigned_to: assignedTo, emoji: '⭐', schedule: 'daily', days: [], one_off: true, expires_on: expiresOn });
+    const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: '', value: val, assigned_to: assignedTo, emoji: '37', schedule: 'daily', days: [], one_off: true, expires_on: expiresOn });
     if (error) return toast('❌ Could not save. Check your connection.');
-    cache.chores.push({ id, name, description: '', value: val, assignedTo, emoji: '⭐', schedule: 'daily', days: [], oneOff: true, expiresOn });
+    cache.chores.push({ id, name, description: '', value: val, assignedTo, emoji: '37', schedule: 'daily', days: [], oneOff: true, expiresOn });
     closeModal(); toast('Quick task assigned! 🎯');
 }
 async function doDeleteChore(id) {
