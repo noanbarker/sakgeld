@@ -2408,19 +2408,19 @@ function vKid() {
                 if (achieved) {
                     const claimDate = new Date(achieved.approvedAt || achieved.claimedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
                     return `
-                    <div class="card flex items-center gap-3" style="background:#f0fdf4;border:1.5px solid #bbf7d0">
-                      <div style="width:40px;height:40px;background:#dcfce7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#16a34a">${uiIcon('trophy', 20, 2)}</div>
+                    <div class="card flex items-center gap-4" style="background:#f0fdf4;border:1.5px solid #bbf7d0">
+                      <div style="flex-shrink:0;width:64px;height:64px;background:#dcfce7;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#16a34a">${uiIcon('trophy', 36, 2)}</div>
                       <div class="flex-1 min-w-0">
-                        <p style="font-family:var(--font-family);font-weight:800;color:#15803d;font-size:13px">${r.name}</p>
-                        <p style="font-family:var(--font-family);font-size:11px;color:#16a34a;margin-top:1px">Earned on ${claimDate}</p>
+                        <p style="font-family:var(--font-family);font-weight:800;color:#15803d">${r.name}</p>
+                        <p style="font-family:var(--font-family);font-size:12px;color:#16a34a;margin-top:2px">Earned on ${claimDate}</p>
+                        <p style="font-family:var(--font-family);font-weight:800;color:#16a34a;margin-top:4px">+ ${R(r.value)}</p>
                       </div>
-                      <p style="font-family:var(--font-family);font-weight:900;color:#16a34a;font-size:15px;flex-shrink:0">+${R(r.value)}</p>
                     </div>`;
                 }
                 if (pending) {
                     return `
                     <div class="card flex items-center gap-4" style="background:#fffbeb;border:1.5px solid #fde68a">
-                      <div style="flex-shrink:0;width:56px;height:56px;background:#fef3c7;border-radius:14px;display:flex;align-items:center;justify-content:center;opacity:0.7;color:#b45309">${uiIcon('trophy', 26, 2)}</div>
+                      <div style="flex-shrink:0;width:64px;height:64px;background:#fef3c7;border-radius:14px;display:flex;align-items:center;justify-content:center;opacity:0.7;color:#b45309">${uiIcon('trophy', 36, 2)}</div>
                       <div class="flex-1 min-w-0">
                         <p style="font-family:var(--font-family);font-weight:800;color:#92400e">${r.name}</p>
                         <p style="font-family:var(--font-family);font-size:12px;color:#b45309;margin-top:2px">Waiting for parent ⏳</p>
@@ -2430,18 +2430,19 @@ function vKid() {
                 }
                 return `
                 <div class="card flex items-center gap-4" style="border:1.5px solid #fed7aa">
-                  <div style="flex-shrink:0;width:56px;height:56px;background:#fff7ed;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fb923c">${uiIcon('trophy', 26, 2)}</div>
+                  <div style="flex-shrink:0;width:64px;height:64px;background:#fff7ed;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fb923c">${uiIcon('trophy', 36, 2)}</div>
                   <div class="flex-1 min-w-0">
                     <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary)">${r.name}</p>
                     ${r.description ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${r.description}</p>` : ''}
                     <p style="font-family:var(--font-family);color:#f97316;font-weight:800;margin-top:4px">+ ${R(r.value)}</p>
                   </div>
-                  <button onclick="markRewardDone('${r.id}')" class="btn-primary flex-shrink-0" style="width:auto;padding:8px 16px;font-size:13px">Done!</button>
+                  <button onclick="markRewardDone('${r.id}')"
+                    class="btn-primary flex-shrink-0" style="width:auto;padding:8px 16px;font-size:13px">Done!</button>
                 </div>`;
             }).join('');
             return `
             <p class="pr-section-label mb-3 mt-2">Rewards</p>
-            <div class="flex flex-col gap-2 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
               ${cards}
             </div>`;
         })()}
