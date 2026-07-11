@@ -1787,22 +1787,17 @@ function pOverview(db) {
         </div>
       </div>
       <div>
-        <p class="pr-section-label mb-3">Pending Approvals ${pending.length ? `<span class="badge ml-1">${pending.length}</span>` : ''}</p>
+        <p class="pr-section-label mb-3">Pending Chore Approvals ${pending.length ? `<span class="badge ml-1">${pending.length}</span>` : ''}</p>
         <div class="flex flex-col gap-2">
           ${pending.length === 0
             ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">Nothing waiting for approval 🎉</div>`
             : pendingRows}
         </div>
+        ${pendingRewards.length === 0 ? '' : `
+        <p class="pr-section-label mb-3 mt-6">Pending Reward Approvals <span class="badge ml-1">${pendingRewards.length}</span></p>
+        <div class="flex flex-col gap-2">${pendingRewardRows}</div>`}
       </div>
     </div>
-    ${pendingRewards.length === 0 ? '' : `
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-      <div>
-        <p class="pr-section-label mb-3">Pending Reward Approvals <span class="badge ml-1">${pendingRewards.length}</span></p>
-        <div class="flex flex-col gap-2">${pendingRewardRows}</div>
-      </div>
-      <div></div>
-    </div>`}
     ${missed.length === 0 ? '' : `
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
       <div>
