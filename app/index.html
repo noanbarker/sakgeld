@@ -1014,7 +1014,12 @@ function R(n) {
     if (code === 'pts') return (+(n || 0)).toFixed(0) + ' pts';
     const curr = CURRENCIES.find(c => c.code === code) || { symbol: 'R' };
     const decimals = NO_DECIMAL_CURRENCIES.includes(code) ? 0 : 2;
-    return curr.symbol + ' ' + (+(n || 0)).toFixed(decimals);
+    const value = +(n || 0);
+    let formatted = value.toFixed(decimals);
+    if (decimals > 0 && formatted.endsWith('.' + '0'.repeat(decimals))) {
+        formatted = value.toFixed(0);
+    }
+    return curr.symbol + ' ' + formatted;
 }
 function dateStr(iso) { return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }); }
 function kidIcon(kidOrName) {
@@ -2152,7 +2157,7 @@ function vKid() {
                 <h1 style="font-family:var(--font-family);font-size:20px;font-weight:800">${kid.name}</h1>
               </div>
             </div>
-            <button onclick="go('home')" style="font-family:var(--font-family);color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer">← Home</button>
+            <button onclick="go('home')" style="font-family:var(--font-family);color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:6px">${uiIcon('home', 16)} Home</button>
           </div>
           <!-- Balance + Tree row (3-column: left content | centre tree | right spacer) -->
           <div style="display:flex;align-items:flex-end;gap:16px">
