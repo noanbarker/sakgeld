@@ -2545,7 +2545,7 @@ function renderModal() {
         body = `
         <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${isEdit ? 'Edit' : 'Add'} Bonus Milestone</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:13px;margin-bottom:16px">Set a savings milestone and the bonus a kid earns when they reach it.</p>
-        <input id="bm-name" placeholder="Name (optional, e.g. First Saver)" value="${m?.name ?? data.name ?? ''}" class="mb-3">
+        <input id="bm-name" placeholder="Name (optional, e.g. Milestone 1)" value="${m?.name ?? data.name ?? ''}" class="mb-3">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
           <div>
             <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:6px">Balance milestone (${currSymbol()})</p>
