@@ -331,17 +331,19 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
 
 let currentUser = null;
-let cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [] };
+let cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [] };
 const DB = { load: () => cache };
 
 async function loadCache() {
     const uid = currentUser.id;
-    const [kRes, cRes, compRes, txRes, bmRes] = await Promise.all([
+    const [kRes, cRes, compRes, txRes, bmRes, rwRes, rcRes] = await Promise.all([
         sb.from('kids').select('*').eq('user_id', uid),
         sb.from('chores').select('*').eq('user_id', uid),
         sb.from('completions').select('*').eq('user_id', uid),
         sb.from('transactions').select('*').eq('user_id', uid),
         sb.from('bonus_milestones').select('*').eq('user_id', uid),
+        sb.from('rewards').select('*').eq('user_id', uid),
+        sb.from('reward_completions').select('*').eq('user_id', uid),
     ]);
     cache = {
         kids: kRes.data || [],
@@ -349,6 +351,8 @@ async function loadCache() {
         completions: (compRes.data || []).map(c => ({ ...c, choreId: c.chore_id, kidId: c.kid_id, completedAt: c.completed_at, dueDate: c.due_date || null, missed: c.missed || false })),
         transactions: (txRes.data || []).map(t => ({ ...t, kidId: t.kid_id, createdAt: t.created_at })),
         bonusMilestones: (bmRes.data || []).map(m => ({ ...m, assignedTo: m.assigned_to, bonusAmount: m.bonus_amount, claimedBy: m.claimed_by || [] })),
+        rewards: (rwRes.data || []).map(r => ({ ...r, assignedTo: r.assigned_to })),
+        rewardCompletions: (rcRes.data || []).map(c => ({ ...c, rewardId: c.reward_id, kidId: c.kid_id, claimedAt: c.claimed_at, approvedAt: c.approved_at })),
     };
 }
 
@@ -367,7 +371,7 @@ async function initApp() {
     sb.auth.onAuthStateChange(async (event, session) => {
         currentUser = session?.user || null;
         if (currentUser) { await loadCache(); }
-        else { cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [] }; S.view = 'home'; }
+        else { cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [] }; S.view = 'home'; }
         render();
     });
 }
@@ -819,6 +823,7 @@ const UI_ICON_PATHS = {
   zap:    '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>',
   plus:   '<path d="M12 5v14M5 12h14"/>',
   home:   '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  trophy: '<path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a2 2 0 0 0 0 4h1M17 5h3a2 2 0 0 1 0 4h-1"/>',
 };
 function uiIcon(name, size = 16, stroke = 2) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round">${UI_ICON_PATHS[name] || ''}</svg>`;
@@ -1248,6 +1253,12 @@ function snapModalInputs() {
         const bo = document.getElementById('bm-bonus');
         if (n) S.modal.data = { ...S.modal.data, name: n.value, threshold: th?.value, bonusAmount: bo?.value };
     }
+    if (t === 'add-reward' || t === 'edit-reward') {
+        const n = document.getElementById('rw-name');
+        const d = document.getElementById('rw-desc');
+        const v = document.getElementById('rw-val');
+        if (n) S.modal.data = { ...S.modal.data, name: n.value, description: d?.value, value: v?.value };
+    }
 }
 function pickEmoji(em) { snapModalInputs(); S.selectedEmoji = em; render(); }
 function setSchedule(s) { snapModalInputs(); S.selectedSchedule = s; render(); }
@@ -1531,12 +1542,14 @@ function reconClear() {
 function vParent() {
     const db = DB.load();
     const pending = db.completions.filter(c => !c.approved && !c.rejected && !c.missed).length;
+    const pendingRewards = (db.rewardCompletions || []).filter(c => !c.approved && !c.rejected).length;
     const navItems = [
         { id: 'overview', label: 'Overview', badge: pending, svg: uiIcon('grid', 18) },
         { id: 'chores',   label: 'Chores',   svg: uiIcon('list', 18) },
         { id: 'kids',     label: 'Kids',     svg: uiIcon('users', 18) },
         { id: 'payouts',  label: 'Payouts',  svg: uiIcon('coin', 18) },
         { id: 'bonuses',  label: 'Bonuses',  svg: uiIcon('star', 18) },
+        { id: 'rewards',  label: 'Rewards',  badge: pendingRewards, svg: uiIcon('trophy', 18) },
         { id: 'recon',    label: 'Recon',    svg: uiIcon('scale', 18) },
         { id: 'settings', label: 'Settings', svg: uiIcon('gear', 18) },
     ];
@@ -1600,6 +1613,7 @@ function vParent() {
             S.tab === 'chores'    ? pChores(db) :
             S.tab === 'kids'      ? pKids(db) :
             S.tab === 'bonuses'   ? pBonuses(db) :
+            S.tab === 'rewards'   ? pRewards(db) :
             S.tab === 'recon'     ? pRecon(db) :
             S.tab === 'settings'  ? pSettings() :
                                     pPayouts(db)}
@@ -1961,6 +1975,92 @@ function pBonuses(db) {
     </div>` : ''}`;
 }
 
+function pRewards(db) {
+    const rewards = (db.rewards || []).filter(r => !r.archived);
+    const rewardHistory = db.transactions
+        .filter(t => t.type === 'reward')
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 20);
+
+    const rewardCards = rewards.map(r => {
+        const affectedKids = db.kids.filter(k =>
+            r.assignedTo === 'all' || (Array.isArray(r.assignedTo) && r.assignedTo.includes(k.id))
+        );
+        const kidRows = affectedKids.map(k => {
+            const comps = (db.rewardCompletions || []).filter(c => c.rewardId === r.id && c.kidId === k.id)
+                                                        .sort((a, b) => new Date(b.claimedAt) - new Date(a.claimedAt));
+            const achieved = comps.find(c => c.approved);
+            const pendingComp = !achieved && comps.find(c => !c.approved && !c.rejected);
+            const ac = kidAccent(k);
+            const claimDate = achieved ? new Date(achieved.approvedAt || achieved.claimedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : null;
+            return `
+            <div style="display:flex;align-items:center;gap:8px;padding:5px 0">
+              <div style="width:24px;height:24px;background:${ac.bg};border:1px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">${kidIcon(k)}</div>
+              <span style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-primary);flex:1">${k.name}</span>
+              ${achieved
+                ? `<span style="font-family:var(--font-family);font-size:10px;font-weight:700;background:#dcfce7;color:#16a34a;padding:3px 9px;border-radius:99px">✓ Claimed ${claimDate}</span>`
+                : pendingComp
+                ? `<span style="font-family:var(--font-family);font-size:10px;font-weight:600;color:var(--color-gold-800);background:#fffbeb;padding:3px 9px;border-radius:99px">Waiting for approval</span>
+                   <button onclick="approveReward('${pendingComp.id}')" title="Approve" style="background:var(--color-green-100);color:var(--color-green-700);padding:5px 9px;border-radius:8px;border:none;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center">${uiIcon('check', 12, 3)}</button>
+                   <button onclick="rejectReward('${pendingComp.id}')" title="Reject" style="background:var(--color-coral-bg);color:var(--color-coral-text);padding:5px 9px;border-radius:8px;border:none;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center">${uiIcon('cross', 12, 3)}</button>`
+                : `<span style="font-family:var(--font-family);font-size:10px;font-weight:600;color:var(--color-text-muted);background:var(--color-background);padding:3px 9px;border-radius:99px">Not yet</span>`}
+            </div>`;
+        }).join('');
+
+        return `
+        <div class="card">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            <div style="width:44px;height:44px;background:#fff7ed;border:1.5px solid #fed7aa;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fb923c">${uiIcon('trophy', 22, 2)}</div>
+            <div class="flex-1 min-w-0">
+              <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">${r.name}</p>
+              ${r.description ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${r.description}</p>` : ''}
+              <div style="display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap">
+                <span style="font-family:var(--font-family);font-size:15px;font-weight:800;color:var(--color-green-600)">+${R(r.value)}</span>
+                <span style="font-family:var(--font-family);font-size:11px;font-weight:700;color:#f97316;background:#fff7ed;padding:2px 8px;border-radius:99px">reward</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:2px;flex-shrink:0">
+              <button onclick="editReward('${r.id}')" title="Edit" class="icon-btn">${uiIcon('pencil', 15)}</button>
+              <button onclick="deleteReward('${r.id}')" title="Delete" class="icon-btn danger">${uiIcon('trash', 15)}</button>
+            </div>
+          </div>
+          ${affectedKids.length > 0 ? `
+          <div style="border-top:1px solid var(--color-border);margin-top:12px;padding-top:8px">
+            ${kidRows}
+          </div>` : ''}
+        </div>`;
+    }).join('');
+
+    const historyRows = rewardHistory.map(t => {
+        const kid = db.kids.find(k => k.id === t.kidId);
+        const ac = kid ? kidAccent(kid) : { bg: '#f1f5f9', border: '#e2e8f0', text: '#64748b' };
+        return `
+        <div class="card flex items-center gap-3">
+          ${kid ? `<div style="width:36px;height:36px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${kidIcon(kid)}</div>` : ''}
+          <div class="flex-1 min-w-0">
+            <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:13px">${t.description}</p>
+            <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary);margin-top:1px">${kid?.name || '?'} · ${dateStr(t.createdAt)}</p>
+          </div>
+          <p style="font-family:var(--font-family);font-weight:800;color:var(--color-green-600);font-size:14px;flex-shrink:0">+${R(t.amount)}</p>
+        </div>`;
+    }).join('');
+
+    return `
+    <div class="flex justify-between items-center mb-2">
+      <p class="pr-section-label">Rewards</p>
+      <button onclick="openModal('add-reward')" class="btn-primary" style="width:auto;padding:8px 16px;font-size:13px">+ Add Reward</button>
+    </div>
+    <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:20px">Set a reward for a longer-term goal — an exam mark, a sports achievement, anything worth celebrating. Kids mark it done, you verify it before the reward pays out.</p>
+    ${rewards.length === 0
+        ? `<div class="card text-center py-12" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">🏆<br><br>No rewards yet.<br>Add one to celebrate a big goal!</div>`
+        : `<div class="flex flex-col gap-3 mb-6">${rewardCards}</div>`}
+    ${rewardHistory.length > 0 ? `
+    <div class="mt-2">
+      <p class="pr-section-label mb-3">Reward History</p>
+      <div class="flex flex-col gap-2">${historyRows}</div>
+    </div>` : ''}`;
+}
+
 function pSettings() {
     const currCode = getCurrencyCode();
     const t = loadTreeThresholds();
@@ -2134,7 +2234,7 @@ function vKid() {
     const ready     = allChores.filter(c => !doneTodayIds.includes(c.id));
     const txns      = db.transactions.filter(t => t.kidId === kid.id)
                         .sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt));
-    const typeIcon  = { payout:'💸', weekly:'📅', chore:'✅', manual:'💰', bonus:'🌟' };
+    const typeIcon  = { payout:'💸', weekly:'📅', chore:'✅', manual:'💰', bonus:'🌟', reward:'🏆' };
     const treeStageIdx = getTreeStage(kid.balance);
     const treeThresh   = loadTreeThresholds();
     const threshArr    = [treeThresh.t1, treeThresh.t2, treeThresh.t3, treeThresh.t4];
@@ -2293,6 +2393,56 @@ function vKid() {
             <div class="flex flex-col gap-2 mb-6">
               ${upcomingCards}
               ${achievedCards}
+            </div>`;
+        })()}
+        ${(() => {
+            const rewards = (db.rewards || []).filter(r =>
+                !r.archived && (r.assignedTo === 'all' || (Array.isArray(r.assignedTo) && r.assignedTo.includes(kid.id)))
+            );
+            if (!rewards.length) return '';
+            const cards = rewards.map(r => {
+                const comps = (db.rewardCompletions || []).filter(c => c.rewardId === r.id && c.kidId === kid.id)
+                                                            .sort((a, b) => new Date(b.claimedAt) - new Date(a.claimedAt));
+                const achieved = comps.find(c => c.approved);
+                const pending  = !achieved && comps.find(c => !c.approved && !c.rejected);
+                if (achieved) {
+                    const claimDate = new Date(achieved.approvedAt || achieved.claimedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+                    return `
+                    <div class="card flex items-center gap-3" style="background:#f0fdf4;border:1.5px solid #bbf7d0">
+                      <div style="width:40px;height:40px;background:#dcfce7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#16a34a">${uiIcon('trophy', 20, 2)}</div>
+                      <div class="flex-1 min-w-0">
+                        <p style="font-family:var(--font-family);font-weight:800;color:#15803d;font-size:13px">${r.name}</p>
+                        <p style="font-family:var(--font-family);font-size:11px;color:#16a34a;margin-top:1px">Earned on ${claimDate}</p>
+                      </div>
+                      <p style="font-family:var(--font-family);font-weight:900;color:#16a34a;font-size:15px;flex-shrink:0">+${R(r.value)}</p>
+                    </div>`;
+                }
+                if (pending) {
+                    return `
+                    <div class="card flex items-center gap-4" style="background:#fffbeb;border:1.5px solid #fde68a">
+                      <div style="flex-shrink:0;width:56px;height:56px;background:#fef3c7;border-radius:14px;display:flex;align-items:center;justify-content:center;opacity:0.7;color:#b45309">${uiIcon('trophy', 26, 2)}</div>
+                      <div class="flex-1 min-w-0">
+                        <p style="font-family:var(--font-family);font-weight:800;color:#92400e">${r.name}</p>
+                        <p style="font-family:var(--font-family);font-size:12px;color:#b45309;margin-top:2px">Waiting for parent ⏳</p>
+                        <p style="font-family:var(--font-family);font-weight:800;color:var(--color-warning);margin-top:4px">+ ${R(r.value)}</p>
+                      </div>
+                    </div>`;
+                }
+                return `
+                <div class="card flex items-center gap-4" style="border:1.5px solid #fed7aa">
+                  <div style="flex-shrink:0;width:56px;height:56px;background:#fff7ed;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fb923c">${uiIcon('trophy', 26, 2)}</div>
+                  <div class="flex-1 min-w-0">
+                    <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary)">${r.name}</p>
+                    ${r.description ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${r.description}</p>` : ''}
+                    <p style="font-family:var(--font-family);color:#f97316;font-weight:800;margin-top:4px">+ ${R(r.value)}</p>
+                  </div>
+                  <button onclick="markRewardDone('${r.id}')" class="btn-primary flex-shrink-0" style="width:auto;padding:8px 16px;font-size:13px">Done!</button>
+                </div>`;
+            }).join('');
+            return `
+            <p class="pr-section-label mb-3 mt-2">Rewards</p>
+            <div class="flex flex-col gap-2 mb-6">
+              ${cards}
             </div>`;
         })()}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;margin-top:8px">
@@ -2570,6 +2720,39 @@ function renderModal() {
         </div>`;
     }
 
+    if (type === 'add-reward' || type === 'edit-reward') {
+        const isEdit = type === 'edit-reward';
+        const kidBtns = db.kids.map(k => {
+            const sel = S.selectedKids === 'all' || (Array.isArray(S.selectedKids) && S.selectedKids.includes(k.id));
+            const ac = kidAccent(k);
+            return `<button onclick="toggleKidAssignment('${k.id}')" type="button"
+              style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? ac.border : 'var(--color-border)'};background:${sel ? ac.bg : 'white'};color:${sel ? ac.text : '#6b7280'};cursor:pointer;display:flex;align-items:center;gap:6px">
+              <span style="font-size:18px">${kidIcon(k)}</span>${k.name}
+            </button>`;
+        }).join('');
+        body = `
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${isEdit ? 'Edit' : 'Add'} Reward</h3>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:13px;margin-bottom:16px">For longer-term goals — an exam mark, a sports achievement, anything worth celebrating.</p>
+        <input id="rw-name" placeholder="Goal (e.g. 90% in Maths exam)" value="${data.name ?? ''}" class="mb-3">
+        <input id="rw-desc" placeholder="Description (optional)" value="${data.description ?? ''}" class="mb-3">
+        <div class="relative mb-4">
+          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
+          <input id="rw-val" type="number" placeholder="Reward amount" value="${data.value ?? ''}" step="0.01" min="0" style="padding-left:38px !important">
+        </div>
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Assign to</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
+          <button onclick="setAllKids()" type="button"
+            style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedKids === 'all' ? 'var(--color-green-600)' : 'var(--color-border)'};background:${S.selectedKids === 'all' ? 'var(--color-green-100)' : 'white'};color:${S.selectedKids === 'all' ? 'var(--color-green-700)' : '#6b7280'};cursor:pointer">
+            👨‍👩‍👧‍👦 All kids
+          </button>
+          ${kidBtns}
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+          <button onclick="saveReward(${isEdit ? `'${data.id}'` : 'null'})" class="btn-primary flex-1" style="padding:10px">${isEdit ? 'Save Changes' : 'Add Reward'}</button>
+        </div>`;
+    }
+
     return `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;justify-content:center;z-index:50" onclick="if(event.target===this)closeModal()">
       <div class="modal-sheet" style="background:var(--color-surface);border-radius:32px 32px 0 0;padding:28px 24px 36px;width:100%;max-width:440px">${body}</div>
@@ -2756,6 +2939,41 @@ async function doDeleteBonusMilestone(id) {
     cache.bonusMilestones = cache.bonusMilestones.filter(x => x.id !== id);
     closeModal(); render();
 }
+function editReward(id) {
+    const r = cache.rewards.find(x => x.id === id);
+    if (r) openModal('edit-reward', { ...r });
+}
+async function saveReward(editId) {
+    const name        = document.getElementById('rw-name').value.trim();
+    const description  = document.getElementById('rw-desc').value.trim();
+    const value        = parseFloat(document.getElementById('rw-val').value) || 0;
+    const assignedTo   = S.selectedKids;
+    if (!name)  return toast('⚠️ Please enter a goal.');
+    if (value <= 0) return toast('⚠️ Please enter a reward amount.');
+    if (!assignedTo || (Array.isArray(assignedTo) && assignedTo.length === 0)) return toast('⚠️ Please select at least one kid.');
+    if (editId && editId !== 'null') {
+        const r = cache.rewards.find(x => x.id === editId);
+        if (!r) return;
+        await sb.from('rewards').update({ name, description, value, assigned_to: assignedTo }).eq('id', editId).eq('user_id', currentUser.id);
+        r.name = name; r.description = description; r.value = value; r.assignedTo = assignedTo;
+        closeModal(); toast('Reward updated.');
+    } else {
+        const id = uid(); const createdAt = new Date().toISOString();
+        const { error } = await sb.from('rewards').insert({ id, user_id: currentUser.id, name, description, value, assigned_to: assignedTo, archived: false, created_at: createdAt });
+        if (error) return toast('❌ ' + (error.message || 'Could not save.'));
+        cache.rewards.push({ id, name, description, value, assignedTo, archived: false, createdAt });
+        closeModal(); toast('Reward added! 🏆');
+    }
+}
+function deleteReward(id) {
+    openModal('confirm-delete', { msg: 'Delete this reward? Kids who already earned it keep their bonus.', onConfirm: `doDeleteReward('${id}')` });
+}
+async function doDeleteReward(id) {
+    const { error } = await sb.from('rewards').delete().eq('id', id).eq('user_id', currentUser.id);
+    if (error) return toast('❌ Could not delete.');
+    cache.rewards = cache.rewards.filter(x => x.id !== id);
+    closeModal(); render();
+}
 async function checkBonusMilestones(kidId, newBalance) {
     const eligible = (cache.bonusMilestones || []).filter(m => {
         const applies = m.assignedTo === 'all' || (Array.isArray(m.assignedTo) && m.assignedTo.includes(kidId));
@@ -2852,6 +3070,41 @@ async function markDone(choreId) {
     if (error) return toast('❌ Could not save. Check your connection.');
     cache.completions.push({ id, choreId, kidId: S.kidId, completedAt, dueDate, approved: false, rejected: false, missed: false });
     toast('Marked as done! Waiting for parent to approve. ⏳');
+}
+async function markRewardDone(rewardId) {
+    const id = uid();
+    const claimedAt = new Date().toISOString();
+    const { error } = await sb.from('reward_completions').insert({ id, user_id: currentUser.id, reward_id: rewardId, kid_id: S.kidId, claimed_at: claimedAt, approved: false, rejected: false });
+    if (error) return toast('❌ Could not save. Check your connection.');
+    cache.rewardCompletions.push({ id, rewardId, kidId: S.kidId, claimedAt, approved: false, rejected: false });
+    toast('Marked as done! Waiting for parent to approve. ⏳');
+}
+async function approveReward(cid) {
+    const comp   = cache.rewardCompletions.find(x => x.id === cid);
+    if (!comp) return;
+    const reward = cache.rewards.find(x => x.id === comp.rewardId);
+    const kid    = cache.kids.find(x => x.id === comp.kidId);
+    const approvedAt = new Date().toISOString();
+    await sb.from('reward_completions').update({ approved: true, approved_at: approvedAt }).eq('id', cid).eq('user_id', currentUser.id);
+    comp.approved = true; comp.approvedAt = approvedAt;
+    if (reward && kid) {
+        const newBalance = (kid.balance || 0) + reward.value;
+        const txId = uid();
+        const txCreatedAt = new Date().toISOString();
+        await sb.from('kids').update({ balance: newBalance }).eq('id', kid.id).eq('user_id', currentUser.id);
+        await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, kid_id: kid.id, amount: reward.value, type: 'reward', description: reward.name, created_at: txCreatedAt });
+        kid.balance = newBalance;
+        cache.transactions.push({ id: txId, kidId: kid.id, amount: reward.value, type: 'reward', description: reward.name, createdAt: txCreatedAt });
+        await checkBonusMilestones(kid.id, newBalance);
+    }
+    toast(`✓ Approved! ${R(reward?.value)} added to ${kid?.name}.`);
+    render();
+}
+async function rejectReward(cid) {
+    await sb.from('reward_completions').update({ rejected: true }).eq('id', cid).eq('user_id', currentUser.id);
+    const c = cache.rewardCompletions.find(x => x.id === cid);
+    if (c) c.rejected = true;
+    render();
 }
 async function recordPayout() {
     const kidId  = document.getElementById('po-kid').value;
