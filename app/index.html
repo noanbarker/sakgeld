@@ -2544,11 +2544,11 @@ function renderModal() {
         }).join('');
         body = `
         <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${isEdit ? 'Edit' : 'Add'} Bonus Milestone</h3>
-        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:13px;margin-bottom:16px">Set a savings target and the bonus a kid earns when they reach it.</p>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:13px;margin-bottom:16px">Set a savings milestone and the bonus a kid earns when they reach it.</p>
         <input id="bm-name" placeholder="Name (optional, e.g. First Saver)" value="${m?.name ?? data.name ?? ''}" class="mb-3">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
           <div>
-            <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:6px">Balance target (${currSymbol()})</p>
+            <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:6px">Balance milestone (${currSymbol()})</p>
             <input id="bm-threshold" type="number" placeholder="e.g. 50" value="${m?.threshold ?? data.threshold ?? ''}" step="0.01" min="0">
           </div>
           <div>
@@ -2730,7 +2730,7 @@ async function saveBonusMilestone(editId) {
     const threshold = parseFloat(document.getElementById('bm-threshold').value) || 0;
     const bonusAmt  = parseFloat(document.getElementById('bm-bonus').value) || 0;
     const assignedTo = S.selectedKids;
-    if (threshold <= 0) return toast('⚠️ Please enter a balance target.');
+    if (threshold <= 0) return toast('⚠️ Please enter a balance milestone.');
     if (bonusAmt  <= 0) return toast('⚠️ Please enter a bonus amount.');
     if (!assignedTo || (Array.isArray(assignedTo) && assignedTo.length === 0)) return toast('⚠️ Please select at least one kid.');
     if (editId && editId !== 'null') {
