@@ -1135,14 +1135,19 @@ function weeklyPossible(db, kidId) {
         }, 0);
 }
 function choreScheduleLabel(c) {
-    if (c.oneOff) return 'Today only';
+    if (c.oneOff) {
+        const today = toLocalDateStr(new Date());
+        if (!c.expiresOn || c.expiresOn <= today) return 'Today only';
+        const d = new Date(c.expiresOn + 'T12:00:00');
+        return `Until ${d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}`;
+    }
     if (!c.schedule || c.schedule === 'daily') return 'Daily';
     if (!c.days || c.days.length === 0) return 'No days set';
     if (c.days.length === 7) return 'Daily';
     return c.days.join(', ');
 }
 function choreIsForToday(c) {
-    if (c.oneOff) return c.expiresOn === toLocalDateStr(new Date());
+    if (c.oneOff) return c.expiresOn >= toLocalDateStr(new Date());
     if (!c.schedule || c.schedule === 'daily') return true;
     const today = DAYS[(new Date().getDay() + 6) % 7];
     return (c.days || []).includes(today);
@@ -1813,7 +1818,7 @@ function pOverview(db) {
 
 function pChores(db) {
     const todayDate = toLocalDateStr(new Date());
-    const visibleChores = db.chores.filter(c => !c.oneOff || c.expiresOn === todayDate);
+    const visibleChores = db.chores.filter(c => !c.oneOff || c.expiresOn >= todayDate);
     return `
     <div class="flex justify-between items-center mb-4">
       <p class="pr-section-label">Chores</p>
@@ -2676,11 +2681,16 @@ function renderModal() {
     if (type === 'quick-task') {
         body = `
         <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Quick Chore</h3>
-        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:13px;margin-bottom:16px">Assign a one-off task to a kid for today only — it expires at midnight.</p>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:13px;margin-bottom:16px">Assign a one-off task to a kid. Choose how many days it stays available before it expires.</p>
         <input id="qt-name" placeholder="Task name (e.g. Help wash the car)" value="${data.name||''}" class="mb-3">
         <div class="relative mb-4">
           <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
           <input id="qt-val" type="number" placeholder="Reward" value="${data.value||''}" step="0.01" min="0" style="padding-left:38px !important">
+        </div>
+        <div class="mb-4">
+          <label style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px;display:block">Valid for how many days?</label>
+          <input id="qt-days" type="number" placeholder="1" value="${data.days||1}" step="1" min="1">
+          <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:6px">Stays on the kid's chore list for this many days. Leave as 1 to expire at midnight tonight.</p>
         </div>
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Assign to</p>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
@@ -2923,10 +2933,13 @@ function pickQuickTaskKid(id) {
 async function addQuickTask() {
     const name      = document.getElementById('qt-name').value.trim();
     const val       = parseFloat(document.getElementById('qt-val').value) || 0;
+    const days      = Math.max(1, parseInt(document.getElementById('qt-days').value) || 1);
     const assignedTo = S.selectedKids;
     if (!name) return toast('⚠️ Please enter a task name.');
     if (!assignedTo || (Array.isArray(assignedTo) && assignedTo.length === 0)) return toast('⚠️ Please select at least one kid.');
-    const expiresOn = toLocalDateStr(new Date());
+    const expiry = new Date();
+    expiry.setDate(expiry.getDate() + (days - 1));
+    const expiresOn = toLocalDateStr(expiry);
     const id = uid();
     const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: '', value: val, assigned_to: assignedTo, emoji: '37', schedule: 'daily', days: [], one_off: true, expires_on: expiresOn });
     if (error) return toast('❌ Could not save. Check your connection.');
