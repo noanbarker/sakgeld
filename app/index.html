@@ -3048,11 +3048,14 @@ async function checkBonusMilestones(kidId, newBalance) {
 
 async function approveChore(cid) {
     const comp  = cache.completions.find(x => x.id === cid);
-    if (!comp) return;
+    if (!comp || comp.approved || comp.rejected) return;
+    comp.approved = true;
     const chore = cache.chores.find(x => x.id === comp.choreId);
     const kid   = cache.kids.find(x => x.id === comp.kidId);
-    await sb.from('completions').update({ approved: true }).eq('id', cid).eq('user_id', currentUser.id);
-    comp.approved = true;
+    render();
+    const { data: won } = await sb.from('completions').update({ approved: true })
+        .eq('id', cid).eq('user_id', currentUser.id).eq('approved', false).select('id');
+    if (!won || !won.length) return;
     if (chore && kid) {
         const newBalance = (kid.balance || 0) + chore.value;
         const txId = uid();
@@ -3064,6 +3067,7 @@ async function approveChore(cid) {
         await checkBonusMilestones(kid.id, newBalance);
     }
     toast(`✓ Approved! ${R(chore?.value)} added to ${kid?.name}.`);
+    render();
 }
 async function approveAllForKid(kidId) {
     const kid   = cache.kids.find(x => x.id === kidId);
@@ -3071,12 +3075,16 @@ async function approveAllForKid(kidId) {
     const comps = cache.completions.filter(c => c.kidId === kidId && !c.approved && !c.rejected && !c.missed);
     if (!comps.length) return;
     const ids = comps.map(c => c.id);
-    await sb.from('completions').update({ approved: true }).in('id', ids).eq('user_id', currentUser.id);
+    comps.forEach(comp => { comp.approved = true; });
+    render();
+    const { data: won } = await sb.from('completions').update({ approved: true })
+        .in('id', ids).eq('user_id', currentUser.id).eq('approved', false).select('id');
+    const wonIds = new Set((won || []).map(r => r.id));
+    const wonComps = comps.filter(c => wonIds.has(c.id));
     const now = new Date().toISOString();
     const txInserts = [];
     let totalAdded = 0;
-    comps.forEach(comp => {
-        comp.approved = true;
+    wonComps.forEach(comp => {
         const chore = cache.chores.find(x => x.id === comp.choreId);
         if (chore) {
             totalAdded += chore.value;
@@ -3103,13 +3111,20 @@ async function rejectChore(cid) {
     render();
 }
 async function markDone(choreId) {
-    const id = uid();
     const now = new Date();
-    const completedAt = now.toISOString();
     const dueDate = toLocalDateStr(now);
-    const { error } = await sb.from('completions').insert({ id, user_id: currentUser.id, chore_id: choreId, kid_id: S.kidId, completed_at: completedAt, due_date: dueDate, approved: false, rejected: false, missed: false });
-    if (error) return toast('❌ Could not save. Check your connection.');
+    const already = cache.completions.some(c => c.choreId === choreId && c.kidId === S.kidId && c.dueDate === dueDate && !c.rejected);
+    if (already) return;
+    const id = uid();
+    const completedAt = now.toISOString();
     cache.completions.push({ id, choreId, kidId: S.kidId, completedAt, dueDate, approved: false, rejected: false, missed: false });
+    render();
+    const { error } = await sb.from('completions').insert({ id, user_id: currentUser.id, chore_id: choreId, kid_id: S.kidId, completed_at: completedAt, due_date: dueDate, approved: false, rejected: false, missed: false });
+    if (error) {
+        cache.completions = cache.completions.filter(c => c.id !== id);
+        render();
+        return toast('❌ Could not save. Check your connection.');
+    }
     toast('Marked as done! Waiting for parent to approve. ⏳');
 }
 async function markRewardDone(rewardId) {
