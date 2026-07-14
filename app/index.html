@@ -7,6 +7,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <style>
       /* ── Sprout Design Tokens ─────────────────────────────────── */
@@ -334,6 +335,69 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 let currentUser = null;
 let cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [] };
 const DB = { load: () => cache };
+
+// ─── PADDLE ──────────────────────────────────────────────────────
+const PADDLE_MONTHLY_PRICE_ID = 'pri_01kxgtadc6jf7sqe3avwrf6k5q';
+const PADDLE_YEARLY_PRICE_ID  = 'pri_01kxgtpwe2jnzw2qk1cjtt2c96';
+Paddle.Environment.set('sandbox');
+Paddle.Initialize({
+    token: 'test_db0521515e2c6640f053ab59f70',
+    eventCallback: function (event) {
+        if (event.name === 'checkout.completed') {
+            S.authMode = 'signin';
+            toast('🎉 Trial started! Check your email to confirm your account, then sign in.');
+            render();
+        }
+    }
+});
+function openTrialCheckout({ email, country, userId }) {
+    Paddle.Checkout.open({
+        items: [{ priceId: PADDLE_MONTHLY_PRICE_ID, quantity: 1 }],
+        customer: { email, address: { countryCode: country } },
+        customData: { supabase_user_id: userId }
+    });
+}
+
+// ─── COUNTRIES ───────────────────────────────────────────────────
+const COUNTRIES = [
+  ['ZA','South Africa'],['AF','Afghanistan'],['AL','Albania'],['DZ','Algeria'],['AD','Andorra'],
+  ['AO','Angola'],['AR','Argentina'],['AM','Armenia'],['AU','Australia'],['AT','Austria'],
+  ['AZ','Azerbaijan'],['BS','Bahamas'],['BH','Bahrain'],['BD','Bangladesh'],['BB','Barbados'],
+  ['BY','Belarus'],['BE','Belgium'],['BZ','Belize'],['BJ','Benin'],['BT','Bhutan'],
+  ['BO','Bolivia'],['BA','Bosnia and Herzegovina'],['BW','Botswana'],['BR','Brazil'],['BN','Brunei'],
+  ['BG','Bulgaria'],['BF','Burkina Faso'],['BI','Burundi'],['KH','Cambodia'],['CM','Cameroon'],
+  ['CA','Canada'],['CV','Cape Verde'],['CF','Central African Republic'],['TD','Chad'],['CL','Chile'],
+  ['CN','China'],['CO','Colombia'],['KM','Comoros'],['CG','Congo'],['CD','Congo (DRC)'],
+  ['CR','Costa Rica'],['HR','Croatia'],['CU','Cuba'],['CY','Cyprus'],['CZ','Czechia'],
+  ['DK','Denmark'],['DJ','Djibouti'],['DM','Dominica'],['DO','Dominican Republic'],['EC','Ecuador'],
+  ['EG','Egypt'],['SV','El Salvador'],['GQ','Equatorial Guinea'],['ER','Eritrea'],['EE','Estonia'],
+  ['SZ','Eswatini'],['ET','Ethiopia'],['FJ','Fiji'],['FI','Finland'],['FR','France'],
+  ['GA','Gabon'],['GM','Gambia'],['GE','Georgia'],['DE','Germany'],['GH','Ghana'],
+  ['GR','Greece'],['GD','Grenada'],['GT','Guatemala'],['GN','Guinea'],['GW','Guinea-Bissau'],
+  ['GY','Guyana'],['HT','Haiti'],['HN','Honduras'],['HK','Hong Kong'],['HU','Hungary'],
+  ['IS','Iceland'],['IN','India'],['ID','Indonesia'],['IR','Iran'],['IQ','Iraq'],
+  ['IE','Ireland'],['IL','Israel'],['IT','Italy'],['CI',"Ivory Coast"],['JM','Jamaica'],
+  ['JP','Japan'],['JO','Jordan'],['KZ','Kazakhstan'],['KE','Kenya'],['KI','Kiribati'],
+  ['KW','Kuwait'],['KG','Kyrgyzstan'],['LA','Laos'],['LV','Latvia'],['LB','Lebanon'],
+  ['LS','Lesotho'],['LR','Liberia'],['LY','Libya'],['LI','Liechtenstein'],['LT','Lithuania'],
+  ['LU','Luxembourg'],['MG','Madagascar'],['MW','Malawi'],['MY','Malaysia'],['MV','Maldives'],
+  ['ML','Mali'],['MT','Malta'],['MR','Mauritania'],['MU','Mauritius'],['MX','Mexico'],
+  ['MD','Moldova'],['MC','Monaco'],['MN','Mongolia'],['ME','Montenegro'],['MA','Morocco'],
+  ['MZ','Mozambique'],['MM','Myanmar'],['NA','Namibia'],['NP','Nepal'],['NL','Netherlands'],
+  ['NZ','New Zealand'],['NI','Nicaragua'],['NE','Niger'],['NG','Nigeria'],['NO','Norway'],
+  ['OM','Oman'],['PK','Pakistan'],['PA','Panama'],['PG','Papua New Guinea'],['PY','Paraguay'],
+  ['PE','Peru'],['PH','Philippines'],['PL','Poland'],['PT','Portugal'],['QA','Qatar'],
+  ['RO','Romania'],['RU','Russia'],['RW','Rwanda'],['WS','Samoa'],['SM','San Marino'],
+  ['ST','Sao Tome and Principe'],['SA','Saudi Arabia'],['SN','Senegal'],['RS','Serbia'],['SC','Seychelles'],
+  ['SL','Sierra Leone'],['SG','Singapore'],['SK','Slovakia'],['SI','Slovenia'],['SB','Solomon Islands'],
+  ['SO','Somalia'],['KR','South Korea'],['SS','South Sudan'],['ES','Spain'],['LK','Sri Lanka'],
+  ['SD','Sudan'],['SR','Suriname'],['SE','Sweden'],['CH','Switzerland'],['TW','Taiwan'],
+  ['TJ','Tajikistan'],['TZ','Tanzania'],['TH','Thailand'],['TG','Togo'],['TO','Tonga'],
+  ['TT','Trinidad and Tobago'],['TN','Tunisia'],['TR','Turkey'],['TM','Turkmenistan'],['UG','Uganda'],
+  ['UA','Ukraine'],['AE','United Arab Emirates'],['GB','United Kingdom'],['US','United States'],['UY','Uruguay'],
+  ['UZ','Uzbekistan'],['VU','Vanuatu'],['VE','Venezuela'],['VN','Vietnam'],['YE','Yemen'],
+  ['ZM','Zambia'],['ZW','Zimbabwe']
+];
 
 async function loadCache() {
     const uid = currentUser.id;
@@ -1315,6 +1379,8 @@ function treeSVG(width = 100, animated = true, light = false) {
 
 // ─── AUTH VIEW ───────────────────────────────────────────────────
 function vLogin() {
+    const isSignup = (S.authMode || 'signup') === 'signup';
+    const countryOptions = COUNTRIES.map(([code, name]) => `<option value="${code}">${name}</option>`).join('');
     return `
     <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
       <div style="width:100%;max-width:440px">
@@ -1324,20 +1390,29 @@ function vLogin() {
           <div class="pr-blob-top"></div>
           <div class="pr-blob-bottom"></div>
           <div style="position:relative;z-index:1">
-            <div style="display:flex;justify-content:center;margin-bottom:32px">
+            <div style="display:flex;justify-content:center;margin-bottom:28px">
               <div style="display:flex;align-items:center;gap:10px;margin-left:-60px">
                 ${treeSVG(50, false, true)}
                 <h1 style="font-family:var(--font-family);font-size:34px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin:0">Sprout</h1>
               </div>
             </div>
+            <div style="display:flex;background:#eef2ef;border-radius:14px;padding:5px;margin-bottom:22px">
+              <button onclick="setAuthMode('signup')" style="flex:1;border:none;cursor:pointer;font-family:var(--font-family);font-weight:800;font-size:14px;padding:11px;border-radius:10px;background:${isSignup ? '#fff' : 'transparent'};color:${isSignup ? '#14532d' : '#64748b'};${isSignup ? 'box-shadow:0 1px 3px rgba(15,40,25,.1)' : ''}">Create account</button>
+              <button onclick="setAuthMode('signin')" style="flex:1;border:none;cursor:pointer;font-family:var(--font-family);font-weight:800;font-size:14px;padding:11px;border-radius:10px;background:${!isSignup ? '#fff' : 'transparent'};color:${!isSignup ? '#14532d' : '#64748b'};${!isSignup ? 'box-shadow:0 1px 3px rgba(15,40,25,.1)' : ''}">Sign in</button>
+            </div>
+            ${isSignup ? `<input type="text" id="l-name" placeholder="Your name" class="mb-3">` : ''}
             <input type="email" id="l-email" placeholder="Email address" class="mb-3"
               onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()">
-            <input type="password" id="l-pass" placeholder="Password" class="mb-2"
-              onkeydown="if(event.key==='Enter')doSignIn()">
-            <p id="l-err" style="color:#f43f5e;font-size:14px;margin-bottom:12px;min-height:20px"></p>
-            <button onclick="doSignIn()" class="btn-primary mb-3">Sign In</button>
-            <button onclick="doSignUp()" class="btn-outline">Create Account</button>
-            <p style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-muted);text-align:center;margin-top:24px">
+            <input type="password" id="l-pass" placeholder="Password" class="${isSignup ? 'mb-3' : 'mb-2'}"
+              onkeydown="if(event.key==='Enter'){${isSignup ? 'doSignUp()' : 'doSignIn()'}}">
+            ${isSignup ? `
+            <select id="l-country" class="mb-2">
+              <option value="">Select your country</option>
+              ${countryOptions}
+            </select>` : ''}
+            <p id="l-err" style="color:#f43f5e;font-size:14px;margin:4px 0 12px;min-height:20px"></p>
+            <button onclick="${isSignup ? 'doSignUp()' : 'doSignIn()'}" class="btn-primary">${isSignup ? 'Create Account' : 'Sign In'}</button>
+            <p style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-muted);text-align:center;margin-top:20px">
               Your family's data is stored securely in the cloud.
             </p>
           </div>
@@ -1345,6 +1420,7 @@ function vLogin() {
       </div>
     </div>`;
 }
+function setAuthMode(mode) { S.authMode = mode; render(); }
 async function doSignIn() {
     const email = document.getElementById('l-email')?.value?.trim();
     const pass  = document.getElementById('l-pass')?.value;
@@ -1355,14 +1431,22 @@ async function doSignIn() {
     if (error && errEl) errEl.textContent = error.message;
 }
 async function doSignUp() {
-    const email = document.getElementById('l-email')?.value?.trim();
-    const pass  = document.getElementById('l-pass')?.value;
+    const name    = document.getElementById('l-name')?.value?.trim();
+    const email   = document.getElementById('l-email')?.value?.trim();
+    const pass    = document.getElementById('l-pass')?.value;
+    const country = document.getElementById('l-country')?.value;
     const errEl = document.getElementById('l-err');
-    if (!email || !pass) { if (errEl) errEl.textContent = 'Please enter email and password.'; return; }
+    if (!name || !email || !pass || !country) { if (errEl) errEl.textContent = 'Please fill in all fields.'; return; }
     if (errEl) errEl.textContent = 'Creating account…';
-    const { error } = await sb.auth.signUp({ email, password: pass });
-    if (error) { if (errEl) errEl.textContent = error.message; }
-    else { toast('Account created! Check your email to confirm, then sign in.'); }
+    const { data, error } = await sb.auth.signUp({
+        email, password: pass,
+        options: { data: { name, country } }
+    });
+    if (error) { if (errEl) errEl.textContent = error.message; return; }
+    const userId = data?.user?.id;
+    if (!userId) { if (errEl) errEl.textContent = 'Something went wrong creating your account.'; return; }
+    if (errEl) errEl.textContent = '';
+    openTrialCheckout({ email, country, userId });
 }
 
 // ─── VIEWS ───────────────────────────────────────────────────────
@@ -2313,8 +2397,8 @@ function vKid() {
             <div style="display:flex;align-items:center;gap:14px">
               <div style="width:52px;height:52px;background:rgba(255,255,255,0.2);border:2px solid rgba(255,255,255,0.4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px">${kidIcon(kid)}</div>
               <div>
-                <p style="font-family:var(--font-family);font-size:12px;color:rgba(255,255,255,0.7)">Hi there,</p>
-                <h1 style="font-family:var(--font-family);font-size:20px;font-weight:800">${kid.name}</h1>
+                <p style="font-family:var(--font-family);font-size:24px;color:rgba(255,255,255,0.7)">Hi there,</p>
+                <h1 style="font-family:var(--font-family);font-size:40px;font-weight:800">${kid.name}</h1>
               </div>
             </div>
             <button onclick="go('home')" style="font-family:var(--font-family);color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:6px">${uiIcon('home', 16)} Home</button>
