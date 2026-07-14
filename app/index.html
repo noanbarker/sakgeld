@@ -1628,6 +1628,23 @@ function vParent() {
     </div>`;
 }
 
+function missedChoreRow(c, db) {
+    const chore = db.chores.find(x => x.id === c.choreId);
+    const kid   = db.kids.find(x => x.id === c.kidId);
+    const d = new Date((c.dueDate || toLocalDateStr(new Date())) + 'T12:00:00');
+    const label = d.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' });
+    return `
+    <div class="card flex items-center gap-3" style="border-left:3px solid ${c.approved ? '#86efac' : '#fca5a5'}">
+      <div class="flex-1 min-w-0">
+        <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:14px">${chore?.name || 'Deleted chore'}</p>
+        <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${kid?.name || '?'} · ${label} · ${R(chore?.value || 0)}${c.approved ? '' : ' not earned'}</p>
+      </div>
+      ${c.approved
+        ? `<span style="font-family:var(--font-family);font-size:11px;font-weight:700;color:#15803d;background:#f0fdf4;padding:4px 10px;border-radius:20px;flex-shrink:0">Approved</span>`
+        : `<button onclick="approveChore('${c.id}')" title="Mark as done and add to balance" style="background:var(--color-green-100);color:var(--color-green-700);padding:6px 11px;border-radius:8px;border:none;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;gap:5px;font-family:var(--font-family);font-size:11px;font-weight:700">${uiIcon('check', 13, 3)} Approve</button>`}
+    </div>`;
+}
+
 function pOverview(db) {
     const pending = db.completions.filter(c => !c.approved && !c.rejected && !c.missed);
     const sortedKids = [...db.kids].sort((a, b) => a.name.localeCompare(b.name));
@@ -1759,21 +1776,9 @@ function pOverview(db) {
     const missedClearedAt = localStorage.getItem('sprout_missed_cleared_at') || '';
     const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const sevenDaysAgoStr = toLocalDateStr(sevenDaysAgo);
-    const missed = db.completions.filter(c => c.missed && (c.dueDate || '') >= sevenDaysAgoStr && (!missedClearedAt || (c.dueDate || '') > missedClearedAt)).sort((a,b) => b.dueDate?.localeCompare(a.dueDate));
-    const missedRows = missed.map(c => {
-        const chore = db.chores.find(x => x.id === c.choreId);
-        const kid   = db.kids.find(x => x.id === c.kidId);
-        const d = new Date(c.dueDate + 'T12:00:00');
-        const label = d.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' });
-        return `
-        <div class="card flex items-center gap-3" style="border-left:3px solid #fca5a5">
-          <div class="flex-1">
-            <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:14px">${chore?.name || 'Deleted chore'}</p>
-            <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${kid?.name || '?'} · ${label} · ${R(chore?.value || 0)} not earned</p>
-          </div>
-          <span style="font-family:var(--font-family);font-size:11px;font-weight:700;color:#f43f5e;background:#fff1f2;padding:4px 10px;border-radius:20px">Missed</span>
-        </div>`;
-    }).join('');
+    const missed = db.completions.filter(c => c.missed && !c.approved && (c.dueDate || '') >= sevenDaysAgoStr && (!missedClearedAt || (c.dueDate || '') > missedClearedAt)).sort((a,b) => b.dueDate?.localeCompare(a.dueDate));
+    const missedRows = missed.map(c => missedChoreRow(c, db)).join('');
+    const hasMissedHistory = db.completions.some(c => c.missed);
 
     return `
     <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
@@ -1804,14 +1809,19 @@ function pOverview(db) {
         <div class="flex flex-col gap-2">${pendingRewardRows}</div>`}
       </div>
     </div>
-    ${missed.length === 0 ? '' : `
+    ${(missed.length === 0 && !hasMissedHistory) ? '' : `
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
       <div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <p class="pr-section-label" style="margin-bottom:0">Missed Chores <span style="font-family:var(--font-family);font-size:11px;font-weight:600;color:var(--color-text-muted)">(last 7 days)</span></p>
-          <button onclick="clearMissedChores()" style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-text-muted);background:none;border:1.5px solid var(--color-border);border-radius:8px;padding:4px 10px;cursor:pointer" onmouseenter="this.style.color='#374151'" onmouseleave="this.style.color='var(--color-text-muted)'">Clear all</button>
+          <div style="display:flex;gap:8px">
+            ${hasMissedHistory ? `<button onclick="openModal('missed-history')" style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-text-muted);background:none;border:1.5px solid var(--color-border);border-radius:8px;padding:4px 10px;cursor:pointer" onmouseenter="this.style.color='#374151'" onmouseleave="this.style.color='var(--color-text-muted)'">History</button>` : ''}
+            ${missed.length === 0 ? '' : `<button onclick="clearMissedChores()" style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-text-muted);background:none;border:1.5px solid var(--color-border);border-radius:8px;padding:4px 10px;cursor:pointer" onmouseenter="this.style.color='#374151'" onmouseleave="this.style.color='var(--color-text-muted)'">Clear all</button>`}
+          </div>
         </div>
-        <div class="flex flex-col gap-2">${missedRows}</div>
+        ${missed.length === 0
+          ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No missed chores right now 🎉</div>`
+          : `<div class="flex flex-col gap-2">${missedRows}</div>`}
       </div>
       <div></div>
     </div>`}`;
@@ -2636,6 +2646,21 @@ function renderModal() {
         <div style="display:flex;gap:8px">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
           <button onclick="${data.onConfirm}" style="flex:1;padding:10px;font-family:var(--font-family);font-size:14px;font-weight:700;background:var(--color-coral);color:white;border:none;border-radius:var(--radius-lg);cursor:pointer">Delete</button>
+        </div>`;
+    }
+
+    if (type === 'missed-history') {
+        const allMissed = db.completions.filter(c => c.missed).sort((a,b) => (b.dueDate||'').localeCompare(a.dueDate||''));
+        const rows = allMissed.map(c => missedChoreRow(c, db)).join('');
+        body = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:0">Missed Chores History</h3>
+          <button onclick="closeModal()" style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);padding:4px;display:inline-flex" title="Close">${uiIcon('cross', 18, 2.5)}</button>
+        </div>
+        <div class="flex flex-col gap-2" style="max-height:60vh;overflow-y:auto;padding-right:2px">
+          ${allMissed.length === 0
+            ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No missed chores on record. 🎉</div>`
+            : rows}
         </div>`;
     }
 
