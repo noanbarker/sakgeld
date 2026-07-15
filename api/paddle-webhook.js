@@ -70,6 +70,7 @@ module.exports = async (req, res) => {
         user_metadata: {
           subscription_status: sub.status || null,
           subscription_id: sub.id || null,
+          paddle_customer_id: sub.customer_id || null,
           current_period_ends_at: sub.current_billing_period ? sub.current_billing_period.ends_at : null,
           next_billed_at: sub.next_billed_at || null,
         },

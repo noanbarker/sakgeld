@@ -2230,6 +2230,13 @@ function pSettings() {
         <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:12px">Preview: <span style="font-weight:800;color:var(--color-text-primary)">${R(25)}</span></p>
       </div>
 
+      <!-- Subscription -->
+      <div class="card mb-5">
+        <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Subscription</p>
+        <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">Update your payment method, view billing history, or cancel your subscription.</p>
+        <button id="manage-sub-btn" onclick="openManageSubscription()" class="btn-primary" style="width:auto;padding:10px 28px">Manage Subscription</button>
+      </div>
+
       <!-- Tree Growth Stages -->
       <div class="card">
         <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Tree Growth Stages</p>
@@ -3343,6 +3350,28 @@ function clearMissedChores() {
         if (data?.user) currentUser = data.user;
     });
     render();
+}
+
+async function openManageSubscription() {
+    const btn = document.getElementById('manage-sub-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+    try {
+        const { data: { session } } = await sb.auth.getSession();
+        const res = await fetch('/api/paddle-portal', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const body = await res.json();
+        if (!res.ok || !body?.urls?.general?.overview) {
+            toast('❌ ' + (body?.error || 'Could not open subscription management.'));
+            return;
+        }
+        window.open(body.urls.general.overview, '_blank');
+    } catch (e) {
+        toast('❌ Could not open subscription management.');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Manage Subscription'; }
+    }
 }
 
 function saveCurrency(code) {
