@@ -1418,7 +1418,8 @@ function treeSVG(width = 100, animated = true, light = false) {
 // ─── AUTH VIEW ───────────────────────────────────────────────────
 function vLogin() {
     const isSignup = (S.authMode || 'signup') === 'signup';
-    const countryOptions = COUNTRIES.map(([code, name]) => `<option value="${code}">${name}</option>`).join('');
+    const draft = S.signupDraft || {};
+    const countryOptions = COUNTRIES.map(([code, name]) => `<option value="${code}" ${code === draft.country ? 'selected' : ''}>${name}</option>`).join('');
     return `
     <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
       <div style="width:100%;max-width:440px">
@@ -1438,10 +1439,10 @@ function vLogin() {
               <button onclick="setAuthMode('signup')" style="flex:1;border:none;cursor:pointer;font-family:var(--font-family);font-weight:800;font-size:14px;padding:11px;border-radius:10px;background:${isSignup ? '#fff' : 'transparent'};color:${isSignup ? '#14532d' : '#64748b'};${isSignup ? 'box-shadow:0 1px 3px rgba(15,40,25,.1)' : ''}">Create account</button>
               <button onclick="setAuthMode('signin')" style="flex:1;border:none;cursor:pointer;font-family:var(--font-family);font-weight:800;font-size:14px;padding:11px;border-radius:10px;background:${!isSignup ? '#fff' : 'transparent'};color:${!isSignup ? '#14532d' : '#64748b'};${!isSignup ? 'box-shadow:0 1px 3px rgba(15,40,25,.1)' : ''}">Sign in</button>
             </div>
-            ${isSignup ? `<input type="text" id="l-name" placeholder="Your name" class="mb-3">` : ''}
-            <input type="email" id="l-email" placeholder="Email address" class="mb-3"
+            ${isSignup ? `<input type="text" id="l-name" placeholder="Your name" value="${draft.name || ''}" class="mb-3">` : ''}
+            <input type="email" id="l-email" placeholder="Email address" value="${draft.email || ''}" class="mb-3"
               onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()">
-            <input type="password" id="l-pass" placeholder="Password" class="${isSignup ? 'mb-3' : 'mb-2'}"
+            <input type="password" id="l-pass" placeholder="Password" value="${draft.pass || ''}" class="${isSignup ? 'mb-3' : 'mb-2'}"
               onkeydown="if(event.key==='Enter'){${isSignup ? 'doSignUp()' : 'doSignIn()'}}">
             ${isSignup ? `
             <select id="l-country" class="mb-3">
@@ -1463,7 +1464,16 @@ function vLogin() {
     </div>`;
 }
 function setAuthMode(mode) { S.authMode = mode; render(); }
-function setBillingCycle(cycle) { S.billingCycle = cycle; render(); }
+function setBillingCycle(cycle) {
+    S.signupDraft = {
+        name: document.getElementById('l-name')?.value,
+        email: document.getElementById('l-email')?.value,
+        pass: document.getElementById('l-pass')?.value,
+        country: document.getElementById('l-country')?.value
+    };
+    S.billingCycle = cycle;
+    render();
+}
 
 // ─── SUBSCRIPTION GATE ───────────────────────────────────────────
 // Signing up creates the Supabase account immediately, but the subscription only
