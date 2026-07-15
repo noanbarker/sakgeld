@@ -470,6 +470,7 @@ async function initApp() {
     render();
     sb.auth.onAuthStateChange(async (event, session) => {
         currentUser = session?.user || null;
+        if (event === 'PASSWORD_RECOVERY') { S.authMode = 'reset'; render(); return; }
         if (currentUser) { await loadCache(); }
         else { cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [] }; S.view = 'home'; }
         render();
@@ -1417,7 +1418,9 @@ function treeSVG(width = 100, animated = true, light = false) {
 
 // ─── AUTH VIEW ───────────────────────────────────────────────────
 function vLogin() {
-    const isSignup = (S.authMode || 'signup') === 'signup';
+    const mode = S.authMode || 'signup';
+    const isSignup = mode === 'signup';
+    const isForgot = mode === 'forgot';
     const draft = S.signupDraft || {};
     const countryOptions = COUNTRIES.map(([code, name]) => `<option value="${code}" ${code === draft.country ? 'selected' : ''}>${name}</option>`).join('');
     return `
@@ -1435,6 +1438,16 @@ function vLogin() {
                 <h1 style="font-family:var(--font-family);font-size:34px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin:0">Sprout</h1>
               </div>
             </div>
+            ${isForgot ? `
+            <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:18px;text-align:center">Enter your email and we'll send you a link to reset your password.</p>
+            <input type="email" id="l-email" placeholder="Email address" value="${draft.email || ''}" class="mb-3"
+              onkeydown="if(event.key==='Enter')doForgotPassword()">
+            <p id="l-err" style="color:#f43f5e;font-size:14px;margin:4px 0 12px;min-height:20px"></p>
+            <button onclick="doForgotPassword()" class="btn-primary" style="margin-bottom:14px">Send reset link</button>
+            <div style="text-align:center">
+              <button type="button" onclick="setAuthMode('signin')" style="background:none;border:none;cursor:pointer;font-family:var(--font-family);font-size:13px;font-weight:600;color:var(--color-text-muted)">&larr; Back to sign in</button>
+            </div>
+            ` : `
             <div style="display:flex;background:#eef2ef;border-radius:14px;padding:5px;margin-bottom:22px">
               <button onclick="setAuthMode('signup')" style="flex:1;border:none;cursor:pointer;font-family:var(--font-family);font-weight:800;font-size:14px;padding:11px;border-radius:10px;background:${isSignup ? '#fff' : 'transparent'};color:${isSignup ? '#14532d' : '#64748b'};${isSignup ? 'box-shadow:0 1px 3px rgba(15,40,25,.1)' : ''}">Create account</button>
               <button onclick="setAuthMode('signin')" style="flex:1;border:none;cursor:pointer;font-family:var(--font-family);font-weight:800;font-size:14px;padding:11px;border-radius:10px;background:${!isSignup ? '#fff' : 'transparent'};color:${!isSignup ? '#14532d' : '#64748b'};${!isSignup ? 'box-shadow:0 1px 3px rgba(15,40,25,.1)' : ''}">Sign in</button>
@@ -1442,8 +1455,9 @@ function vLogin() {
             ${isSignup ? `<input type="text" id="l-name" placeholder="Your name" value="${draft.name || ''}" class="mb-3">` : ''}
             <input type="email" id="l-email" placeholder="Email address" value="${draft.email || ''}" class="mb-3"
               onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()">
-            <input type="password" id="l-pass" placeholder="Password" value="${draft.pass || ''}" class="${isSignup ? 'mb-3' : 'mb-2'}"
+            <input type="password" id="l-pass" placeholder="Password" value="${draft.pass || ''}" class="${isSignup ? 'mb-3' : 'mb-1'}"
               onkeydown="if(event.key==='Enter'){${isSignup ? 'doSignUp()' : 'doSignIn()'}}">
+            ${!isSignup ? `<div style="text-align:right;margin-bottom:12px"><button type="button" onclick="setAuthMode('forgot')" style="background:none;border:none;cursor:pointer;font-family:var(--font-family);font-size:13px;font-weight:600;color:#15803d;padding:0">Forgot password?</button></div>` : ''}
             ${isSignup ? `
             <select id="l-country" class="mb-3">
               <option value="">Select your country</option>
@@ -1455,6 +1469,7 @@ function vLogin() {
             </div>` : ''}
             <p id="l-err" style="color:#f43f5e;font-size:14px;margin:4px 0 12px;min-height:20px"></p>
             <button onclick="${isSignup ? 'doSignUp()' : 'doSignIn()'}" class="btn-primary">${isSignup ? 'Create Account' : 'Sign In'}</button>
+            `}
             <p style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-muted);text-align:center;margin-top:20px">
               Your family's data is stored securely in the cloud.
             </p>
@@ -1464,6 +1479,53 @@ function vLogin() {
     </div>`;
 }
 function setAuthMode(mode) { S.authMode = mode; render(); }
+async function doForgotPassword() {
+    const email = document.getElementById('l-email')?.value?.trim();
+    const errEl = document.getElementById('l-err');
+    if (!email) { if (errEl) errEl.textContent = 'Please enter your email.'; return; }
+    if (errEl) errEl.textContent = 'Sending…';
+    const redirectTo = window.location.origin + window.location.pathname + '?mode=reset';
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) { if (errEl) errEl.textContent = error.message; return; }
+    S.authMode = 'signin';
+    toast('Check your email for a link to reset your password.');
+}
+function vResetPassword() {
+    return `
+    <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
+      <div style="width:100%;max-width:440px">
+        <div class="pr-card" style="padding:52px 40px 44px">
+          <div class="pr-stripe"></div>
+          <div class="pr-blob-top"></div>
+          <div class="pr-blob-bottom"></div>
+          <div style="position:relative;z-index:1">
+            <div style="display:flex;justify-content:center;margin-bottom:28px">
+              <div style="display:flex;align-items:center;gap:10px;margin-left:-60px">
+                ${treeSVG(50, false, true)}
+                <h1 style="font-family:var(--font-family);font-size:34px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin:0">Sprout</h1>
+              </div>
+            </div>
+            <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:18px;text-align:center">Choose a new password for your account.</p>
+            <input type="password" id="rp-pass" placeholder="New password" class="mb-3"
+              onkeydown="if(event.key==='Enter')doResetPassword()">
+            <p id="rp-err" style="color:#f43f5e;font-size:14px;margin:4px 0 12px;min-height:20px"></p>
+            <button onclick="doResetPassword()" class="btn-primary">Set new password</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+async function doResetPassword() {
+    const pass = document.getElementById('rp-pass')?.value;
+    const errEl = document.getElementById('rp-err');
+    if (!pass || pass.length < 6) { if (errEl) errEl.textContent = 'Password must be at least 6 characters.'; return; }
+    if (errEl) errEl.textContent = 'Saving…';
+    const { error } = await sb.auth.updateUser({ password: pass });
+    if (error) { if (errEl) errEl.textContent = error.message; return; }
+    S.authMode = 'signin';
+    toast('Password updated! You can now sign in.');
+    await sb.auth.signOut();
+}
 function setBillingCycle(cycle) {
     S.signupDraft = {
         name: document.getElementById('l-name')?.value,
@@ -3527,6 +3589,10 @@ function render() {
     const toastHtml = S.toast
         ? `<div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:white;font-family:var(--font-family);font-size:14px;font-weight:600;padding:10px 20px;border-radius:var(--radius-full);box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:99;max-width:320px;text-align:center">${S.toast}</div>`
         : '';
+    if (S.authMode === 'reset') {
+        document.getElementById('app').innerHTML = vResetPassword() + toastHtml;
+        return;
+    }
     if (!currentUser) {
         document.getElementById('app').innerHTML = vLogin() + toastHtml;
         return;
