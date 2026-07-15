@@ -337,14 +337,14 @@ let cache = { kids: [], chores: [], completions: [], transactions: [], bonusMile
 const DB = { load: () => cache };
 
 // ─── PADDLE ──────────────────────────────────────────────────────
-const PADDLE_MONTHLY_PRICE_ID = 'pri_01kxgtadc6jf7sqe3avwrf6k5q';
-const PADDLE_YEARLY_PRICE_ID  = 'pri_01kxgtpwe2jnzw2qk1cjtt2c96';
+const PADDLE_MONTHLY_PRICE_ID = 'pri_01kxk0mnq639h8s7at892147qv';
+const PADDLE_YEARLY_PRICE_ID  = 'pri_01kxk0mp1mpfz3vr3dtnm94j5g';
 // South Africa gets its own tax-inclusive prices so R59/R590 is genuinely the total charged, not the base price + VAT on top.
-const PADDLE_MONTHLY_PRICE_ID_ZA = 'pri_01kxjg29j2r2xvny9ab9q7qs4t';
-const PADDLE_YEARLY_PRICE_ID_ZA  = 'pri_01kxjgbkwvzksqcdzecnn9whxy';
-Paddle.Environment.set('sandbox');
+const PADDLE_MONTHLY_PRICE_ID_ZA = 'pri_01kxk0mpc8359xzt2y6cn7n1rb';
+const PADDLE_YEARLY_PRICE_ID_ZA  = 'pri_01kxk0mppxjmn8neh65j572r34';
+Paddle.Environment.set('production');
 Paddle.Initialize({
-    token: 'test_db0521515e2c6640f053ab59f70',
+    token: 'live_e173d47036db9b102418e3d9795',
     eventCallback: function (event) {
         if (event.name === 'checkout.completed') {
             if (currentUser) {
