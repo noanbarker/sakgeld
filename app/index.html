@@ -347,12 +347,39 @@ Paddle.Initialize({
     token: 'test_db0521515e2c6640f053ab59f70',
     eventCallback: function (event) {
         if (event.name === 'checkout.completed') {
-            S.authMode = 'signin';
-            toast('🎉 Trial started! Check your email to confirm your account, then sign in.');
-            render();
+            if (currentUser) {
+                // Existing signed-in user finishing checkout from the subscription gate —
+                // the webhook needs a moment to reach Supabase, so poll briefly for it.
+                toast('🎉 Almost there! Confirming your subscription…');
+                refreshUserAfterCheckout();
+            } else {
+                S.authMode = 'signin';
+                toast('🎉 Trial started! Check your email to confirm your account, then sign in.');
+                render();
+            }
         }
     }
 });
+async function refreshUserAfterCheckout() {
+    for (let i = 0; i < 4; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        const { data } = await sb.auth.getUser();
+        if (data?.user) {
+            currentUser = data.user;
+            if (currentUser.user_metadata?.subscription_status) break;
+        }
+    }
+    render();
+}
+function resumeCheckout() {
+    const meta = currentUser?.user_metadata || {};
+    openTrialCheckout({
+        email: currentUser.email,
+        country: meta.country,
+        userId: currentUser.id,
+        billingCycle: meta.billing_cycle || 'monthly'
+    });
+}
 function openTrialCheckout({ email, country, userId, billingCycle }) {
     const isYearly = billingCycle === 'yearly';
     const isZA = country === 'ZA';
@@ -1437,6 +1464,35 @@ function vLogin() {
 }
 function setAuthMode(mode) { S.authMode = mode; render(); }
 function setBillingCycle(cycle) { S.billingCycle = cycle; render(); }
+
+// ─── SUBSCRIPTION GATE ───────────────────────────────────────────
+// Signing up creates the Supabase account immediately, but the subscription only
+// exists once Paddle's webhook confirms checkout — so a signed-in user with no
+// active/trialing subscription (abandoned checkout, failed payment, canceled, etc.)
+// must be blocked here rather than let into the app.
+function vSubscriptionGate() {
+    const status = currentUser?.user_metadata?.subscription_status;
+    const needsAttention = !!status;
+    return `
+    <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
+      <div style="width:100%;max-width:440px">
+        <div class="pr-card" style="padding:52px 40px 44px;text-align:center">
+          <div class="pr-stripe"></div>
+          <div style="position:relative;z-index:1">
+            <div style="display:flex;justify-content:center;margin-bottom:20px">${treeSVG(50, false, true)}</div>
+            <h2 style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d;margin-bottom:10px">${needsAttention ? 'Your subscription needs attention' : "You're almost there!"}</h2>
+            <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:28px">${needsAttention
+                ? 'There’s an issue with your payment method or subscription. Please update your details to keep using Sprout.'
+                : 'Your account is set up, but your subscription was never completed. Finish checkout to start your 14-day free trial.'}</p>
+            <button id="manage-sub-btn" onclick="${needsAttention ? 'openManageSubscription()' : 'resumeCheckout()'}" class="btn-primary" style="margin-bottom:14px">${needsAttention ? 'Manage Subscription' : 'Continue to Checkout'}</button>
+            <div>
+              <button onclick="signOut()" style="font-family:var(--font-family);font-size:13px;font-weight:600;color:var(--color-text-muted);background:none;border:none;cursor:pointer">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
 async function doSignIn() {
     const email = document.getElementById('l-email')?.value?.trim();
     const pass  = document.getElementById('l-pass')?.value;
@@ -1457,7 +1513,7 @@ async function doSignUp() {
     if (errEl) errEl.textContent = 'Creating account…';
     const { data, error } = await sb.auth.signUp({
         email, password: pass,
-        options: { data: { name, country } }
+        options: { data: { name, country, billing_cycle: billingCycle } }
     });
     if (error) { if (errEl) errEl.textContent = error.message; return; }
     const userId = data?.user?.id;
@@ -3456,6 +3512,11 @@ function render() {
         : '';
     if (!currentUser) {
         document.getElementById('app').innerHTML = vLogin() + toastHtml;
+        return;
+    }
+    const subStatus = currentUser.user_metadata?.subscription_status;
+    if (subStatus !== 'trialing' && subStatus !== 'active') {
+        document.getElementById('app').innerHTML = vSubscriptionGate() + toastHtml;
         return;
     }
     const views = { home: vHome, parent: vParent, 'kid-pin': vKidPin, kid: vKid, 'parent-pin': vParentPin };
