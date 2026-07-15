@@ -458,6 +458,17 @@ async function loadCache() {
 
 async function initApp() {
     document.getElementById('app').innerHTML = '<div class="min-h-screen flex items-center justify-center"><p style="color:var(--color-text-secondary)">Loading…</p></div>';
+    // Registered before getSession() below: Supabase processes a password-recovery
+    // link's URL hash as part of that call, and only fires the PASSWORD_RECOVERY
+    // event to listeners that are already attached when it happens. Attaching this
+    // any later means the recovery link silently becomes a normal signed-in session.
+    sb.auth.onAuthStateChange(async (event, session) => {
+        currentUser = session?.user || null;
+        if (event === 'PASSWORD_RECOVERY') { S.authMode = 'reset'; render(); return; }
+        if (currentUser) { await loadCache(); }
+        else { cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [] }; S.view = 'home'; }
+        render();
+    });
     const { data: { session } } = await sb.auth.getSession();
     if (session) {
         currentUser = session.user;
@@ -468,13 +479,6 @@ async function initApp() {
         await loadCache();
     }
     render();
-    sb.auth.onAuthStateChange(async (event, session) => {
-        currentUser = session?.user || null;
-        if (event === 'PASSWORD_RECOVERY') { S.authMode = 'reset'; render(); return; }
-        if (currentUser) { await loadCache(); }
-        else { cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [] }; S.view = 'home'; }
-        render();
-    });
 }
 
 async function signOut() { await sb.auth.signOut(); }
