@@ -460,7 +460,8 @@ const S = {
     selectedDays: [],
     selectedKids: 'all',
     parentPin: '',
-    historyOpen: false
+    historyOpen: false,
+    authMode: new URLSearchParams(window.location.search).get('mode') === 'signin' ? 'signin' : 'signup'
 };
 
 // ─── KID EMOJIS ──────────────────────────────────────────────────
