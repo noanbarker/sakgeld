@@ -1494,7 +1494,7 @@ function vSubscriptionGate() {
             <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:28px">${needsAttention
                 ? 'There’s an issue with your payment method or subscription. Please update your details to keep using Sprout.'
                 : 'Your account is set up, but your subscription was never completed. Finish checkout to start your 14-day free trial.'}</p>
-            <button id="manage-sub-btn" onclick="${needsAttention ? 'openManageSubscription()' : 'resumeCheckout()'}" class="btn-primary" style="margin-bottom:14px">${needsAttention ? 'Manage Subscription' : 'Continue to Checkout'}</button>
+            <button onclick="${needsAttention ? 'openManageSubscription()' : 'resumeCheckout()'}" class="btn-primary ${needsAttention ? 'manage-sub-btn' : ''}" style="margin-bottom:14px">${needsAttention ? 'Manage Subscription' : 'Continue to Checkout'}</button>
             <div>
               <button onclick="signOut()" style="font-family:var(--font-family);font-size:13px;font-weight:600;color:var(--color-text-muted);background:none;border:none;cursor:pointer">Sign out</button>
             </div>
@@ -1753,7 +1753,7 @@ function vParent() {
       </nav>
       <div style="padding:16px;border-top:1px solid var(--color-border)">
         <button onclick="go('home')" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:block;margin-bottom:6px;background:none;border:none;cursor:pointer">← Home</button>
-        <button id="manage-sub-btn" onclick="openManageSubscription()" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('coin', 13)} Manage Subscription</button>
+        <button class="manage-sub-btn" onclick="openManageSubscription()" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('coin', 13)} Manage Subscription</button>
         <button onclick="signOut()" style="color:#94a3b8;font-size:12px;font-family:var(--font-family);background:none;border:none;cursor:pointer">Sign out</button>
       </div>
     </aside>`;
@@ -1765,7 +1765,6 @@ function vParent() {
         <h1 style="font-family:var(--font-family);font-size:18px;font-weight:900;letter-spacing:-0.02em">Sprout</h1>
       </div>
       <div class="flex items-center gap-4">
-        <button onclick="openModal('set-parent-pin')" style="color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer;font-family:var(--font-family);display:flex;align-items:center;gap:5px">${uiIcon('lock', 13)} PIN</button>
         <button onclick="go('home')" style="color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer;font-family:var(--font-family)">← Home</button>
       </div>
     </div>
@@ -2317,6 +2316,14 @@ function pSettings() {
             </div>
             ${chevron}
           </button>`).join('')}
+          <button onclick="openManageSubscription()" class="manage-sub-btn card mb-3" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;cursor:pointer">
+            <span style="flex-shrink:0;color:var(--color-text-secondary)">${uiIcon('coin', 18)}</span>
+            <span>
+              <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:2px">Manage Subscription</p>
+              <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary)">Update payment method, billing history, or cancel</p>
+            </span>
+          </button>
+          <button onclick="signOut()" style="display:block;width:100%;text-align:center;color:#94a3b8;font-size:13px;font-weight:600;font-family:var(--font-family);background:none;border:none;cursor:pointer;padding:14px 0">Sign out</button>
         </div>`;
     }
 
@@ -3470,8 +3477,8 @@ function clearMissedChores() {
 }
 
 async function openManageSubscription() {
-    const btn = document.getElementById('manage-sub-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+    const btns = document.querySelectorAll('.manage-sub-btn');
+    btns.forEach((b) => { b.disabled = true; b.style.opacity = '0.6'; });
     try {
         const { data: { session } } = await sb.auth.getSession();
         const res = await fetch('/api/paddle-portal', {
@@ -3487,7 +3494,7 @@ async function openManageSubscription() {
     } catch (e) {
         toast('❌ Could not open subscription management.');
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = 'Manage Subscription'; }
+        render();
     }
 }
 
