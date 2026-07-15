@@ -339,6 +339,9 @@ const DB = { load: () => cache };
 // ─── PADDLE ──────────────────────────────────────────────────────
 const PADDLE_MONTHLY_PRICE_ID = 'pri_01kxgtadc6jf7sqe3avwrf6k5q';
 const PADDLE_YEARLY_PRICE_ID  = 'pri_01kxgtpwe2jnzw2qk1cjtt2c96';
+// South Africa gets its own tax-inclusive prices so R59/R590 is genuinely the total charged, not the base price + VAT on top.
+const PADDLE_MONTHLY_PRICE_ID_ZA = 'pri_01kxjg29j2r2xvny9ab9q7qs4t';
+const PADDLE_YEARLY_PRICE_ID_ZA  = 'pri_01kxjgbkwvzksqcdzecnn9whxy';
 Paddle.Environment.set('sandbox');
 Paddle.Initialize({
     token: 'test_db0521515e2c6640f053ab59f70',
@@ -351,8 +354,9 @@ Paddle.Initialize({
     }
 });
 function openTrialCheckout({ email, country, userId }) {
+    const priceId = country === 'ZA' ? PADDLE_MONTHLY_PRICE_ID_ZA : PADDLE_MONTHLY_PRICE_ID;
     Paddle.Checkout.open({
-        items: [{ priceId: PADDLE_MONTHLY_PRICE_ID, quantity: 1 }],
+        items: [{ priceId, quantity: 1 }],
         customer: { email, address: { countryCode: country } },
         customData: { supabase_user_id: userId }
     });
