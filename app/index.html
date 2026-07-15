@@ -1484,7 +1484,7 @@ async function doForgotPassword() {
     const errEl = document.getElementById('l-err');
     if (!email) { if (errEl) errEl.textContent = 'Please enter your email.'; return; }
     if (errEl) errEl.textContent = 'Sending…';
-    const redirectTo = window.location.origin + window.location.pathname + '?mode=reset';
+    const redirectTo = window.location.origin + window.location.pathname;
     const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
     if (error) { if (errEl) errEl.textContent = error.message; return; }
     S.authMode = 'signin';
