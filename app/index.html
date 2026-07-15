@@ -461,6 +461,7 @@ const S = {
     selectedKids: 'all',
     parentPin: '',
     historyOpen: false,
+    settingsSection: null,
     authMode: new URLSearchParams(window.location.search).get('mode') === 'signin' ? 'signin' : 'signup'
 };
 
@@ -1103,7 +1104,7 @@ function kidIcon(kidOrName) {
     return icons[h % icons.length];
 }
 function go(view, params = {}) { Object.assign(S, params); S.view = view; render(); }
-function setTab(t) { S.tab = t; render(); }
+function setTab(t) { S.tab = t; S.settingsSection = null; render(); }
 function toast(msg) {
     if (S.toastTimer) clearTimeout(S.toastTimer);
     S.toast = msg; render();
@@ -2216,71 +2217,106 @@ function pSettings() {
         { stage: 3, name: 'Money Tree', range: `${R(t.t3)} – ${R(t.t4 - 0.01)}` },
         { stage: 4, name: 'Forest',     range: `${R(t.t4)} and above` },
     ];
-    return `
-    <div style="max-width:600px">
-      <p class="pr-section-label mb-5">Settings</p>
+    const sections = [
+        { id: 'currency', title: 'Currency / Value Display', subtitle: 'Choose how values are displayed' },
+        { id: 'pin',      title: 'Parent PIN',               subtitle: currentUser?.user_metadata?.parent_pin ? '🔐 A PIN is currently set' : '⚠️ No PIN set' },
+        { id: 'tree',     title: 'Tree Growth Stages',       subtitle: 'Set the balance thresholds for each tree stage' },
+    ];
+    const chevron = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex-shrink:0"><path d="M7 5l4 4-4 4" stroke="var(--color-text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-      <!-- Currency -->
-      <div class="card mb-5">
-        <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Currency / Value Display</p>
-        <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">Choose how values are displayed. Select "Points" for a non-monetary reward system.</p>
-        <select onchange="saveCurrency(this.value)">
-          ${CURRENCIES.map(c => `<option value="${c.code}" ${c.code === currCode ? 'selected' : ''}>${c.name}</option>`).join('')}
-        </select>
-        <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:12px">Preview: <span style="font-weight:800;color:var(--color-text-primary)">${R(25)}</span></p>
-      </div>
-
-      <!-- Parent PIN -->
-      <div class="card mb-5">
-        <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Parent PIN</p>
-        <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">${currentUser?.user_metadata?.parent_pin ? '🔐 A PIN is currently set to protect the parent dashboard.' : '⚠️ No PIN set — anyone can access the parent dashboard.'}</p>
-        <button onclick="openModal('set-parent-pin')" class="btn-primary" style="width:auto;padding:10px 28px">${currentUser?.user_metadata?.parent_pin ? 'Change PIN' : 'Set PIN'}</button>
-      </div>
-
-      <!-- Tree Growth Stages -->
-      <div class="card">
-        <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Tree Growth Stages</p>
-        <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:20px">Set the balance thresholds that unlock each tree stage for your kids. The tree on each kid's screen will grow as they save more.</p>
-
-        <!-- Stage cards -->
-        <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px">
-          ${tiers.map(tier => `
-          <div style="display:flex;align-items:center;gap:16px;padding:14px 16px;border-radius:16px;background:${tier.stage === 4 ? 'linear-gradient(135deg,#f0fdf4,#dcfce7)' : 'var(--color-background)'};border:1.5px solid ${tier.stage === 4 ? 'var(--color-green-border)' : 'var(--color-border)'}">
-            <div style="flex-shrink:0">${treeStageSVG(tier.stage, 52)}</div>
-            <div style="flex:1;min-width:0">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
-                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">${tier.name}</p>
-                ${tier.stage === 4 ? `<span style="font-family:var(--font-family);font-size:10px;font-weight:700;background:var(--color-green-100);color:var(--color-green-700);padding:2px 8px;border-radius:99px">TOP TIER 🏆</span>` : ''}
-              </div>
-              <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${TREE_STAGES[tier.stage].description}</p>
-              <p style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-green-600);margin-top:3px">${tier.range}</p>
+    if (!S.settingsSection) {
+        return `
+        <div style="max-width:600px">
+          <p class="pr-section-label mb-5">Settings</p>
+          ${sections.map(s => `
+          <button onclick="openSettingsSection('${s.id}')" class="card mb-3" style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;cursor:pointer">
+            <div>
+              <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:2px">${s.title}</p>
+              <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary)">${s.subtitle}</p>
             </div>
-          </div>`).join('')}
-        </div>
+            ${chevron}
+          </button>`).join('')}
+        </div>`;
+    }
 
-        <!-- Threshold editors -->
-        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:12px">Set Thresholds</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
-          ${[
-            { key:'t1', label:'Seedling → Sapling', val: t.t1 },
-            { key:'t2', label:'Sapling → Young Tree', val: t.t2 },
-            { key:'t3', label:'Young Tree → Money Tree', val: t.t3 },
-            { key:'t4', label:'Money Tree → Forest', val: t.t4 },
-          ].map(row => `
-          <div>
-            <p style="font-family:var(--font-family);font-size:11px;font-weight:700;color:var(--color-text-secondary);margin-bottom:6px">${row.label}</p>
-            <div style="position:relative">
-              <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:14px;line-height:1;pointer-events:none">${currSymbol()}</span>
-              <input id="thresh-${row.key}" type="number" value="${row.val}" min="1" step="1"
-                style="padding-left:32px !important;font-weight:700">
+    const backBtn = `<button onclick="openSettingsSection(null)" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:16px;background:none;border:none;cursor:pointer">← Back to Settings</button>`;
+
+    if (S.settingsSection === 'currency') {
+        return `
+        <div style="max-width:600px">
+          ${backBtn}
+          <div class="card">
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Currency / Value Display</p>
+            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">Choose how values are displayed. Select "Points" for a non-monetary reward system.</p>
+            <select onchange="saveCurrency(this.value)">
+              ${CURRENCIES.map(c => `<option value="${c.code}" ${c.code === currCode ? 'selected' : ''}>${c.name}</option>`).join('')}
+            </select>
+            <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:12px">Preview: <span style="font-weight:800;color:var(--color-text-primary)">${R(25)}</span></p>
+          </div>
+        </div>`;
+    }
+
+    if (S.settingsSection === 'pin') {
+        return `
+        <div style="max-width:600px">
+          ${backBtn}
+          <div class="card">
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Parent PIN</p>
+            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">${currentUser?.user_metadata?.parent_pin ? '🔐 A PIN is currently set to protect the parent dashboard.' : '⚠️ No PIN set — anyone can access the parent dashboard.'}</p>
+            <button onclick="openModal('set-parent-pin')" class="btn-primary" style="width:auto;padding:10px 28px">${currentUser?.user_metadata?.parent_pin ? 'Change PIN' : 'Set PIN'}</button>
+          </div>
+        </div>`;
+    }
+
+    if (S.settingsSection === 'tree') {
+        return `
+        <div style="max-width:600px">
+          ${backBtn}
+          <div class="card">
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Tree Growth Stages</p>
+            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:20px">Set the balance thresholds that unlock each tree stage for your kids. The tree on each kid's screen will grow as they save more.</p>
+
+            <!-- Stage cards -->
+            <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px">
+              ${tiers.map(tier => `
+              <div style="display:flex;align-items:center;gap:16px;padding:14px 16px;border-radius:16px;background:${tier.stage === 4 ? 'linear-gradient(135deg,#f0fdf4,#dcfce7)' : 'var(--color-background)'};border:1.5px solid ${tier.stage === 4 ? 'var(--color-green-border)' : 'var(--color-border)'}">
+                <div style="flex-shrink:0">${treeStageSVG(tier.stage, 52)}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+                    <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">${tier.name}</p>
+                    ${tier.stage === 4 ? `<span style="font-family:var(--font-family);font-size:10px;font-weight:700;background:var(--color-green-100);color:var(--color-green-700);padding:2px 8px;border-radius:99px">TOP TIER 🏆</span>` : ''}
+                  </div>
+                  <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${TREE_STAGES[tier.stage].description}</p>
+                  <p style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-green-600);margin-top:3px">${tier.range}</p>
+                </div>
+              </div>`).join('')}
             </div>
-          </div>`).join('')}
-        </div>
-        <button onclick="saveTreeThresholdsFromUI()" class="btn-primary" style="width:auto;padding:10px 28px">Save Thresholds</button>
-        <button onclick="resetTreeThresholds()" style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-muted);background:none;border:none;cursor:pointer;margin-left:16px">Reset to defaults</button>
-      </div>
-    </div>`;
+
+            <!-- Threshold editors -->
+            <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:12px">Set Thresholds</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+              ${[
+                { key:'t1', label:'Seedling → Sapling', val: t.t1 },
+                { key:'t2', label:'Sapling → Young Tree', val: t.t2 },
+                { key:'t3', label:'Young Tree → Money Tree', val: t.t3 },
+                { key:'t4', label:'Money Tree → Forest', val: t.t4 },
+              ].map(row => `
+              <div>
+                <p style="font-family:var(--font-family);font-size:11px;font-weight:700;color:var(--color-text-secondary);margin-bottom:6px">${row.label}</p>
+                <div style="position:relative">
+                  <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:14px;line-height:1;pointer-events:none">${currSymbol()}</span>
+                  <input id="thresh-${row.key}" type="number" value="${row.val}" min="1" step="1"
+                    style="padding-left:32px !important;font-weight:700">
+                </div>
+              </div>`).join('')}
+            </div>
+            <button onclick="saveTreeThresholdsFromUI()" class="btn-primary" style="width:auto;padding:10px 28px">Save Thresholds</button>
+            <button onclick="resetTreeThresholds()" style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-muted);background:none;border:none;cursor:pointer;margin-left:16px">Reset to defaults</button>
+          </div>
+        </div>`;
+    }
 }
+function openSettingsSection(id) { S.settingsSection = id; render(); }
 
 function vKidPin() {
     const db = DB.load();
