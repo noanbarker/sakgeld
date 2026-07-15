@@ -353,8 +353,12 @@ Paddle.Initialize({
         }
     }
 });
-function openTrialCheckout({ email, country, userId }) {
-    const priceId = country === 'ZA' ? PADDLE_MONTHLY_PRICE_ID_ZA : PADDLE_MONTHLY_PRICE_ID;
+function openTrialCheckout({ email, country, userId, billingCycle }) {
+    const isYearly = billingCycle === 'yearly';
+    const isZA = country === 'ZA';
+    const priceId = isZA
+        ? (isYearly ? PADDLE_YEARLY_PRICE_ID_ZA : PADDLE_MONTHLY_PRICE_ID_ZA)
+        : (isYearly ? PADDLE_YEARLY_PRICE_ID : PADDLE_MONTHLY_PRICE_ID);
     Paddle.Checkout.open({
         items: [{ priceId, quantity: 1 }],
         customer: { email, address: { countryCode: country } },
@@ -466,7 +470,8 @@ const S = {
     parentPin: '',
     historyOpen: false,
     settingsSection: null,
-    authMode: new URLSearchParams(window.location.search).get('mode') === 'signin' ? 'signin' : 'signup'
+    authMode: new URLSearchParams(window.location.search).get('mode') === 'signin' ? 'signin' : 'signup',
+    billingCycle: 'monthly'
 };
 
 // ─── KID EMOJIS ──────────────────────────────────────────────────
@@ -1412,10 +1417,14 @@ function vLogin() {
             <input type="password" id="l-pass" placeholder="Password" class="${isSignup ? 'mb-3' : 'mb-2'}"
               onkeydown="if(event.key==='Enter'){${isSignup ? 'doSignUp()' : 'doSignIn()'}}">
             ${isSignup ? `
-            <select id="l-country" class="mb-2">
+            <select id="l-country" class="mb-3">
               <option value="">Select your country</option>
               ${countryOptions}
-            </select>` : ''}
+            </select>
+            <div style="display:flex;background:#eef2ef;border-radius:14px;padding:5px;margin-bottom:12px">
+              <button type="button" onclick="setBillingCycle('monthly')" style="flex:1;border:none;cursor:pointer;font-family:var(--font-family);font-weight:800;font-size:13px;padding:10px;border-radius:10px;background:${S.billingCycle !== 'yearly' ? '#fff' : 'transparent'};color:${S.billingCycle !== 'yearly' ? '#14532d' : '#64748b'};${S.billingCycle !== 'yearly' ? 'box-shadow:0 1px 3px rgba(15,40,25,.1)' : ''}">Monthly</button>
+              <button type="button" onclick="setBillingCycle('yearly')" style="flex:1;border:none;cursor:pointer;font-family:var(--font-family);font-weight:800;font-size:13px;padding:10px;border-radius:10px;background:${S.billingCycle === 'yearly' ? '#fff' : 'transparent'};color:${S.billingCycle === 'yearly' ? '#14532d' : '#64748b'};${S.billingCycle === 'yearly' ? 'box-shadow:0 1px 3px rgba(15,40,25,.1)' : ''}">Yearly · 2 months free</button>
+            </div>` : ''}
             <p id="l-err" style="color:#f43f5e;font-size:14px;margin:4px 0 12px;min-height:20px"></p>
             <button onclick="${isSignup ? 'doSignUp()' : 'doSignIn()'}" class="btn-primary">${isSignup ? 'Create Account' : 'Sign In'}</button>
             <p style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-muted);text-align:center;margin-top:20px">
@@ -1427,6 +1436,7 @@ function vLogin() {
     </div>`;
 }
 function setAuthMode(mode) { S.authMode = mode; render(); }
+function setBillingCycle(cycle) { S.billingCycle = cycle; render(); }
 async function doSignIn() {
     const email = document.getElementById('l-email')?.value?.trim();
     const pass  = document.getElementById('l-pass')?.value;
@@ -1441,6 +1451,7 @@ async function doSignUp() {
     const email   = document.getElementById('l-email')?.value?.trim();
     const pass    = document.getElementById('l-pass')?.value;
     const country = document.getElementById('l-country')?.value;
+    const billingCycle = S.billingCycle || 'monthly';
     const errEl = document.getElementById('l-err');
     if (!name || !email || !pass || !country) { if (errEl) errEl.textContent = 'Please fill in all fields.'; return; }
     if (errEl) errEl.textContent = 'Creating account…';
@@ -1452,7 +1463,7 @@ async function doSignUp() {
     const userId = data?.user?.id;
     if (!userId) { if (errEl) errEl.textContent = 'Something went wrong creating your account.'; return; }
     if (errEl) errEl.textContent = '';
-    openTrialCheckout({ email, country, userId });
+    openTrialCheckout({ email, country, userId, billingCycle });
 }
 
 // ─── VIEWS ───────────────────────────────────────────────────────
