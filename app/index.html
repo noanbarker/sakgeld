@@ -1269,6 +1269,11 @@ function choreIsForDate(c, d) {
     const day = DAYS[(d.getDay() + 6) % 7];
     return (c.days || []).includes(day);
 }
+function choreScheduleWasActiveOn(c, d) {
+    const ref = c.schedule_updated_at || c.created_at;
+    if (!ref) return true;
+    return toLocalDateStr(new Date(ref)) <= toLocalDateStr(d);
+}
 async function writeMissedChores(kidId) {
     const db = DB.load();
     const inserts = [];
@@ -1276,7 +1281,7 @@ async function writeMissedChores(kidId) {
         const d = new Date();
         d.setDate(d.getDate() - ago);
         const due = toLocalDateStr(d);
-        const scheduled = db.chores.filter(c => choreAssignedTo(c, kidId) && choreIsForDate(c, d));
+        const scheduled = db.chores.filter(c => choreAssignedTo(c, kidId) && choreIsForDate(c, d) && choreScheduleWasActiveOn(c, d));
         for (const chore of scheduled) {
             const exists = cache.completions.some(c =>
                 c.choreId === chore.id && c.kidId === kidId && c.dueDate === due
@@ -3184,9 +3189,10 @@ async function addChore() {
     if (schedule === 'weekly' && days.length === 0) return toast('⚠️ Please select at least one day.');
     if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('⚠️ Please select at least one kid.');
     const id = uid();
-    const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: desc, value: val, assigned_to: assignedTo, emoji, schedule, days });
+    const now = new Date().toISOString();
+    const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: desc, value: val, assigned_to: assignedTo, emoji, schedule, days, created_at: now, schedule_updated_at: now });
     if (error) return toast('❌ Could not save. Check your connection.');
-    cache.chores.push({ id, name, description: desc, value: val, assignedTo, emoji, schedule, days });
+    cache.chores.push({ id, name, description: desc, value: val, assignedTo, emoji, schedule, days, created_at: now, schedule_updated_at: now });
     closeModal(); toast('Chore added!');
 }
 function editChore(id) {
@@ -3204,10 +3210,16 @@ async function saveChore(id) {
     if (!name) return toast('⚠️ Please enter a chore name.');
     if (schedule === 'weekly' && days.length === 0) return toast('⚠️ Please select at least one day.');
     if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('⚠️ Please select at least one kid.');
-    const { error } = await sb.from('chores').update({ name, description: desc, value: val, assigned_to: assignedTo, emoji, schedule, days }).eq('id', id).eq('user_id', currentUser.id);
-    if (error) return toast('❌ Could not save.');
     const c = cache.chores.find(x => x.id === id);
-    if (c) { c.name = name; c.description = desc; c.value = val; c.assignedTo = assignedTo; c.emoji = emoji; c.schedule = schedule; c.days = days; }
+    const scheduleChanged = c && (c.schedule !== schedule || JSON.stringify(c.days || []) !== JSON.stringify(days));
+    const update = { name, description: desc, value: val, assigned_to: assignedTo, emoji, schedule, days };
+    if (scheduleChanged) update.schedule_updated_at = new Date().toISOString();
+    const { error } = await sb.from('chores').update(update).eq('id', id).eq('user_id', currentUser.id);
+    if (error) return toast('❌ Could not save.');
+    if (c) {
+        c.name = name; c.description = desc; c.value = val; c.assignedTo = assignedTo; c.emoji = emoji; c.schedule = schedule; c.days = days;
+        if (scheduleChanged) c.schedule_updated_at = update.schedule_updated_at;
+    }
     closeModal(); toast('Saved!');
 }
 function deleteChore(id) {
