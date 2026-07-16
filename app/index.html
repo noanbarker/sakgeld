@@ -2827,7 +2827,9 @@ function renderModal() {
         body = `
         <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:16px">${e ? 'Edit' : 'Add'} Kid</h3>
         <input id="k-name" placeholder="Name" value="${data.name||''}" class="mb-3">
-        <input id="k-pin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" value="${data.pin||''}" class="mb-4">
+        <input id="k-pin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" value="${data.pin||''}" class="mb-3">
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Date of birth</p>
+        <input id="k-dob" type="date" value="${data.date_of_birth||''}" max="${new Date().toISOString().slice(0,10)}" class="mb-4">
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:10px">Theme Colour</p>
         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:20px">
           ${KID_ACCENT_OPTIONS.map(opt => {
@@ -3124,16 +3126,18 @@ function renderModal() {
 
 // ─── ACTIONS ─────────────────────────────────────────────────────
 async function addKid() {
-    const name      = document.getElementById('k-name').value.trim();
-    const pin       = document.getElementById('k-pin').value.trim();
+    const name          = document.getElementById('k-name').value.trim();
+    const pin           = document.getElementById('k-pin').value.trim();
+    const date_of_birth = document.getElementById('k-dob').value;
     const emoji     = S.selectedEmoji || '😀';
     const color_key = S.selectedColor || 'blue';
     if (!name)                 return toast('⚠️ Please enter a name.');
     if (!/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits (e.g. 1234).');
+    if (!date_of_birth)        return toast('⚠️ Please enter a date of birth.');
     const id = uid();
-    const { error } = await sb.from('kids').insert({ id, user_id: currentUser.id, name, pin, emoji, color_key, balance: 0 });
+    const { error } = await sb.from('kids').insert({ id, user_id: currentUser.id, name, pin, emoji, color_key, date_of_birth, balance: 0 });
     if (error) return toast('❌ Could not save. Check your connection.');
-    cache.kids.push({ id, name, pin, emoji, color_key, balance: 0 });
+    cache.kids.push({ id, name, pin, emoji, color_key, date_of_birth, balance: 0 });
     closeModal(); toast(`${name} added! 🎉`);
 }
 function editKid(id) {
@@ -3141,16 +3145,18 @@ function editKid(id) {
     if (k) openModal('edit-kid', { ...k });
 }
 async function saveKid(id) {
-    const name      = document.getElementById('k-name').value.trim();
-    const pin       = document.getElementById('k-pin').value.trim();
+    const name          = document.getElementById('k-name').value.trim();
+    const pin           = document.getElementById('k-pin').value.trim();
+    const date_of_birth = document.getElementById('k-dob').value;
     const emoji     = S.selectedEmoji || '😀';
     const color_key = S.selectedColor || 'blue';
     if (!name)                 return toast('⚠️ Please enter a name.');
     if (!/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits (e.g. 1234).');
-    const { error } = await sb.from('kids').update({ name, pin, emoji, color_key }).eq('id', id).eq('user_id', currentUser.id);
+    if (!date_of_birth)        return toast('⚠️ Please enter a date of birth.');
+    const { error } = await sb.from('kids').update({ name, pin, emoji, color_key, date_of_birth }).eq('id', id).eq('user_id', currentUser.id);
     if (error) return toast('❌ Could not save.');
     const k = cache.kids.find(x => x.id === id);
-    if (k) { k.name = name; k.pin = pin; k.emoji = emoji; k.color_key = color_key; }
+    if (k) { k.name = name; k.pin = pin; k.emoji = emoji; k.color_key = color_key; k.date_of_birth = date_of_birth; }
     closeModal(); toast('Saved!');
 }
 function deleteKid(id) {
