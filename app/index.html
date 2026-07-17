@@ -310,6 +310,11 @@
 
         /* Modals */
         .modal-sheet { padding: 20px 16px 28px !important; }
+
+        /* Reconciliation rows: stack instead of squashing the difference column */
+        .sp-recon-row { grid-template-columns: 1fr !important; gap: 4px !important; }
+        .sp-recon-row > div:nth-child(2) { border-top: 1px solid var(--color-border); padding-top: 12px; margin-top: 8px; }
+        .sp-recon-row > div:nth-child(3) { border-top: 1px solid var(--color-border); padding-top: 12px; margin-top: 8px; text-align: left !important; }
       }
     </style>
 </head>
@@ -1677,7 +1682,7 @@ function pRecon(db) {
         const diffLabel = diff === null ? '—' : diff === 0 ? '✓ Balanced' : diff > 0 ? `+${R(diff)} more in bank` : `${R(Math.abs(diff))} less in bank`;
 
         return `
-        <div class="card" style="display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;gap:12px;padding:16px 20px">
+        <div class="card sp-recon-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;gap:12px;padding:16px 20px">
           <!-- Kid -->
           <div style="display:flex;align-items:center;gap:10px">
             <div style="width:36px;height:36px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${kidIcon(k)}</div>
@@ -2598,15 +2603,12 @@ function vKid() {
       <div class="sp-kid-header" style="background:${ac.header};color:white;padding:32px 32px 28px;position:relative;overflow:hidden">
         <div class="max-w-5xl mx-auto">
           <!-- Top row: avatar/name + home button -->
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-            <div style="display:flex;align-items:center;gap:14px">
-              <div style="width:52px;height:52px;background:rgba(255,255,255,0.2);border:2px solid rgba(255,255,255,0.4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px">${kidIcon(kid)}</div>
-              <div>
-                <p style="font-family:var(--font-family);font-size:24px;color:rgba(255,255,255,0.7)">Hi,</p>
-                <h1 style="font-family:var(--font-family);font-size:40px;font-weight:800">${kid.name}</h1>
-              </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:12px">
+            <div style="display:flex;align-items:center;gap:14px;min-width:0">
+              <div style="width:52px;height:52px;background:rgba(255,255,255,0.2);border:2px solid rgba(255,255,255,0.4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">${kidIcon(kid)}</div>
+              <h1 class="sp-kid-hi" style="font-family:var(--font-family);font-size:32px;font-weight:800;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="font-weight:600;color:rgba(255,255,255,0.7)">Hi,</span> ${kid.name}</h1>
             </div>
-            <button onclick="go('home')" style="font-family:var(--font-family);color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:6px">${uiIcon('home', 16)} Home</button>
+            <button onclick="go('home')" style="font-family:var(--font-family);color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;flex-shrink:0">${uiIcon('home', 16)} Home</button>
           </div>
           <!-- Balance + Tree row (3-column: left content | centre tree | right spacer) -->
           <div style="display:flex;align-items:flex-end;gap:16px">
