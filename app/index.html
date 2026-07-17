@@ -282,7 +282,7 @@
         /* Mobile tab bar — show icon only, hide text label */
         .sp-mob-tab { display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 2px !important; }
         .sp-mob-tab-svg { display:flex; }
-        .sp-mob-tab-svg svg { width:18px; height:18px; }
+        .sp-mob-tab-svg svg { width:18px; height:18px; stroke-width:2.75; }
         .sp-mob-tab-label { font-size:8px !important; letter-spacing:0 !important; }
 
         /* Kid view: tighten header padding */
@@ -1836,7 +1836,7 @@ function vParent() {
     const mobileHeader = `
     <div class="md:hidden text-white px-5 pt-8 pb-4 flex justify-between items-center" style="background:var(--gradient-primary)">
       <div style="display:flex;align-items:center;gap:10px">
-        ${treeSVG(32, false)}
+        ${treeSVG(32, false, true)}
         <h1 style="font-family:var(--font-family);font-size:18px;font-weight:900;letter-spacing:-0.02em">Sprout</h1>
       </div>
       <div class="flex items-center gap-4">
