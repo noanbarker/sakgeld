@@ -2803,8 +2803,8 @@ function vKid() {
                     ${r.description ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${r.description}</p>` : ''}
                     <p style="font-family:var(--font-family);color:#f97316;font-weight:800;margin-top:4px">+ ${R(r.value)}</p>
                   </div>
-                  <button onclick="markRewardDone('${r.id}')"
-                    class="btn-primary flex-shrink-0" style="width:auto;padding:8px 16px;font-size:13px">Done!</button>
+                  <button onclick="markRewardDone('${r.id}', event)"
+                    class="chore-done-btn flex-shrink-0" style="padding:8px 16px;font-size:13px">Done!</button>
                 </div>`;
             }).join('');
             return `
@@ -3512,7 +3512,8 @@ async function markDone(choreId, evt) {
     }
     toast('Marked as done! Waiting for parent to approve. ⏳');
 }
-async function markRewardDone(rewardId) {
+async function markRewardDone(rewardId, evt) {
+    celebrateDone(evt?.currentTarget);
     const id = uid();
     const claimedAt = new Date().toISOString();
     const { error } = await sb.from('reward_completions').insert({ id, user_id: currentUser.id, reward_id: rewardId, kid_id: S.kidId, claimed_at: claimedAt, approved: false, rejected: false });
