@@ -932,6 +932,7 @@ const UI_ICON_PATHS = {
   plus:   '<path d="M12 5v14M5 12h14"/>',
   home:   '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   trophy: '<path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a2 2 0 0 0 0 4h1M17 5h3a2 2 0 0 1 0 4h-1"/>',
+  user:   '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"/>',
 };
 function uiIcon(name, size = 16, stroke = 2) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round">${UI_ICON_PATHS[name] || ''}</svg>`;
@@ -2541,7 +2542,7 @@ function vParentPin() {
     <div class="min-h-screen flex flex-col items-center justify-center p-6" style="background:var(--color-background)">
       <button onclick="go('home')" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px;background:none;border:none;cursor:pointer;margin-bottom:40px;position:absolute;top:24px;left:24px">← Back</button>
       <div class="flex flex-col items-center">
-        <div style="width:80px;height:80px;background:var(--color-green-100);border:2px solid var(--color-green-border);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;margin-bottom:12px">🌳</div>
+        <div style="width:80px;height:80px;background:var(--color-green-100);border:2px solid var(--color-green-border);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--color-green-700);margin-bottom:12px">${uiIcon('user', 36, 2)}</div>
         <h2 style="font-family:var(--font-family);font-size:28px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Parent</h2>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);margin-bottom:40px">Enter parent PIN</p>
         <div style="display:flex;gap:24px;margin-bottom:12px">${dots}</div>
@@ -2603,7 +2604,7 @@ function vKid() {
             <div style="display:flex;align-items:center;gap:14px">
               <div style="width:52px;height:52px;background:rgba(255,255,255,0.2);border:2px solid rgba(255,255,255,0.4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px">${kidIcon(kid)}</div>
               <div>
-                <p style="font-family:var(--font-family);font-size:24px;color:rgba(255,255,255,0.7)">Hi there,</p>
+                <p style="font-family:var(--font-family);font-size:24px;color:rgba(255,255,255,0.7)">Hi,</p>
                 <h1 style="font-family:var(--font-family);font-size:40px;font-weight:800">${kid.name}</h1>
               </div>
             </div>
