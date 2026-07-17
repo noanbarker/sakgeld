@@ -474,8 +474,6 @@ async function initApp() {
         currentUser = session.user;
         const savedCurrency = session.user?.user_metadata?.currency;
         if (savedCurrency) localStorage.setItem('sprout_currency', savedCurrency);
-        const savedMissedClearedAt = session.user?.user_metadata?.missed_cleared_at;
-        if (savedMissedClearedAt) localStorage.setItem('sprout_missed_cleared_at', savedMissedClearedAt);
         await loadCache();
     }
     render();
@@ -2018,7 +2016,7 @@ function pOverview(db) {
       </div>
     </div>`;
 
-    const missedClearedAt = localStorage.getItem('sprout_missed_cleared_at') || '';
+    const missedClearedAt = currentUser?.user_metadata?.missed_cleared_at || '';
     const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const sevenDaysAgoStr = toLocalDateStr(sevenDaysAgo);
     const missed = db.completions.filter(c => c.missed && !c.approved && (c.dueDate || '') >= sevenDaysAgoStr && (!missedClearedAt || (c.dueDate || '') > missedClearedAt)).sort((a,b) => b.dueDate?.localeCompare(a.dueDate));
@@ -3557,11 +3555,11 @@ async function resetTreeThresholds() {
 
 function clearMissedChores() {
     const latest = cache.completions.filter(c => c.missed).map(c => c.dueDate || '').sort().pop() || toLocalDateStr(new Date());
-    localStorage.setItem('sprout_missed_cleared_at', latest);
+    if (currentUser) currentUser.user_metadata = { ...currentUser.user_metadata, missed_cleared_at: latest };
+    render();
     sb.auth.updateUser({ data: { missed_cleared_at: latest } }).then(({ data }) => {
         if (data?.user) currentUser = data.user;
     });
-    render();
 }
 
 async function openManageSubscription() {
