@@ -1833,7 +1833,7 @@ function vParent() {
           <p style="color:var(--color-text-secondary);font-size:11px;font-family:var(--font-family);margin-top:2px">Parent Dashboard</p>
         </div>
       </div>
-      <nav style="flex:1;padding:12px">
+      <nav style="padding:12px">
         ${navItems.map(t => {
           const isActive = S.tab === t.id;
           const activeStyle = isActive ? 'background:rgba(22,163,74,.12);color:#14532d;' : '';
@@ -1844,12 +1844,12 @@ function vParent() {
             ${t.badge ? `<span class="badge">${t.badge}</span>` : ''}
           </button>`;
         }).join('')}
+        <div style="padding:12px 4px 0;margin-top:8px;border-top:1px solid var(--color-border)">
+          <button onclick="go('home')" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:block;margin-bottom:6px;background:none;border:none;cursor:pointer">← Home</button>
+          <button class="manage-sub-btn" onclick="openManageSubscription()" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('coin', 13)} Manage Subscription</button>
+          <button onclick="signOut()" style="color:#94a3b8;font-size:12px;font-family:var(--font-family);background:none;border:none;cursor:pointer">Sign out</button>
+        </div>
       </nav>
-      <div style="padding:16px;border-top:1px solid var(--color-border)">
-        <button onclick="go('home')" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:block;margin-bottom:6px;background:none;border:none;cursor:pointer">← Home</button>
-        <button class="manage-sub-btn" onclick="openManageSubscription()" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('coin', 13)} Manage Subscription</button>
-        <button onclick="signOut()" style="color:#94a3b8;font-size:12px;font-family:var(--font-family);background:none;border:none;cursor:pointer">Sign out</button>
-      </div>
     </aside>`;
 
     const mobileHeader = `
@@ -2065,6 +2065,19 @@ function pOverview(db) {
             ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No kids added yet.</div>`
             : kidRows}
         </div>
+        ${(missed.length === 0 && !hasMissedHistory) ? '' : `
+        <div style="margin-top:24px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <p class="pr-section-label" style="margin-bottom:0">Missed Chores <span style="font-family:var(--font-family);font-size:11px;font-weight:600;color:var(--color-text-muted)">(last 7 days)</span></p>
+            <div style="display:flex;gap:8px">
+              ${hasMissedHistory ? `<button onclick="openModal('missed-history')" style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-text-muted);background:none;border:1.5px solid var(--color-border);border-radius:8px;padding:4px 10px;cursor:pointer" onmouseenter="this.style.color='#374151'" onmouseleave="this.style.color='var(--color-text-muted)'">History</button>` : ''}
+              ${missed.length === 0 ? '' : `<button onclick="clearMissedChores()" style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-text-muted);background:none;border:1.5px solid var(--color-border);border-radius:8px;padding:4px 10px;cursor:pointer" onmouseenter="this.style.color='#374151'" onmouseleave="this.style.color='var(--color-text-muted)'">Clear all</button>`}
+            </div>
+          </div>
+          ${missed.length === 0
+            ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No missed chores right now 🎉</div>`
+            : `<div class="flex flex-col gap-2">${missedRows}</div>`}
+        </div>`}
       </div>
       <div>
         <p class="pr-section-label mb-3">Pending Chore Approvals ${pending.length ? `<span class="badge ml-1">${pending.length}</span>` : ''}</p>
@@ -2077,23 +2090,7 @@ function pOverview(db) {
         <p class="pr-section-label mb-3 mt-6">Pending Reward Approvals <span class="badge ml-1">${pendingRewards.length}</span></p>
         <div class="flex flex-col gap-2">${pendingRewardRows}</div>`}
       </div>
-    </div>
-    ${(missed.length === 0 && !hasMissedHistory) ? '' : `
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <p class="pr-section-label" style="margin-bottom:0">Missed Chores <span style="font-family:var(--font-family);font-size:11px;font-weight:600;color:var(--color-text-muted)">(last 7 days)</span></p>
-          <div style="display:flex;gap:8px">
-            ${hasMissedHistory ? `<button onclick="openModal('missed-history')" style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-text-muted);background:none;border:1.5px solid var(--color-border);border-radius:8px;padding:4px 10px;cursor:pointer" onmouseenter="this.style.color='#374151'" onmouseleave="this.style.color='var(--color-text-muted)'">History</button>` : ''}
-            ${missed.length === 0 ? '' : `<button onclick="clearMissedChores()" style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-text-muted);background:none;border:1.5px solid var(--color-border);border-radius:8px;padding:4px 10px;cursor:pointer" onmouseenter="this.style.color='#374151'" onmouseleave="this.style.color='var(--color-text-muted)'">Clear all</button>`}
-          </div>
-        </div>
-        ${missed.length === 0
-          ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No missed chores right now 🎉</div>`
-          : `<div class="flex flex-col gap-2">${missedRows}</div>`}
-      </div>
-      <div></div>
-    </div>`}`;
+    </div>`;
 }
 
 function pChores(db) {
