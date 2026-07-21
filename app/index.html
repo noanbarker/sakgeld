@@ -2028,7 +2028,7 @@ function pOverview(db) {
             <p style="font-family:var(--font-family);font-size:20px;font-weight:800;color:var(--color-green-700);line-height:1">${weekPct}%</p>
           </div>
         </div>
-        <p style="font-family:var(--font-family);font-size:15px;font-weight:800;color:var(--color-green-700);margin-top:2px">${R(totalEarned)} <span style="font-size:13px;font-weight:700;color:var(--color-text-secondary)">of ${R(totalWeekly)}</span></p>
+        <p style="font-family:var(--font-family);font-size:15px;font-weight:800;color:var(--color-green-700);margin-top:2px">${R(totalEarned)} <span style="font-size:13px;font-weight:700;color:var(--color-text-secondary)">of</span> <span style="font-size:13px;font-weight:700;color:var(--color-green-700)">${R(totalWeekly)}</span></p>
       </div>
       <div class="stat-card">
         <p class="pr-section-label">Pending approvals</p>
@@ -2679,7 +2679,7 @@ function vKid() {
                   <p style="font-family:var(--font-family);font-size:20px;font-weight:800;color:${ac.header};line-height:1">${pct}%</p>
                 </div>
               </div>
-              <p style="font-family:var(--font-family);font-size:15px;font-weight:800;color:${ac.header};margin-top:2px">${R(earned)} <span style="font-size:15px;font-weight:700;color:${ac.text}">of ${R(possible)}</span></p>
+              <p style="font-family:var(--font-family);font-size:15px;font-weight:800;color:${ac.header};margin-top:2px">${R(earned)} <span style="font-size:15px;font-weight:700;color:${ac.text}">of</span> <span style="font-size:15px;font-weight:700;color:${ac.header}">${R(possible)}</span></p>
             </div>`;
         })()}
         <p class="pr-section-label mb-3">
