@@ -2687,7 +2687,7 @@ function vKid() {
                   <p style="font-family:var(--font-family);font-size:14px;font-weight:800;color:var(--color-green-700);line-height:1">${stagePct}%</p>
                 </div>
               </div>
-              <p style="font-family:var(--font-family);font-size:13px;font-weight:800;color:var(--color-green-700)">${R(Math.max(0, nextThresh - kid.balance))} <span style="font-size:12px;font-weight:700;color:var(--color-text-secondary)">to</span> <span style="font-size:13px;font-weight:800;color:var(--color-green-700)">${TREE_STAGES[treeStageIdx + 1]?.label || ''}</span></p>
+              <p style="font-family:var(--font-family);font-size:13px;font-weight:800;color:var(--color-green-700);display:flex;align-items:center;justify-content:center;gap:4px">${R(Math.max(0, nextThresh - kid.balance))} <span style="font-size:12px;font-weight:700;color:var(--color-text-secondary)">to</span> <span style="font-size:13px;font-weight:800;color:var(--color-green-700)">${TREE_STAGES[treeStageIdx + 1]?.label || ''}</span> <span style="display:inline-flex;width:16px;height:19px;align-items:center;justify-content:center">${treeStageSVG(treeStageIdx + 1, 16)}</span></p>
             </div>` : `
             <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center">
               <p class="pr-section-label" style="color:var(--color-green-700)">Top tier</p>
