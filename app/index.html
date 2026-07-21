@@ -2666,19 +2666,23 @@ function vKid() {
             const earned   = weeklyEarned(db, kid.id);
             const possible = weeklyPossible(db, kid.id);
             const pct      = possible > 0 ? Math.min(100, Math.round(earned / possible * 100)) : 0;
+            const ringR = 37, ringC = 2 * Math.PI * ringR, ringOffset = ringC * (1 - pct / 100);
             return `
-            <div class="card mb-4" style="background:${ac.bg};border:1.5px solid ${ac.border}">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
-                <p class="pr-section-label" style="color:${ac.text}">This week's earnings</p>
-                <p style="font-family:var(--font-family);font-size:12px;color:${ac.text};font-weight:600">${pct}%</p>
+            <div class="card mb-4" style="background:${ac.bg};border:1.5px solid ${ac.border};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center">
+              <p class="pr-section-label" style="color:${ac.text}">Earnings this week</p>
+              <div style="position:relative;width:88px;height:88px">
+                <svg width="88" height="88" viewBox="0 0 88 88" style="transform:rotate(-90deg)">
+                  <circle cx="44" cy="44" r="${ringR}" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="10"/>
+                  <circle cx="44" cy="44" r="${ringR}" fill="none" stroke="${ac.header}" stroke-width="10"
+                    stroke-linecap="round"
+                    stroke-dasharray="${ringC.toFixed(2)}"
+                    stroke-dashoffset="${ringOffset.toFixed(2)}"/>
+                </svg>
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
+                  <p style="font-family:var(--font-family);font-size:20px;font-weight:800;color:${ac.header};line-height:1">${pct}%</p>
+                </div>
               </div>
-              <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:8px">
-                <p style="font-family:var(--font-family);font-size:24px;font-weight:800;color:${ac.header}">${R(earned)}</p>
-                <p style="font-family:var(--font-family);font-size:13px;color:${ac.text}">of ${R(possible)} possible</p>
-              </div>
-              <div style="background:rgba(255,255,255,0.6);border-radius:99px;height:10px;overflow:hidden">
-                <div style="background:${ac.header};width:${pct}%;height:100%;border-radius:99px;transition:width 0.4s ease"></div>
-              </div>
+              <p style="font-family:var(--font-family);font-size:15px;font-weight:800;color:${ac.header};margin-top:2px">${R(earned)} <span style="font-size:13px;font-weight:700;color:${ac.text}">of ${R(possible)}</span></p>
             </div>`;
         })()}
         <p class="pr-section-label mb-3">
