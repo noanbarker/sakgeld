@@ -262,6 +262,8 @@
       }
       .sidebar-item                   { color:#475569; border:1px solid transparent; }
       .sidebar-item:not(.active):hover{ background:rgba(22,163,74,0.08);color:#14532d; }
+      .sp-sidebar-icon { display:inline-flex; transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1); }
+      .sidebar-item.active .sp-sidebar-icon { transform: scale(1.18); }
       input, select {
         outline:none; border:1.5px solid var(--color-border);
         border-radius:var(--radius-md); padding:10px 14px !important;
@@ -357,7 +359,7 @@
       .sp-tab-exit-back { animation: spTabSlideOutRight 0.32s cubic-bezier(0.16,1,0.3,1) both; }
       @media (prefers-reduced-motion: reduce) {
         .sp-tab-anim-fwd, .sp-tab-anim-back, .sp-tab-exit-fwd, .sp-tab-exit-back { animation: none !important; }
-        .sp-mob-tab-svg { transition: none !important; }
+        .sp-mob-tab-svg, .sp-sidebar-icon { transition: none !important; }
       }
     </style>
 </head>
@@ -1892,7 +1894,7 @@ function vParent() {
           const activeStyle = isActive ? 'background:rgba(22,163,74,.12);color:#14532d;' : '';
           return `
           <button onclick="setTab('${t.id}')" class="sidebar-item ${isActive ? 'active' : ''}" style="margin-bottom:4px;${activeStyle}">
-            ${t.svg}
+            <span class="sp-sidebar-icon">${t.svg}</span>
             <span style="flex:1">${t.label}</span>
             ${t.badge ? `<span class="badge">${t.badge}</span>` : ''}
           </button>`;
