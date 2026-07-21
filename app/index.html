@@ -2011,19 +2011,24 @@ function pOverview(db) {
     const totalBalances = db.kids.reduce((s, k) => s + (k.balance || 0), 0);
     const pendingValue  = pending.reduce((s, c) => { const ch = db.chores.find(x => x.id === c.choreId); return s + (ch?.value || 0); }, 0);
     const weekPct       = totalWeekly > 0 ? Math.min(100, Math.round(totalEarned / totalWeekly * 100)) : 0;
+    const ringR = 37, ringC = 2 * Math.PI * ringR, ringOffset = ringC * (1 - weekPct / 100);
     const weeklyCard  = db.kids.length === 0 ? '' : `
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-      <div class="stat-card">
-        <p class="pr-section-label">Earned this week</p>
-        <p style="font-family:var(--font-family);font-size:24px;font-weight:800;color:var(--color-green-700);margin-top:4px">${R(totalEarned)}</p>
-        <div style="background:var(--color-green-100);border-radius:99px;height:6px;overflow:hidden;margin-top:10px">
-          <div style="background:var(--color-green-500);width:${weekPct}%;height:100%;border-radius:99px"></div>
+      <div class="stat-card" style="grid-column: span 2 / span 2; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center">
+        <p class="pr-section-label">Earnings this week</p>
+        <div style="position:relative;width:88px;height:88px">
+          <svg width="88" height="88" viewBox="0 0 88 88" style="transform:rotate(-90deg)">
+            <circle cx="44" cy="44" r="${ringR}" fill="none" stroke="var(--color-green-100)" stroke-width="10"/>
+            <circle cx="44" cy="44" r="${ringR}" fill="none" stroke="var(--color-green-500)" stroke-width="10"
+              stroke-linecap="round"
+              stroke-dasharray="${ringC.toFixed(2)}"
+              stroke-dashoffset="${ringOffset.toFixed(2)}"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
+            <p style="font-family:var(--font-family);font-size:20px;font-weight:800;color:var(--color-green-700);line-height:1">${weekPct}%</p>
+          </div>
         </div>
-      </div>
-      <div class="stat-card">
-        <p class="pr-section-label">Possible this week</p>
-        <p style="font-family:var(--font-family);font-size:24px;font-weight:800;color:var(--color-text-primary);margin-top:4px">${R(totalWeekly)}</p>
-        <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:8px">Across ${db.kids.length} kid${db.kids.length === 1 ? '' : 's'}</p>
+        <p style="font-family:var(--font-family);font-size:15px;font-weight:800;color:var(--color-green-700);margin-top:2px">${R(totalEarned)} <span style="font-size:13px;font-weight:700;color:var(--color-text-secondary)">of ${R(totalWeekly)}</span></p>
       </div>
       <div class="stat-card">
         <p class="pr-section-label">Pending approvals</p>
