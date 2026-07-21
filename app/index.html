@@ -2616,6 +2616,16 @@ function vKid() {
     const stagePct     = nextThresh
         ? Math.min(100, Math.round(((kid.balance - stageFloor) / (nextThresh - stageFloor)) * 100))
         : 100;
+    const kidMilestones = (db.bonusMilestones || []).filter(m =>
+        m.assignedTo === 'all' || (Array.isArray(m.assignedTo) && m.assignedTo.includes(kid.id))
+    );
+    const kidMilestonesAchieved = kidMilestones.filter(m => (m.claimedBy || []).some(c => c.kidId === kid.id)).length;
+    const kidRewards = (db.rewards || []).filter(r =>
+        !r.archived && (r.assignedTo === 'all' || (Array.isArray(r.assignedTo) && r.assignedTo.includes(kid.id)))
+    );
+    const kidRewardsAchieved = kidRewards.filter(r =>
+        (db.rewardCompletions || []).some(c => c.rewardId === r.id && c.kidId === kid.id && c.approved)
+    ).length;
     return `
     <div class="flex flex-col min-h-screen">
       <div class="sp-kid-header" style="background:${ac.header};color:white;padding:32px 32px 28px;position:relative;overflow:hidden">
@@ -2632,9 +2642,12 @@ function vKid() {
           <div style="display:flex;align-items:flex-end;gap:16px">
             <!-- Left: balance + progress -->
             <div style="flex:1">
-              <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
-                <p class="sp-kid-balance" style="font-family:var(--font-family);font-size:44px;font-weight:900;line-height:1">${R(kid.balance)}</p>
-                <p style="font-family:var(--font-family);color:rgba(255,255,255,0.7)">balance</p>
+              <div style="margin-bottom:4px">
+                <p style="font-family:var(--font-family);font-size:28px;font-weight:600;color:rgba(255,255,255,0.85);line-height:1">Savings: <strong>${R(kid.balance)}</strong></p>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:2px;margin-top:8px">
+                <p style="font-family:var(--font-family);font-size:14px;font-weight:600;color:rgba(255,255,255,0.85)">Bonuses: <strong>${kidMilestonesAchieved}</strong> of ${kidMilestones.length}</p>
+                <p style="font-family:var(--font-family);font-size:14px;font-weight:600;color:rgba(255,255,255,0.85)">Rewards: <strong>${kidRewardsAchieved}</strong> of ${kidRewards.length}</p>
               </div>
             </div>
             <!-- Centre: tree -->
