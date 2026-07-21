@@ -126,6 +126,22 @@
         from { opacity:0; transform:translateY(14px); }
         to   { opacity:1; transform:translateY(0); }
       }
+      @keyframes spTabSlideRight {
+        from { opacity:0; transform:translateX(28px); }
+        to   { opacity:1; transform:translateX(0); }
+      }
+      @keyframes spTabSlideLeft {
+        from { opacity:0; transform:translateX(-28px); }
+        to   { opacity:1; transform:translateX(0); }
+      }
+      @keyframes spTabSlideOutLeft {
+        from { opacity:1; transform:translateX(0); }
+        to   { opacity:0; transform:translateX(-28px); }
+      }
+      @keyframes spTabSlideOutRight {
+        from { opacity:1; transform:translateX(0); }
+        to   { opacity:0; transform:translateX(28px); }
+      }
       @keyframes floatUp {
         0%, 100% { transform: translateY(0); }
         50%       { transform: translateY(-9px); }
@@ -332,6 +348,15 @@
         .sp-recon-row > div:nth-child(2) { border-top: 1px solid var(--color-border); padding-top: 12px; margin-top: 8px; }
         .sp-recon-row > div:nth-child(3) { border-top: 1px solid var(--color-border); padding-top: 12px; margin-top: 8px; text-align: left !important; }
       }
+
+      /* ── Parent dashboard: animated tab transitions ──────────── */
+      .sp-tab-anim-fwd  { animation: spTabSlideRight 0.42s cubic-bezier(0.16,1,0.3,1); }
+      .sp-tab-anim-back { animation: spTabSlideLeft  0.42s cubic-bezier(0.16,1,0.3,1); }
+      .sp-tab-exit-fwd  { animation: spTabSlideOutLeft  0.32s cubic-bezier(0.16,1,0.3,1) both; }
+      .sp-tab-exit-back { animation: spTabSlideOutRight 0.32s cubic-bezier(0.16,1,0.3,1) both; }
+      @media (prefers-reduced-motion: reduce) {
+        .sp-tab-anim-fwd, .sp-tab-anim-back, .sp-tab-exit-fwd, .sp-tab-exit-back { animation: none !important; }
+      }
     </style>
 </head>
 <body class="min-h-screen">
@@ -508,6 +533,7 @@ const S = {
     view: 'home',
     kidId: null,
     tab: 'overview',
+    tabAnim: null,
     pin: '',
     pinKidId: null,
     modal: null,
@@ -1168,7 +1194,32 @@ function kidIcon(kidOrName) {
     return icons[h % icons.length];
 }
 function go(view, params = {}) { Object.assign(S, params); S.view = view; render(); }
-function setTab(t) { S.tab = t; S.settingsSection = null; render(); }
+const PARENT_TAB_ORDER = ['overview', 'chores', 'kids', 'payouts', 'bonuses', 'rewards', 'recon', 'settings'];
+function setTab(t) {
+    const oldIdx = PARENT_TAB_ORDER.indexOf(S.tab);
+    const newIdx = PARENT_TAB_ORDER.indexOf(t);
+    const dir = newIdx === oldIdx ? null : (newIdx > oldIdx ? 'fwd' : 'back');
+    if (dir) {
+        const live = document.querySelector('.sp-tab-content');
+        if (live) {
+            const rect = live.getBoundingClientRect();
+            const outgoing = live.cloneNode(true);
+            outgoing.className = 'sp-tab-content ' + (dir === 'fwd' ? 'sp-tab-exit-fwd' : 'sp-tab-exit-back');
+            outgoing.style.position = 'fixed';
+            outgoing.style.top = rect.top + 'px';
+            outgoing.style.left = rect.left + 'px';
+            outgoing.style.width = rect.width + 'px';
+            outgoing.style.height = rect.height + 'px';
+            outgoing.style.margin = '0';
+            outgoing.style.zIndex = '40';
+            outgoing.style.pointerEvents = 'none';
+            document.body.appendChild(outgoing);
+            setTimeout(() => outgoing.remove(), 340);
+        }
+    }
+    S.tabAnim = dir;
+    S.tab = t; S.settingsSection = null; render();
+}
 function toast(msg) {
     if (S.toastTimer) clearTimeout(S.toastTimer);
     S.toast = msg; render();
@@ -1878,7 +1929,7 @@ function vParent() {
       ${sidebar}
       <div style="flex:1;display:flex;flex-direction:column;min-width:0">
         ${mobileHeader}
-        <div class="sp-tab-content" style="flex:1;overflow:auto;padding:24px 28px;background:var(--color-background)">
+        <div class="sp-tab-content ${S.tabAnim === 'fwd' ? 'sp-tab-anim-fwd' : S.tabAnim === 'back' ? 'sp-tab-anim-back' : ''}" style="flex:1;overflow:auto;padding:24px 28px;background:var(--color-background)">
           ${S.tab === 'overview'  ? pOverview(db) :
             S.tab === 'chores'    ? pChores(db) :
             S.tab === 'kids'      ? pKids(db) :
@@ -3718,6 +3769,7 @@ function render() {
     const views = { home: vHome, parent: vParent, 'kid-pin': vKidPin, kid: vKid, 'parent-pin': vParentPin };
     const html  = (views[S.view] || vHome)();
     document.getElementById('app').innerHTML = html + renderModal() + toastHtml;
+    S.tabAnim = null;
 }
 
 initApp();
