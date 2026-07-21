@@ -248,8 +248,18 @@
         transition:background 0.1s; cursor:pointer;
       }
       .numpad-btn:active { background:#f1f5f9; }
-      .tab-active   { color:var(--color-green-600); border-bottom:2px solid var(--color-green-600); }
+      .tab-active   { color:#fff; }
       .tab-inactive { color:#6b7280; }
+      .sp-mob-tabbar { position:relative; }
+      .sp-mob-thumb {
+        position:absolute; top:4px; bottom:4px; left:0;
+        background:var(--color-green-600); border-radius:12px;
+        box-shadow:0 2px 8px rgba(22,163,74,0.35); z-index:0;
+      }
+      .sp-mob-divider {
+        position:absolute; top:9px; bottom:9px; width:1px;
+        background:var(--color-border); transition:opacity 0.2s ease; z-index:0;
+      }
       .card {
         background:var(--color-surface); border-radius:var(--radius-md);
         border:1px solid var(--color-border);
@@ -359,7 +369,7 @@
       .sp-tab-exit-back { animation: spTabSlideOutRight 0.32s cubic-bezier(0.16,1,0.3,1) both; }
       @media (prefers-reduced-motion: reduce) {
         .sp-tab-anim-fwd, .sp-tab-anim-back, .sp-tab-exit-fwd, .sp-tab-exit-back { animation: none !important; }
-        .sp-mob-tab-svg, .sp-sidebar-icon { transition: none !important; }
+        .sp-mob-tab-svg, .sp-sidebar-icon, .sp-mob-thumb, .sp-mob-divider { transition: none !important; }
       }
     </style>
 </head>
@@ -1223,6 +1233,25 @@ function setTab(t) {
     }
     S.tabAnim = dir;
     S.tab = t; S.settingsSection = null; render();
+
+    // Mobile tab bar's sliding pill: since render() rebuilds the whole bar from
+    // scratch, the thumb is a brand-new element each time and a plain CSS
+    // transition never plays. Snap it back to the old spot with transitions
+    // off, force a reflow, then transition to the real target so it visibly
+    // slides across every tab in between (further apart = slower).
+    if (dir) {
+        const mobileBar = document.querySelector('.sp-mob-tabbar');
+        const thumb = document.querySelector('.sp-mob-thumb');
+        if (mobileBar && thumb) {
+            const tabWidth = mobileBar.getBoundingClientRect().width / PARENT_TAB_ORDER.length;
+            const duration = Math.min(900, 220 + Math.abs(newIdx - oldIdx) * 70);
+            thumb.style.transition = 'none';
+            thumb.style.transform = `translateX(${oldIdx * tabWidth}px)`;
+            thumb.getBoundingClientRect();
+            thumb.style.transition = `transform ${duration}ms cubic-bezier(0.65,0,0.35,1)`;
+            thumb.style.transform = `translateX(${newIdx * tabWidth}px)`;
+        }
+    }
 }
 function toast(msg) {
     if (S.toastTimer) clearTimeout(S.toastTimer);
@@ -1917,7 +1946,13 @@ function vParent() {
         <button onclick="go('home')" style="color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer;font-family:var(--font-family)">← Home</button>
       </div>
     </div>
-    <div class="md:hidden border-b flex sticky top-0 z-10" style="background:var(--color-surface);border-color:var(--color-border)">
+    <div class="md:hidden sp-mob-tabbar border-b flex sticky top-0 z-10" style="background:var(--color-surface);border-color:var(--color-border)">
+      <div class="sp-mob-thumb" style="width:calc(100% / ${navItems.length});transform:translateX(${PARENT_TAB_ORDER.indexOf(S.tab) * 100}%)"></div>
+      ${navItems.slice(0, -1).map((_, i) => {
+          const activeIdx = PARENT_TAB_ORDER.indexOf(S.tab);
+          const hidden = i === activeIdx - 1 || i === activeIdx;
+          return `<div class="sp-mob-divider" style="left:calc(${i + 1} * (100% / ${navItems.length}));opacity:${hidden ? 0 : 1}"></div>`;
+      }).join('')}
       ${navItems.map(t => `
         <button onclick="setTab('${t.id}')"
           class="sp-mob-tab flex-1 py-3 relative ${S.tab === t.id ? 'tab-active' : 'tab-inactive'}"
