@@ -1570,10 +1570,7 @@ function vLogin() {
           <div class="pr-blob-bottom"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;justify-content:center;margin-bottom:28px">
-              <div style="display:flex;align-items:center;gap:10px;margin-left:-60px">
-                ${treeSVG(50, false, true)}
-                <h1 style="font-family:var(--font-family);font-size:34px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin:0">Sprout</h1>
-              </div>
+              <img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:64px;width:auto;display:block">
             </div>
             ${isForgot ? `
             <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:18px;text-align:center">Enter your email and we'll send you a link to reset your password.</p>
@@ -1637,10 +1634,7 @@ function vResetPassword() {
           <div class="pr-blob-bottom"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;justify-content:center;margin-bottom:28px">
-              <div style="display:flex;align-items:center;gap:10px;margin-left:-60px">
-                ${treeSVG(50, false, true)}
-                <h1 style="font-family:var(--font-family);font-size:34px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin:0">Sprout</h1>
-              </div>
+              <img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:64px;width:auto;display:block">
             </div>
             <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:18px;text-align:center">Choose a new password for your account.</p>
             <input type="password" id="rp-pass" placeholder="New password" class="mb-3"
@@ -1688,7 +1682,7 @@ function vSubscriptionGate() {
         <div class="pr-card" style="padding:52px 40px 44px;text-align:center">
           <div class="pr-stripe"></div>
           <div style="position:relative;z-index:1">
-            <div style="display:flex;justify-content:center;margin-bottom:20px">${treeSVG(50, false, true)}</div>
+            <div style="display:flex;justify-content:center;margin-bottom:20px"><img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:64px;width:auto;display:block"></div>
             <h2 style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d;margin-bottom:10px">${needsAttention ? 'Your subscription needs attention' : "You're almost there!"}</h2>
             <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:28px">${needsAttention
                 ? 'There’s an issue with your payment method or subscription. Please update your details to keep using Sprout.'
@@ -1746,10 +1740,7 @@ function vHome() {
           <div style="position:relative;z-index:1">
             <!-- Logo block -->
             <div style="display:flex;justify-content:center;margin-bottom:32px">
-              <div style="display:flex;align-items:center;gap:10px;margin-left:-60px">
-                ${treeSVG(50, false, true)}
-                <h1 style="font-family:var(--font-family);font-size:34px;font-weight:900;color:#14532d;letter-spacing:-0.03em;margin:0">Sprout</h1>
-              </div>
+              <img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:64px;width:auto;display:block">
             </div>
             <!-- Parent button -->
             <button onclick="goParent()" class="pr-btn-primary" style="margin-bottom:10px">
@@ -1932,11 +1923,8 @@ function vParent() {
     const sidebar = `
     <aside style="width:220px;min-height:100vh;background:#f6faf7;flex-direction:column;flex-shrink:0;border-right:1px solid var(--color-border)" class="hidden md:flex">
       <div style="padding:28px 20px 20px;border-bottom:1px solid var(--color-border);display:flex;align-items:center;gap:12px">
-        ${treeSVG(36, false, true)}
-        <div>
-          <h1 style="color:#14532d;font-family:var(--font-family);font-size:18px;font-weight:900;line-height:1.1;letter-spacing:-0.02em">Sprout</h1>
-          <p style="color:var(--color-text-secondary);font-size:11px;font-family:var(--font-family);margin-top:2px">Parent Dashboard</p>
-        </div>
+        <img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:40px;width:auto;display:block">
+        <p style="color:var(--color-text-secondary);font-size:11px;font-family:var(--font-family)">Parent Dashboard</p>
       </div>
       <nav style="padding:12px">
         ${navItems.map(t => {
@@ -1960,13 +1948,12 @@ function vParent() {
     </aside>`;
 
     const mobileHeader = `
-    <div class="md:hidden text-white px-5 pt-8 pb-4 flex justify-between items-center" style="background:var(--gradient-primary)">
+    <div class="md:hidden px-5 pt-8 pb-4 flex justify-between items-center" style="background:var(--color-surface);border-bottom:1px solid var(--color-border)">
       <div style="display:flex;align-items:center;gap:10px">
-        ${treeSVG(32, false, true)}
-        <h1 style="font-family:var(--font-family);font-size:18px;font-weight:900;letter-spacing:-0.02em">Sprout</h1>
+        <img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:40px;width:auto;display:block">
       </div>
       <div class="flex items-center gap-4">
-        <button onclick="go('home')" style="color:rgba(255,255,255,0.7);font-size:21px;background:none;border:none;cursor:pointer;font-family:var(--font-family);display:flex;align-items:center;gap:6px">← ${uiIcon('home', 24)}</button>
+        <button onclick="go('home')" style="color:#15803d;font-size:21px;background:none;border:none;cursor:pointer;font-family:var(--font-family);display:flex;align-items:center;gap:6px">← ${uiIcon('home', 24)}</button>
       </div>
     </div>
     <div class="md:hidden sp-mob-tabbar border-b flex sticky top-0 z-10" style="background:var(--color-surface);border-color:var(--color-border)">
