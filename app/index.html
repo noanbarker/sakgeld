@@ -3021,7 +3021,9 @@ function renderModal() {
         const e = type === 'edit-kid';
         body = `
         <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:16px">${e ? 'Edit' : 'Add'} Kid</h3>
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Name</p>
         <input id="k-name" placeholder="Name" value="${data.name||''}" class="mb-3">
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">PIN</p>
         <input id="k-pin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" value="${data.pin||''}" class="mb-3">
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Date of birth</p>
         <input id="k-dob" type="date" value="${data.date_of_birth||''}" max="${new Date().toISOString().slice(0,10)}" class="mb-4">
