@@ -1065,8 +1065,14 @@ function getTreeStage(balance) {
 
 function treeStageSVG(stageIndex, size = 80) {
     const files = ['1_Seedling.webp', '2_Sapling.webp', '3_Small_Tree.webp', '4_Big_Tree.webp', '5_Forest.webp'];
+    // Relative to each other, these source images vary a lot in native resolution
+    // (the seedling art is much lower-res than the rest), so scale each stage
+    // independently rather than rendering every stage at the same requested size —
+    // otherwise the lower-res art looks soft/pixelated next to the others.
+    const scale = [0.75, 1, 1, 1, 1];
     const idx = Math.min(stageIndex, 4);
-    return `<img src="../images/${files[idx]}" alt="${TREE_STAGES[idx].label}" style="height:${size}px;width:auto;display:block">`;
+    const h = Math.round(size * scale[idx]);
+    return `<img src="../images/${files[idx]}" alt="${TREE_STAGES[idx].label}" style="height:${h}px;width:auto;display:block">`;
 }
 
 // ─── CHORE EMOJIS (legacy — kept for fallback) ────────────────────
