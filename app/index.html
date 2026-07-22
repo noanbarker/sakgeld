@@ -1948,7 +1948,7 @@ function vParent() {
     </aside>`;
 
     const mobileHeader = `
-    <div class="md:hidden px-5 pt-8 pb-4 flex justify-between items-center" style="background:var(--color-surface);border-bottom:1px solid var(--color-border)">
+    <div class="md:hidden px-5 pt-3 pb-2 flex justify-between items-center" style="background:var(--color-surface);border-bottom:1px solid var(--color-green-border)">
       <div style="display:flex;align-items:center;gap:10px">
         <img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:100px;width:auto;display:block">
       </div>
@@ -1956,7 +1956,7 @@ function vParent() {
         <button onclick="go('home')" style="color:#15803d;font-size:21px;background:none;border:none;cursor:pointer;font-family:var(--font-family);display:flex;align-items:center;gap:6px">← ${uiIcon('home', 24)}</button>
       </div>
     </div>
-    <div class="md:hidden sp-mob-tabbar border-b flex sticky top-0 z-10" style="background:var(--color-surface);border-color:var(--color-border)">
+    <div class="md:hidden sp-mob-tabbar border-b flex sticky top-0 z-10" style="background:var(--color-surface);border-color:var(--color-green-border)">
       <div class="sp-mob-thumb" style="width:calc(100% / ${navItems.length});transform:translateX(${PARENT_TAB_ORDER.indexOf(S.tab) * 100}%)"></div>
       ${navItems.slice(0, -1).map((_, i) => {
           const activeIdx = PARENT_TAB_ORDER.indexOf(S.tab);
