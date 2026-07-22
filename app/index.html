@@ -1032,8 +1032,8 @@ function choreIconSVG(key, size = 44) {
 const TREE_STAGES = [
     { key: 'seedling',   label: 'Seedling',   emoji: '🌱', description: 'Just getting started' },
     { key: 'sapling',    label: 'Sapling',    emoji: '🌿', description: 'Growing strong' },
-    { key: 'young-tree', label: 'Young Tree', emoji: '🌳', description: 'Looking good' },
-    { key: 'money-tree', label: 'Money Tree', emoji: '🌟', description: 'Thriving saver' },
+    { key: 'small-tree', label: 'Small Tree', emoji: '🌳', description: 'Looking good' },
+    { key: 'big-tree',   label: 'Big Tree',   emoji: '🌟', description: 'Thriving saver' },
     { key: 'forest',     label: 'Forest',     emoji: '🏆', description: 'Champion grower' },
 ];
 
@@ -2393,8 +2393,8 @@ function pSettings() {
     const tiers = [
         { stage: 0, name: 'Seedling',   range: `${R(0)} – ${R(t.t1 - 0.01)}` },
         { stage: 1, name: 'Sapling',    range: `${R(t.t1)} – ${R(t.t2 - 0.01)}` },
-        { stage: 2, name: 'Young Tree', range: `${R(t.t2)} – ${R(t.t3 - 0.01)}` },
-        { stage: 3, name: 'Money Tree', range: `${R(t.t3)} – ${R(t.t4 - 0.01)}` },
+        { stage: 2, name: 'Small Tree', range: `${R(t.t2)} – ${R(t.t3 - 0.01)}` },
+        { stage: 3, name: 'Big Tree',   range: `${R(t.t3)} – ${R(t.t4 - 0.01)}` },
         { stage: 4, name: 'Forest',     range: `${R(t.t4)} and above` },
     ];
     const sections = [
@@ -2486,9 +2486,9 @@ function pSettings() {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
               ${[
                 { key:'t1', label:'Seedling → Sapling', val: t.t1 },
-                { key:'t2', label:'Sapling → Young Tree', val: t.t2 },
-                { key:'t3', label:'Young Tree → Money Tree', val: t.t3 },
-                { key:'t4', label:'Money Tree → Forest', val: t.t4 },
+                { key:'t2', label:'Sapling → Small Tree', val: t.t2 },
+                { key:'t3', label:'Small Tree → Big Tree', val: t.t3 },
+                { key:'t4', label:'Big Tree → Forest', val: t.t4 },
               ].map(row => `
               <div>
                 <p style="font-family:var(--font-family);font-size:11px;font-weight:700;color:var(--color-text-secondary);margin-bottom:6px">${row.label}</p>
