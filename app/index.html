@@ -236,18 +236,31 @@
       }
 
       /* ── Legacy compat ────────────────────────────────────────── */
+      @keyframes pinPop {
+        0%   { transform:scale(0.6); }
+        55%  { transform:scale(1.3); }
+        100% { transform:scale(1); }
+      }
+      @keyframes pinShake {
+        10%, 90% { transform:translateX(-1px); }
+        20%, 80% { transform:translateX(2px); }
+        30%, 50%, 70% { transform:translateX(-5px); }
+        40%, 60% { transform:translateX(5px); }
+      }
       .pin-dot {
         width:16px; height:16px; border-radius:50%;
         border:2px solid var(--color-green-600); transition:background 0.15s;
       }
-      .pin-dot.filled { background: var(--color-green-600); }
+      .pin-dot.filled { background: var(--color-green-600); animation:pinPop .22s cubic-bezier(.34,1.56,.64,1); }
+      .pin-dots-row.shake { animation:pinShake .4s; }
       .numpad-btn {
         height:64px; font-size:22px; font-weight:700; font-family:var(--font-family);
         border-radius:var(--radius-lg); background:var(--color-surface);
         border:1.5px solid var(--color-border); box-shadow:var(--shadow-sm);
-        transition:background 0.1s; cursor:pointer;
+        transition:background 0.08s, transform 0.08s; cursor:pointer;
+        touch-action:manipulation; user-select:none; -webkit-user-select:none;
       }
-      .numpad-btn:active { background:#f1f5f9; }
+      .numpad-btn:active { background:#f1f5f9; transform:scale(0.9); box-shadow:none; }
       .tab-active   { color:#fff; }
       .tab-inactive { color:#6b7280; }
       .sp-mob-tabbar { position:relative; }
@@ -2621,13 +2634,14 @@ function vKidPin() {
         <div style="width:80px;height:80px;background:${ac.bg};border:2px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;margin-bottom:12px">${kidIcon(kid)}</div>
         <h2 style="font-family:var(--font-family);font-size:28px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${kid?.name || ''}</h2>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);margin-bottom:40px">Enter your PIN</p>
-        <div style="display:flex;gap:24px;margin-bottom:12px">${dots}</div>
+        <div id="pin-dots" class="pin-dots-row" style="display:flex;gap:24px;margin-bottom:12px">${dots}</div>
         <p id="pin-err" style="color:var(--color-coral);font-family:var(--font-family);font-size:14px;margin-bottom:32px;min-height:20px"></p>
         <div class="grid grid-cols-3 gap-3 w-72">${pad}</div>
       </div>
     </div>`;
 }
 function pinPress(k) {
+    if (navigator.vibrate) navigator.vibrate(8);
     if (k === '⌫') { S.pin = S.pin.slice(0,-1); render(); return; }
     if (S.pin.length >= 4) return;
     S.pin += k; render();
@@ -2641,8 +2655,11 @@ function checkPin() {
         S.kidId = kidId; S.pin = ''; go('kid');
         writeMissedChores(kidId);
     } else {
+        if (navigator.vibrate) navigator.vibrate([40,40,40]);
         const el = document.getElementById('pin-err');
         if (el) el.textContent = 'Wrong PIN. Try again.';
+        const dotsEl = document.getElementById('pin-dots');
+        if (dotsEl) { dotsEl.classList.remove('shake'); void dotsEl.offsetWidth; dotsEl.classList.add('shake'); }
         setTimeout(() => { S.pin = ''; render(); }, 900);
     }
 }
@@ -2667,13 +2684,14 @@ function vParentPin() {
         <div style="width:80px;height:80px;background:var(--color-green-100);border:2px solid var(--color-green-border);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--color-green-700);margin-bottom:12px">${uiIcon('user', 36, 2)}</div>
         <h2 style="font-family:var(--font-family);font-size:28px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Parent</h2>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);margin-bottom:40px">Enter parent PIN</p>
-        <div style="display:flex;gap:24px;margin-bottom:12px">${dots}</div>
+        <div id="ppin-dots" class="pin-dots-row" style="display:flex;gap:24px;margin-bottom:12px">${dots}</div>
         <p id="ppin-err" style="color:var(--color-coral);font-family:var(--font-family);font-size:14px;margin-bottom:32px;min-height:20px"></p>
         <div class="grid grid-cols-3 gap-3 w-72">${pad}</div>
       </div>
     </div>`;
 }
 function parentPinPress(k) {
+    if (navigator.vibrate) navigator.vibrate(8);
     if (k === '⌫') { S.parentPin = S.parentPin.slice(0,-1); render(); return; }
     if (S.parentPin.length >= 4) return;
     S.parentPin += k; render();
@@ -2684,8 +2702,11 @@ function checkParentPin() {
     if (S.parentPin === correctPin) {
         S.parentPin = ''; go('parent', { tab: 'overview' });
     } else {
+        if (navigator.vibrate) navigator.vibrate([40,40,40]);
         const el = document.getElementById('ppin-err');
         if (el) el.textContent = 'Wrong PIN. Try again.';
+        const dotsEl = document.getElementById('ppin-dots');
+        if (dotsEl) { dotsEl.classList.remove('shake'); void dotsEl.offsetWidth; dotsEl.classList.add('shake'); }
         setTimeout(() => { S.parentPin = ''; render(); }, 900);
     }
 }
