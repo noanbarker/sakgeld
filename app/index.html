@@ -260,7 +260,7 @@
         transition:background 0.08s, transform 0.08s; cursor:pointer;
         touch-action:manipulation; user-select:none; -webkit-user-select:none;
       }
-      .numpad-btn:active { background:#f1f5f9; transform:scale(0.9); box-shadow:none; }
+      .numpad-btn:active, .numpad-btn.pressed { background:#f1f5f9; transform:scale(0.9); box-shadow:none; }
       .tab-active   { color:#fff; }
       .tab-inactive { color:#6b7280; }
       .sp-mob-tabbar { position:relative; }
@@ -2625,7 +2625,7 @@ function vKidPin() {
     const keys = [1,2,3,4,5,6,7,8,9,null,0,'⌫'];
     const pad = keys.map(k => k === null
         ? `<div></div>`
-        : `<button class="numpad-btn" onclick="pinPress('${k}')">${k}</button>`
+        : `<button class="numpad-btn" onclick="pinPress('${k}')" onpointerdown="this.classList.add('pressed')" onpointerup="this.classList.remove('pressed')" onpointerleave="this.classList.remove('pressed')" onpointercancel="this.classList.remove('pressed')">${k}</button>`
     ).join('');
     return `
     <div class="min-h-screen flex flex-col items-center justify-center p-6" style="background:var(--color-background)">
@@ -2675,7 +2675,7 @@ function vParentPin() {
     const keys = [1,2,3,4,5,6,7,8,9,null,0,'⌫'];
     const pad = keys.map(k => k === null
         ? `<div></div>`
-        : `<button class="numpad-btn" onclick="parentPinPress('${k}')">${k}</button>`
+        : `<button class="numpad-btn" onclick="parentPinPress('${k}')" onpointerdown="this.classList.add('pressed')" onpointerup="this.classList.remove('pressed')" onpointerleave="this.classList.remove('pressed')" onpointercancel="this.classList.remove('pressed')">${k}</button>`
     ).join('');
     return `
     <div class="min-h-screen flex flex-col items-center justify-center p-6" style="background:var(--color-background)">
