@@ -1936,7 +1936,7 @@ function vParent() {
           </button>`;
         }).join('')}
         <div style="padding:12px 4px 0;margin-top:8px;border-top:1px solid var(--color-border)">
-          <button onclick="go('home')" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:block;margin-bottom:6px;background:none;border:none;cursor:pointer">← Home</button>
+          <button onclick="go('home')" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">← ${uiIcon('home', 16)}</button>
           <button class="manage-sub-btn" onclick="openManageSubscription()" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('card', 13)} Manage Subscription</button>
           <button onclick="signOut()" style="color:#94a3b8;font-size:12px;font-family:var(--font-family);background:none;border:none;cursor:pointer">Sign out</button>
         </div>
@@ -1950,7 +1950,7 @@ function vParent() {
         <h1 style="font-family:var(--font-family);font-size:18px;font-weight:900;letter-spacing:-0.02em">Sprout</h1>
       </div>
       <div class="flex items-center gap-4">
-        <button onclick="go('home')" style="color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer;font-family:var(--font-family)">← Home</button>
+        <button onclick="go('home')" style="color:rgba(255,255,255,0.7);font-size:14px;background:none;border:none;cursor:pointer;font-family:var(--font-family);display:flex;align-items:center;gap:6px">← ${uiIcon('home', 16)}</button>
       </div>
     </div>
     <div class="md:hidden sp-mob-tabbar border-b flex sticky top-0 z-10" style="background:var(--color-surface);border-color:var(--color-border)">
