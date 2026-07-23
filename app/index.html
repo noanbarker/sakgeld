@@ -2071,12 +2071,27 @@ function pOverview(db) {
     ${weeklyCard}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
       <div>
-        <p class="pr-section-label mb-3">Balances</p>
-        <div class="flex flex-col gap-2">
-          ${db.kids.length === 0
-            ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No kids added yet.</div>`
-            : kidRows}
+        <div>
+          <p class="pr-section-label mb-3">Balances</p>
+          <div class="flex flex-col gap-2">
+            ${db.kids.length === 0
+              ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No kids added yet.</div>`
+              : kidRows}
+          </div>
         </div>
+        ${(missed.length === 0 && !hasMissedHistory) ? '' : `
+        <div class="mt-6">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <p class="pr-section-label" style="margin-bottom:0">Missed Chores <span style="font-family:var(--font-family);font-size:11px;font-weight:600;color:var(--color-text-muted)">(last 7 days)</span></p>
+            <div style="display:flex;gap:8px">
+              ${hasMissedHistory ? `<button onclick="openModal('missed-history')" style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-text-muted);background:none;border:1.5px solid var(--color-border);border-radius:8px;padding:4px 10px;cursor:pointer" onmouseenter="this.style.color='#374151'" onmouseleave="this.style.color='var(--color-text-muted)'">History</button>` : ''}
+              ${missed.length === 0 ? '' : `<button onclick="clearMissedChores()" style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-text-muted);background:none;border:1.5px solid var(--color-border);border-radius:8px;padding:4px 10px;cursor:pointer" onmouseenter="this.style.color='#374151'" onmouseleave="this.style.color='var(--color-text-muted)'">Clear all</button>`}
+            </div>
+          </div>
+          ${missed.length === 0
+            ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No missed chores right now 🎉</div>`
+            : `<div class="flex flex-col gap-2">${missedRows}</div>`}
+        </div>`}
       </div>
       <div>
         <p class="pr-section-label mb-3">Pending Chore Approvals ${pending.length ? `<span class="badge ml-1">${pending.length}</span>` : ''}</p>
@@ -2089,19 +2104,6 @@ function pOverview(db) {
         <p class="pr-section-label mb-3 mt-6">Pending Reward Approvals <span class="badge ml-1">${pendingRewards.length}</span></p>
         <div class="flex flex-col gap-2">${pendingRewardRows}</div>`}
       </div>
-      ${(missed.length === 0 && !hasMissedHistory) ? '' : `
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <p class="pr-section-label" style="margin-bottom:0">Missed Chores <span style="font-family:var(--font-family);font-size:11px;font-weight:600;color:var(--color-text-muted)">(last 7 days)</span></p>
-          <div style="display:flex;gap:8px">
-            ${hasMissedHistory ? `<button onclick="openModal('missed-history')" style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-text-muted);background:none;border:1.5px solid var(--color-border);border-radius:8px;padding:4px 10px;cursor:pointer" onmouseenter="this.style.color='#374151'" onmouseleave="this.style.color='var(--color-text-muted)'">History</button>` : ''}
-            ${missed.length === 0 ? '' : `<button onclick="clearMissedChores()" style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-text-muted);background:none;border:1.5px solid var(--color-border);border-radius:8px;padding:4px 10px;cursor:pointer" onmouseenter="this.style.color='#374151'" onmouseleave="this.style.color='var(--color-text-muted)'">Clear all</button>`}
-          </div>
-        </div>
-        ${missed.length === 0
-          ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No missed chores right now 🎉</div>`
-          : `<div class="flex flex-col gap-2">${missedRows}</div>`}
-      </div>`}
     </div>`;
 }
 
