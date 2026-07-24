@@ -1762,7 +1762,7 @@ function pChores(db) {
             const who = choreAssignmentLabel(c, db.kids);
             return `
             <div class="card flex items-center gap-3">
-              <div style="width:48px;height:48px;background:var(--color-green-50);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${choreIconSVG(c.emoji, 36)}</div>
+              <div style="width:96px;height:96px;background:var(--color-green-50);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${choreIconSVG(c.emoji, 72)}</div>
               <div class="flex-1 min-w-0">
                 <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary)">${c.name}</p>
                 <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${who} · ${R(c.value)}</p>
@@ -2396,7 +2396,7 @@ function vKid() {
             : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
               ${ready.map(c => `
                 <div class="card flex items-center gap-4">
-                  <div style="flex-shrink:0;width:64px;height:64px;background:${ac.bg};border-radius:14px;display:flex;align-items:center;justify-content:center" class="sp-chore-icon">${choreIconSVG(c.emoji, 44)}</div>
+                  <div style="flex-shrink:0;width:128px;height:128px;background:${ac.bg};border-radius:14px;display:flex;align-items:center;justify-content:center" class="sp-chore-icon">${choreIconSVG(c.emoji, 88)}</div>
                   <div class="flex-1 min-w-0">
                     <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary)">${c.name}</p>
                     ${c.description ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${c.description}</p>` : ''}
@@ -2416,7 +2416,7 @@ function vKid() {
               const chore = db.chores.find(x => x.id === c.choreId);
               return `
               <div class="card flex items-center gap-4" style="background:#fffbeb;border:1.5px solid #fde68a">
-                <div style="flex-shrink:0;width:64px;height:64px;background:#fef3c7;border-radius:14px;display:flex;align-items:center;justify-content:center;opacity:0.7">${choreIconSVG(chore?.emoji, 44)}</div>
+                <div style="flex-shrink:0;width:128px;height:128px;background:#fef3c7;border-radius:14px;display:flex;align-items:center;justify-content:center;opacity:0.7">${choreIconSVG(chore?.emoji, 88)}</div>
                 <div class="flex-1 min-w-0">
                   <p style="font-family:var(--font-family);font-weight:800;color:#92400e">${chore?.name || 'Deleted chore'}</p>
                   <p style="font-family:var(--font-family);font-size:12px;color:#b45309;margin-top:2px">Waiting for parent ⏳</p>
@@ -2608,8 +2608,8 @@ function renderModal() {
             const n = parseInt(num);
             const isSel = String(n) === String(selIcon) || n === selIconNum;
             return `<button onclick="pickEmoji('${n}')" type="button" title="${CHORE_ICON_NAMES[n]}"
-                style="width:52px;height:52px;border-radius:10px;border:2px solid ${isSel?'var(--color-green-600)':'transparent'};background:${isSel?'var(--color-green-100)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.1s">
-                ${choreIconSVG(n, 40)}
+                style="width:104px;height:104px;border-radius:14px;border:2px solid ${isSel?'var(--color-green-600)':'transparent'};background:${isSel?'var(--color-green-100)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.1s">
+                ${choreIconSVG(n, 80)}
             </button>`;
         }).join('');
         body = `
@@ -2656,7 +2656,7 @@ function renderModal() {
           }).join('')}
         </div>` : '<div style="margin-bottom:14px"></div>'}
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:4px">Chore Icon <span style="font-size:11px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--color-green-700);margin-left:6px">${selIconName}</span></p>
-        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;max-height:180px;overflow-y:auto;border:1.5px solid var(--color-border);border-radius:12px;padding:6px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:340px;overflow-y:auto;border:1.5px solid var(--color-border);border-radius:12px;padding:6px;margin-bottom:16px">
           ${iconGrid}
         </div>
         <div style="display:flex;gap:8px">
