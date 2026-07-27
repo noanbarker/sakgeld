@@ -3135,7 +3135,7 @@ async function approveChore(cid) {
     if (chore && kid) {
         const newBalance = (kid.balance || 0) + chore.value;
         const txId = uid();
-        const txCreatedAt = new Date().toISOString();
+        const txCreatedAt = new Date((comp.dueDate || toLocalDateStr(new Date())) + 'T12:00:00').toISOString();
         await sb.from('kids').update({ balance: newBalance }).eq('id', kid.id).eq('user_id', currentUser.id);
         await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, kid_id: kid.id, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt });
         kid.balance = newBalance;
@@ -3157,14 +3157,14 @@ async function approveAllForKid(kidId) {
         .in('id', ids).eq('user_id', currentUser.id).eq('approved', false).select('id');
     const wonIds = new Set((won || []).map(r => r.id));
     const wonComps = comps.filter(c => wonIds.has(c.id));
-    const now = new Date().toISOString();
     const txInserts = [];
     let totalAdded = 0;
     wonComps.forEach(comp => {
         const chore = cache.chores.find(x => x.id === comp.choreId);
         if (chore) {
             totalAdded += chore.value;
-            txInserts.push({ id: uid(), user_id: currentUser.id, kid_id: kidId, amount: chore.value, type: 'chore', description: chore.name, created_at: now });
+            const txCreatedAt = new Date((comp.dueDate || toLocalDateStr(new Date())) + 'T12:00:00').toISOString();
+            txInserts.push({ id: uid(), user_id: currentUser.id, kid_id: kidId, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt });
         }
     });
     if (totalAdded > 0) {
