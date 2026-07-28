@@ -766,7 +766,7 @@ function R(n) {
     if (decimals > 0 && formatted.endsWith('.' + '0'.repeat(decimals))) {
         formatted = value.toFixed(0);
     }
-    return curr.symbol + ' ' + formatted;
+    return curr.symbol + ' ' + formatted;
 }
 function dateStr(iso) { return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }); }
 function kidIcon(kidOrName) {
@@ -2400,9 +2400,9 @@ function vKid() {
                   <div class="flex-1 min-w-0">
                     <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary)">${c.name}</p>
                     ${c.description ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${c.description}</p>` : ''}
-                    <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
-                      <p style="font-family:var(--font-family);color:${ac.header};font-weight:800">+ ${R(c.value)}</p>
-                      <span style="font-size:10px;background:${ac.bg};color:${ac.text};border-radius:6px;padding:2px 7px;font-family:var(--font-family);font-weight:700">${choreScheduleLabel(c)}</span>
+                    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:4px">
+                      <p style="font-family:var(--font-family);color:${ac.header};font-weight:800;white-space:nowrap">+ ${R(c.value)}</p>
+                      <span style="font-size:10px;background:${ac.bg};color:${ac.text};border-radius:6px;padding:2px 7px;font-family:var(--font-family);font-weight:700;white-space:nowrap">${choreScheduleLabel(c)}</span>
                     </div>
                   </div>
                   <button onclick="markDone('${c.id}', event)"
