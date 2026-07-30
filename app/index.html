@@ -543,7 +543,12 @@ async function initApp() {
     // any later means the recovery link silently becomes a normal signed-in session.
     sb.auth.onAuthStateChange(async (event, session) => {
         currentUser = session?.user || null;
-        if (event === 'PASSWORD_RECOVERY') { S.authMode = 'reset'; render(); return; }
+        if (event === 'PASSWORD_RECOVERY') {
+            const intent = localStorage.getItem('sprout_recovery_intent');
+            localStorage.removeItem('sprout_recovery_intent');
+            S.authMode = intent === 'pin' ? 'reset-pin' : 'reset';
+            render(); return;
+        }
         if (currentUser) { await loadCache(); }
         else { cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [] }; S.view = 'home'; }
         render();
@@ -1168,11 +1173,20 @@ async function doForgotPassword() {
     const errEl = document.getElementById('l-err');
     if (!email) { if (errEl) errEl.textContent = 'Please enter your email.'; return; }
     if (errEl) errEl.textContent = 'Sending…';
+    localStorage.setItem('sprout_recovery_intent', 'password');
     const redirectTo = window.location.origin + window.location.pathname;
     const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
     if (error) { if (errEl) errEl.textContent = error.message; return; }
     S.authMode = 'signin';
     toast('Check your email for a link to reset your password.');
+}
+async function doForgotParentPin() {
+    if (!currentUser?.email) return;
+    localStorage.setItem('sprout_recovery_intent', 'pin');
+    const redirectTo = window.location.origin + window.location.pathname;
+    const { error } = await sb.auth.resetPasswordForEmail(currentUser.email, { redirectTo });
+    if (error) { toast('❌ Could not send reset email.'); return; }
+    toast('Check your email for a link to reset your PIN.');
 }
 function vResetPassword() {
     return `
@@ -1205,6 +1219,39 @@ async function doResetPassword() {
     if (error) { if (errEl) errEl.textContent = error.message; return; }
     S.authMode = 'signin';
     toast('Password updated! You can now sign in.');
+    await sb.auth.signOut();
+}
+function vResetParentPin() {
+    return `
+    <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
+      <div style="width:100%;max-width:440px">
+        <div class="pr-card" style="padding:52px 40px 44px">
+          <div class="pr-stripe"></div>
+          <div class="pr-blob-top"></div>
+          <div class="pr-blob-bottom"></div>
+          <div style="position:relative;z-index:1">
+            <div style="display:flex;justify-content:center;margin-bottom:28px">
+              <img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:100px;width:auto;display:block">
+            </div>
+            <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:18px;text-align:center">Choose a new 4-digit parent PIN.</p>
+            <input id="rpp-pin" placeholder="New 4-digit PIN" maxlength="4" inputmode="numeric" class="mb-3"
+              onkeydown="if(event.key==='Enter')doResetParentPin()">
+            <p id="rpp-err" style="color:#f43f5e;font-size:14px;margin:4px 0 12px;min-height:20px"></p>
+            <button onclick="doResetParentPin()" class="btn-primary">Set new PIN</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+async function doResetParentPin() {
+    const pin = document.getElementById('rpp-pin')?.value?.trim();
+    const errEl = document.getElementById('rpp-err');
+    if (!/^\d{4}$/.test(pin)) { if (errEl) errEl.textContent = 'PIN must be exactly 4 digits.'; return; }
+    if (errEl) errEl.textContent = 'Saving…';
+    const { error } = await sb.auth.updateUser({ data: { parent_pin: pin } });
+    if (error) { if (errEl) errEl.textContent = error.message; return; }
+    S.authMode = 'signin';
+    toast('PIN updated! Sign in to continue.');
     await sb.auth.signOut();
 }
 function setBillingCycle(cycle) {
@@ -2226,8 +2273,9 @@ function vParentPin() {
         <h2 style="font-family:var(--font-family);font-size:28px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Parent</h2>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);margin-bottom:40px">Enter parent PIN</p>
         <div id="ppin-dots" class="pin-dots-row" style="display:flex;gap:24px;margin-bottom:12px">${dots}</div>
-        <p id="ppin-err" style="color:var(--color-coral);font-family:var(--font-family);font-size:14px;margin-bottom:32px;min-height:20px"></p>
+        <p id="ppin-err" style="color:var(--color-coral);font-family:var(--font-family);font-size:14px;margin-bottom:24px;min-height:20px"></p>
         <div class="grid grid-cols-3 gap-3 w-72">${pad}</div>
+        <button type="button" onclick="doForgotParentPin()" style="background:none;border:none;cursor:pointer;font-family:var(--font-family);font-size:13px;font-weight:600;color:#15803d;padding:0;margin-top:24px">Forgot PIN?</button>
       </div>
     </div>`;
 }
@@ -3369,6 +3417,10 @@ function render() {
         : '';
     if (S.authMode === 'reset') {
         document.getElementById('app').innerHTML = vResetPassword() + toastHtml;
+        return;
+    }
+    if (S.authMode === 'reset-pin') {
+        document.getElementById('app').innerHTML = vResetParentPin() + toastHtml;
         return;
     }
     if (!currentUser) {
