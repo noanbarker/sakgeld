@@ -1041,7 +1041,8 @@ function snapModalInputs() {
     if (t === 'quick-task') {
         const n = document.getElementById('qt-name');
         const v = document.getElementById('qt-val');
-        if (n) S.modal.data = { ...S.modal.data, name: n.value, value: v?.value };
+        const d = document.getElementById('qt-days');
+        if (n) S.modal.data = { ...S.modal.data, name: n.value, value: v?.value, days: d?.value };
     }
     if (t === 'manual-adjustment') {
         const a = document.getElementById('ma-amount');
