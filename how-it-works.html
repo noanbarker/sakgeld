@@ -267,6 +267,9 @@
   .pr-grid-4col{grid-template-columns:repeat(2,1fr)!important;gap:16px!important}
   .pr-grid-hero{grid-template-columns:1fr!important;gap:32px!important}
   .pr-grid-row{grid-template-columns:1fr!important;justify-items:center;text-align:center}
+  .pr-hiw-steps-row{grid-template-columns:1fr!important}
+  .pr-hiw-phone-wrap{order:-1}
+  .pr-hiw-gif{height:auto!important;max-width:60%!important}
 }
 @media (min-width:641px){
   .pr-cta-plant-img{height:104px!important}
@@ -303,30 +306,37 @@
   </div>
 
   <!-- steps as vertical timeline -->
-  <div style="max-width:940px;margin:0 auto;padding:20px clamp(20px,5vw,44px);display:flex;flex-direction:column;gap:24px">
-    <div class="pr-grid-row" style="background:#fff;border:1px solid #e5ece7;border-radius:28px;padding:40px;box-shadow:0 1px 3px rgba(15,40,25,.07);display:grid;grid-template-columns:auto 1fr auto;gap:32px;align-items:center">
-      <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(132deg,#16a34a,#15803d);color:#fbbf24;font-weight:900;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(22,163,74,.35)">1</div>
-      <div>
-        <h2 style="font-size:clamp(22px,5.5vw,24px);font-weight:900;letter-spacing:-.02em;color:#15803d;margin:0 0 8px">Add your kids &amp; chores</h2>
-        <p style="font-size:15.5px;line-height:1.65;color:#475569;margin:0">Create a profile for each child with their own colour, avatar and PIN. Pick chores from the library and set what each one pays. Takes about two minutes per child.</p>
+  <div style="max-width:1160px;margin:0 auto;padding:20px clamp(20px,5vw,44px)">
+    <div class="pr-hiw-steps-row" style="display:grid;grid-template-columns:1fr auto;gap:40px;align-items:center">
+      <div style="display:flex;flex-direction:column;gap:24px">
+        <div class="pr-grid-row" style="background:#fff;border:1px solid #e5ece7;border-radius:28px;padding:40px;box-shadow:0 1px 3px rgba(15,40,25,.07);display:grid;grid-template-columns:auto 1fr auto;gap:32px;align-items:center">
+          <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(132deg,#16a34a,#15803d);color:#fbbf24;font-weight:900;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(22,163,74,.35)">1</div>
+          <div>
+            <h2 style="font-size:clamp(22px,5.5vw,24px);font-weight:900;letter-spacing:-.02em;color:#15803d;margin:0 0 8px">Add your kids &amp; chores</h2>
+            <p style="font-size:15.5px;line-height:1.65;color:#475569;margin:0">Create a profile for each child with their own colour, avatar and PIN. Pick chores from the library and set what each one pays. Takes about two minutes per child.</p>
+          </div>
+          <div><img loading="lazy" src="images/Website%20Icons/Add%20Child.webp" alt="Add child" width="54" height="54" style="display:block"></div>
+        </div>
+        <div class="pr-grid-row" style="background:#fff;border:1px solid #e5ece7;border-radius:28px;padding:40px;box-shadow:0 1px 3px rgba(15,40,25,.07);display:grid;grid-template-columns:auto 1fr auto;gap:32px;align-items:center">
+          <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(132deg,#16a34a,#15803d);color:#fbbf24;font-weight:900;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(22,163,74,.35)">2</div>
+          <div>
+            <h2 style="font-size:clamp(22px,5.5vw,24px);font-weight:900;letter-spacing:-.02em;color:#15803d;margin:0 0 8px">Kids tick off their day</h2>
+            <p style="font-size:15.5px;line-height:1.65;color:#475569;margin:0">Each child logs in with their PIN, sees today's chores with friendly pictures, and taps "Done!" as they finish. Simple enough for the youngest, satisfying for everyone.</p>
+          </div>
+          <div><img loading="lazy" src="images/Website%20Icons/Check%20Sign.webp" alt="Check" width="54" height="54" style="display:block"></div>
+        </div>
+        <div class="pr-grid-row" style="background:#fff;border:1px solid #e5ece7;border-radius:28px;padding:40px;box-shadow:0 1px 3px rgba(15,40,25,.07);display:grid;grid-template-columns:auto 1fr auto;gap:32px;align-items:center">
+          <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(132deg,#16a34a,#15803d);color:#fbbf24;font-weight:900;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(22,163,74,.35)">3</div>
+          <div>
+            <h2 style="font-size:clamp(22px,5.5vw,24px);font-weight:900;letter-spacing:-.02em;color:#15803d;margin:0 0 8px">You approve, they grow</h2>
+            <p style="font-size:15.5px;line-height:1.65;color:#475569;margin:0">Approve completed chores from your dashboard, one at a time or a whole day at once. Balances update, milestones unlock, and the money tree grows.</p>
+          </div>
+          <div><img loading="lazy" src="images/4_Big_Tree_v2.webp" alt="Big tree" style="height:65px;width:auto;display:block"></div>
+        </div>
       </div>
-      <div><img loading="lazy" src="images/Website%20Icons/Add%20Child.webp" alt="Add child" width="54" height="54" style="display:block"></div>
-    </div>
-    <div class="pr-grid-row" style="background:#fff;border:1px solid #e5ece7;border-radius:28px;padding:40px;box-shadow:0 1px 3px rgba(15,40,25,.07);display:grid;grid-template-columns:auto 1fr auto;gap:32px;align-items:center">
-      <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(132deg,#16a34a,#15803d);color:#fbbf24;font-weight:900;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(22,163,74,.35)">2</div>
-      <div>
-        <h2 style="font-size:clamp(22px,5.5vw,24px);font-weight:900;letter-spacing:-.02em;color:#15803d;margin:0 0 8px">Kids tick off their day</h2>
-        <p style="font-size:15.5px;line-height:1.65;color:#475569;margin:0">Each child logs in with their PIN, sees today's chores with friendly pictures, and taps "Done!" as they finish. Simple enough for the youngest, satisfying for everyone.</p>
+      <div class="pr-hiw-phone-wrap" style="display:flex;align-items:center;justify-content:center">
+        <img loading="lazy" class="pr-hiw-gif" src="images/marketing/demo-animation.gif" alt="Sprout walkthrough: a parent adding a kid and a chore, the kid completing it, and the parent approving it" style="max-width:100%;width:auto;height:520px;display:block;border-radius:22px;box-shadow:0 1px 3px rgba(15,40,25,.07)">
       </div>
-      <div><img loading="lazy" src="images/Website%20Icons/Check%20Sign.webp" alt="Check" width="54" height="54" style="display:block"></div>
-    </div>
-    <div class="pr-grid-row" style="background:#fff;border:1px solid #e5ece7;border-radius:28px;padding:40px;box-shadow:0 1px 3px rgba(15,40,25,.07);display:grid;grid-template-columns:auto 1fr auto;gap:32px;align-items:center">
-      <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(132deg,#16a34a,#15803d);color:#fbbf24;font-weight:900;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(22,163,74,.35)">3</div>
-      <div>
-        <h2 style="font-size:clamp(22px,5.5vw,24px);font-weight:900;letter-spacing:-.02em;color:#15803d;margin:0 0 8px">You approve, they grow</h2>
-        <p style="font-size:15.5px;line-height:1.65;color:#475569;margin:0">Approve completed chores from your dashboard, one at a time or a whole day at once. Balances update, milestones unlock, and the money tree grows.</p>
-      </div>
-      <div><img loading="lazy" src="images/4_Big_Tree_v2.webp" alt="Big tree" style="height:65px;width:auto;display:block"></div>
     </div>
   </div>
 
