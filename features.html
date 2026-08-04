@@ -253,6 +253,8 @@
   body{margin:0}
   @keyframes sway{0%,100%{transform:rotate(-1.6deg)}50%{transform:rotate(1.6deg)}}
   @keyframes blobMorph{0%,100%{border-radius:60% 40% 30% 70%/60% 30% 70% 40%}50%{border-radius:30% 60% 70% 40%/50% 60% 30% 60%}}
+  .pr-treegrow-slot{opacity:0;transform:scaleY(.05);transform-origin:bottom center}
+  .pr-treegrow-slot.visible{opacity:1;transform:scaleY(1);transition:opacity .5s ease-out,transform .6s cubic-bezier(.22,1,.36,1)}
 </style>
 <style>
 @media (max-width:640px){
@@ -270,9 +272,13 @@
   .pr-grid-hero{grid-template-columns:1fr!important;gap:32px!important}
   .pr-grid-row{grid-template-columns:1fr!important;justify-items:center;text-align:center}
   .pr-tree-row{flex-wrap:wrap!important}
+  .pr-treegrow{border-left:none!important;padding-left:0!important;border-top:1px solid rgba(21,128,61,.18)!important;padding-top:24px!important;margin-top:6px}
+  .pr-treegrow-row-desktop{display:none!important}
+  .pr-treegrow-mobile{display:flex!important}
 }
 @media (min-width:641px){
   .pr-cta-plant-img{height:104px!important}
+  .pr-treegrow-mobile{display:none!important}
 }
 </style>
 </head>
@@ -343,18 +349,30 @@
 
     <div style="position:relative;background:#dcfce7;border-radius:32px;padding:48px;color:#15803d;overflow:hidden;box-shadow:0 24px 64px rgba(22,163,74,.2)">
       <div style="position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#16a34a 33.333%,#fbbf24 33.333%,#fbbf24 66.666%,#f43f5e 66.666%)"></div>
-      <div class="pr-grid-2col" style="position:relative;display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center">
+      <div class="pr-grid-2col" style="position:relative;display:grid;grid-template-columns:minmax(0,.4fr) minmax(0,.6fr);gap:44px;align-items:center">
         <div>
           <div style="font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#2563eb">Signature feature</div>
           <h2 style="font-size:clamp(22px,5.5vw,30px);font-weight:900;letter-spacing:-.02em;margin:10px 0 12px">The savings tree that grows</h2>
           <p style="font-size:16px;line-height:1.65;color:#15803d;margin:0">As each child saves, their tree grows from seedling to forest. Saving stops being an abstract number and becomes something kids can see, feel, and be proud of.</p>
         </div>
-        <div class="pr-tree-row" style="display:flex;justify-content:center;align-items:flex-end;gap:18px">
-          <div style="text-align:center"><div style="height:120px;display:flex;align-items:flex-end;justify-content:center"><img loading="lazy" src="images/1_Seedling_v2.webp" alt="Day one" style="height:34px;width:auto;display:block"></div><div style="font-size:12px;font-weight:800;color:#15803d;margin-top:6px;white-space:nowrap">Day one</div></div>
-          <div style="text-align:center"><div style="height:120px;display:flex;align-items:flex-end;justify-content:center"><img loading="lazy" src="images/2_Sapling_v2.webp" alt="R500 saved" style="height:77px;width:auto;display:block"></div><div style="font-size:12px;font-weight:800;color:#15803d;margin-top:6px;white-space:nowrap">R500 saved</div></div>
-          <div style="text-align:center"><div style="height:120px;display:flex;align-items:flex-end;justify-content:center;animation:sway 5s ease-in-out infinite;transform-origin:bottom"><img loading="lazy" src="images/3_Small_Tree_v2.webp" alt="R1000 saved" style="height:90px;width:auto;display:block"></div><div style="font-size:12px;font-weight:900;color:#15803d;margin-top:6px;white-space:nowrap">R1000 saved</div></div>
-          <div style="text-align:center"><div style="height:120px;display:flex;align-items:flex-end;justify-content:center"><img loading="lazy" src="images/4_Big_Tree_v2.webp" alt="R2500 saved" style="height:115px;width:auto;display:block"></div><div style="font-size:12px;font-weight:900;color:#15803d;margin-top:6px;white-space:nowrap">R2500 saved</div></div>
-          <div style="text-align:center"><div style="height:120px;display:flex;align-items:flex-end;justify-content:center"><img loading="lazy" src="images/5_Forest_v2.webp" alt="R5000 saved" style="height:120px;width:auto;display:block"></div><div style="font-size:12px;font-weight:900;color:#15803d;margin-top:6px;white-space:nowrap">R5000 saved</div></div>
+        <div class="pr-treegrow" style="border-left:1px solid rgba(21,128,61,.18);padding-left:24px">
+          <div style="text-align:center;margin-bottom:14px">
+            <div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#16a34a">Saved so far</div>
+            <div class="pr-treegrow-counter" style="font-size:clamp(28px,5.5vw,40px);font-weight:900;letter-spacing:-.02em;color:#15803d;font-variant-numeric:tabular-nums;line-height:1.1">R0</div>
+          </div>
+          <div class="pr-treegrow-row-desktop" style="display:flex;justify-content:center;align-items:flex-end;gap:14px;min-height:150px">
+            <div class="pr-treegrow-slot visible" data-amount="0" style="text-align:center"><div style="height:26px;display:flex;align-items:flex-end;justify-content:center"><img loading="lazy" src="images/1_Seedling_v2.webp" alt="Day one" style="height:100%;width:auto;display:block"></div><div style="font-size:12px;font-weight:800;color:#15803d;margin-top:6px;white-space:nowrap">Day one</div></div>
+            <div class="pr-treegrow-slot" data-amount="500" style="text-align:center"><div style="height:58px;display:flex;align-items:flex-end;justify-content:center"><img loading="lazy" src="images/2_Sapling_v2.webp" alt="R500 saved" style="height:100%;width:auto;display:block"></div><div style="font-size:12px;font-weight:800;color:#15803d;margin-top:6px;white-space:nowrap">R500 saved</div></div>
+            <div class="pr-treegrow-slot" data-amount="1000" style="text-align:center"><div style="height:68px;display:flex;align-items:flex-end;justify-content:center"><img loading="lazy" src="images/3_Small_Tree_v2.webp" alt="R1000 saved" style="height:100%;width:auto;display:block"></div><div style="font-size:12px;font-weight:900;color:#15803d;margin-top:6px;white-space:nowrap">R1000 saved</div></div>
+            <div class="pr-treegrow-slot" data-amount="2500" style="text-align:center"><div style="height:79px;display:flex;align-items:flex-end;justify-content:center"><img loading="lazy" src="images/4_Big_Tree_v2.webp" alt="R2500 saved" style="height:100%;width:auto;display:block"></div><div style="font-size:12px;font-weight:900;color:#15803d;margin-top:6px;white-space:nowrap">R2500 saved</div></div>
+            <div class="pr-treegrow-slot" data-amount="5000" style="text-align:center"><div style="height:88px;display:flex;align-items:flex-end;justify-content:center"><img loading="lazy" src="images/5_Forest_v2.webp" alt="R5000 saved" style="height:100%;width:auto;display:block;transform:scale(1.12);transform-origin:bottom center"></div><div style="font-size:12px;font-weight:900;color:#15803d;margin-top:6px;white-space:nowrap">R5000 saved</div></div>
+          </div>
+          <div class="pr-treegrow-mobile" style="display:none;flex-direction:column;align-items:center">
+            <div class="pr-treegrow-mobile-box" style="height:38px;display:flex;align-items:flex-end;justify-content:center;transition:height .4s cubic-bezier(.22,1,.36,1)">
+              <img loading="lazy" class="pr-treegrow-mobile-img" src="images/1_Seedling_v2.webp" alt="Day one" style="height:100%;width:auto;display:block;transition:opacity .22s ease">
+            </div>
+            <div class="pr-treegrow-mobile-label" style="font-size:13px;font-weight:800;color:#15803d;margin-top:8px">Day one</div>
+          </div>
         </div>
       </div>
     </div>
@@ -426,6 +444,100 @@
 </div>
 </div>
 
+<script>
+(function(){
+  function formatAmount(n){return 'R'+Math.round(n).toLocaleString('en-ZA');}
+  var MOBILE_HEIGHTS = [38, 86, 100, 117, 130];
+  function initTreeGrow(root){
+    var counter = root.querySelector('.pr-treegrow-counter');
+    var slots = Array.prototype.slice.call(root.querySelectorAll('.pr-treegrow-slot'));
+    if (!counter || !slots.length) return;
+    var mobileImg = root.querySelector('.pr-treegrow-mobile-img');
+    var mobileLabel = root.querySelector('.pr-treegrow-mobile-label');
+    var mobileBox = root.querySelector('.pr-treegrow-mobile-box');
+    var trees = slots.map(function(s){
+      var img = s.querySelector('img');
+      var label = s.querySelector('div:last-child');
+      return { src: img.src, alt: img.alt, label: label ? label.textContent : img.alt };
+    });
+    var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var STAGGER = 1100;
+    var timers = [];
+    var rafId = null;
+    function setMobileStage(i, animate){
+      if (!mobileImg) return;
+      var apply = function(){
+        mobileImg.src = trees[i].src;
+        mobileImg.alt = trees[i].alt;
+        if (mobileLabel) mobileLabel.textContent = trees[i].label;
+        if (mobileBox) mobileBox.style.height = MOBILE_HEIGHTS[i] + 'px';
+        mobileImg.style.transform = (i === trees.length - 1) ? 'scale(1.12)' : 'none';
+        mobileImg.style.transformOrigin = 'bottom center';
+      };
+      if (!animate) { apply(); mobileImg.style.opacity = '1'; return; }
+      mobileImg.style.opacity = '0';
+      var t = setTimeout(function(){ apply(); mobileImg.style.opacity = '1'; }, 220);
+      timers.push(t);
+    }
+    function tween(from, to, duration){
+      if (rafId) cancelAnimationFrame(rafId);
+      var start = null;
+      function step(ts){
+        if (!start) start = ts;
+        var p = Math.min(1, (ts - start) / duration);
+        var eased = 1 - Math.pow(1 - p, 3);
+        counter.textContent = formatAmount(from + (to - from) * eased);
+        if (p < 1) { rafId = requestAnimationFrame(step); } else { counter.textContent = formatAmount(to); }
+      }
+      rafId = requestAnimationFrame(step);
+    }
+    function reset(){
+      timers.forEach(function(id){ clearTimeout(id); });
+      timers = [];
+      if (rafId) cancelAnimationFrame(rafId);
+      slots.forEach(function(s){ s.classList.remove('visible'); });
+      counter.textContent = 'R0';
+    }
+    function play(){
+      reset();
+      if (reduceMotion) {
+        slots.forEach(function(s){ s.classList.add('visible'); });
+        setMobileStage(trees.length - 1, false);
+        counter.textContent = formatAmount(parseInt(slots[slots.length - 1].dataset.amount, 10));
+        return;
+      }
+      slots[0].classList.add('visible');
+      setMobileStage(0, false);
+      for (var i = 1; i < slots.length; i++) {
+        (function(i){
+          var t = setTimeout(function(){
+            slots[i].classList.add('visible');
+            setMobileStage(i, true);
+            var fromAmt = parseInt(slots[i - 1].dataset.amount, 10);
+            var toAmt = parseInt(slots[i].dataset.amount, 10);
+            tween(fromAmt, toAmt, 550);
+          }, STAGGER * i);
+          timers.push(t);
+        })(i);
+      }
+      var hold = STAGGER * (slots.length - 1) + 2600;
+      timers.push(setTimeout(play, hold));
+    }
+    if ('IntersectionObserver' in window) {
+      var started = false;
+      var obs = new IntersectionObserver(function(entries){
+        entries.forEach(function(e){
+          if (e.isIntersecting && !started) { started = true; play(); obs.disconnect(); }
+        });
+      }, { threshold: .4 });
+      obs.observe(root);
+    } else {
+      play();
+    }
+  }
+  document.querySelectorAll('.pr-treegrow').forEach(initTreeGrow);
+})();
+</script>
 
 
 </body></html>
