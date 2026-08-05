@@ -526,8 +526,8 @@
             <div class="pr-treegrow-slot" data-amount="5000" style="text-align:center"><div style="height:88px;display:flex;align-items:flex-end;justify-content:center"><img loading="lazy" src="images/5_Forest_v2.webp" alt="R5000 saved" style="height:100%;width:auto;display:block;transform:scale(1.12);transform-origin:bottom center"></div><div style="font-size:12px;font-weight:900;color:#15803d;margin-top:6px;white-space:nowrap">R5000 saved</div></div>
           </div>
           <div class="pr-treegrow-mobile" style="display:none;flex-direction:column;align-items:center">
-            <div class="pr-treegrow-mobile-box" style="height:38px;display:flex;align-items:flex-end;justify-content:center;transition:height .4s cubic-bezier(.22,1,.36,1)">
-              <img loading="lazy" class="pr-treegrow-mobile-img" src="images/1_Seedling_v2.webp" alt="Day one" style="height:100%;width:auto;display:block;transition:opacity .22s ease">
+            <div class="pr-treegrow-mobile-box" style="height:150px;display:flex;align-items:flex-end;justify-content:center">
+              <img loading="lazy" class="pr-treegrow-mobile-img" src="images/1_Seedling_v2.webp" alt="Day one" style="height:38px;width:auto;display:block;transition:opacity .22s ease,height .4s cubic-bezier(.22,1,.36,1)">
             </div>
             <div class="pr-treegrow-mobile-label" style="font-size:13px;font-weight:800;color:#15803d;margin-top:8px">Day one</div>
           </div>
@@ -741,7 +741,6 @@ document.querySelectorAll('.faq-toggle').forEach(function(btn) {
     if (!counter || !slots.length) return;
     var mobileImg = root.querySelector('.pr-treegrow-mobile-img');
     var mobileLabel = root.querySelector('.pr-treegrow-mobile-label');
-    var mobileBox = root.querySelector('.pr-treegrow-mobile-box');
     var trees = slots.map(function(s){
       var img = s.querySelector('img');
       var label = s.querySelector('div:last-child');
@@ -757,7 +756,7 @@ document.querySelectorAll('.faq-toggle').forEach(function(btn) {
         mobileImg.src = trees[i].src;
         mobileImg.alt = trees[i].alt;
         if (mobileLabel) mobileLabel.textContent = trees[i].label;
-        if (mobileBox) mobileBox.style.height = MOBILE_HEIGHTS[i] + 'px';
+        mobileImg.style.height = MOBILE_HEIGHTS[i] + 'px';
         mobileImg.style.transform = (i === trees.length - 1) ? 'scale(1.12)' : 'none';
         mobileImg.style.transformOrigin = 'bottom center';
       };
