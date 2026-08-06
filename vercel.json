@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/purge-canceled-accounts",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

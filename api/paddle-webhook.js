@@ -77,6 +77,11 @@ module.exports = async (req, res) => {
         return;
       }
 
+      // Cancellation doesn't delete anything here — it only stamps when it
+      // happened. api/purge-canceled-accounts.js does the actual deletion,
+      // once the 60-day grace period has passed, so a family that reactivates
+      // (e.g. after an expired card) gets their data back exactly as it was.
+      // Reactivating clears the stamp, so the purge job leaves them alone.
       const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         user_metadata: {
           ...existing.user.user_metadata,
@@ -85,6 +90,7 @@ module.exports = async (req, res) => {
           paddle_customer_id: sub.customer_id || null,
           current_period_ends_at: sub.current_billing_period ? sub.current_billing_period.ends_at : null,
           next_billed_at: sub.next_billed_at || null,
+          canceled_at: sub.status === 'canceled' ? (event.occurred_at || new Date().toISOString()) : null,
         },
       });
       if (error) {
