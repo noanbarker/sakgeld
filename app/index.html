@@ -1723,6 +1723,27 @@ async function captureExpense() {
     toast(`${R(amount)} recorded as spent for ${k.name}.`);
 }
 
+function deleteExpense(txId) {
+    const t = cache.transactions.find(x => x.id === txId);
+    if (!t) return;
+    const k = cache.kids.find(x => x.id === t.kidId);
+    openModal('confirm-delete', { msg: `Delete this ${R(Math.abs(t.amount))} expense${k ? ' for ' + esc(k.name) : ''}? Their balance will be restored.`, onConfirm: `doDeleteExpense('${txId}')` });
+}
+async function doDeleteExpense(txId) {
+    const t = cache.transactions.find(x => x.id === txId);
+    if (!t) return closeModal();
+    const k = cache.kids.find(x => x.id === t.kidId);
+    if (k) {
+        const newBalance = (k.balance || 0) - t.amount;
+        await sb.from('kids').update({ balance: newBalance }).eq('id', k.id).eq('user_id', currentUser.id);
+        k.balance = newBalance;
+    }
+    await sb.from('transactions').delete().eq('id', txId).eq('user_id', currentUser.id);
+    cache.transactions = cache.transactions.filter(x => x.id !== txId);
+    closeModal();
+    toast('Expense deleted and balance restored.');
+}
+
 function vParent() {
     const db = DB.load();
     const pending = db.completions.filter(c => !c.approved && !c.rejected && !c.missed).length;
@@ -2206,6 +2227,7 @@ function pExpenditure(db) {
                 <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${esc(t.description) || 'Money spent'} · ${dateStr(t.createdAt)}</p>
               </div>
               <p style="font-family:var(--font-family);font-weight:800;color:var(--color-coral)">${R(Math.abs(t.amount))}</p>
+              <button onclick="deleteExpense('${t.id}')" title="Delete" class="icon-btn danger">${uiIcon('trash', 15)}</button>
             </div>`;
         }).join('');
 
