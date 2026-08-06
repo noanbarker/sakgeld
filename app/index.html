@@ -426,7 +426,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
 
 let currentUser = null;
-let cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [] };
+let cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [] };
 const DB = { load: () => cache };
 
 // ─── PADDLE ──────────────────────────────────────────────────────
@@ -539,7 +539,7 @@ const COUNTRIES = [
 
 async function loadCache() {
     const uid = currentUser.id;
-    const [kRes, cRes, compRes, txRes, bmRes, rwRes, rcRes] = await Promise.all([
+    const [kRes, cRes, compRes, txRes, bmRes, rwRes, rcRes, distRes] = await Promise.all([
         sb.from('kids').select('*').eq('user_id', uid),
         sb.from('chores').select('*').eq('user_id', uid),
         sb.from('completions').select('*').eq('user_id', uid),
@@ -547,6 +547,7 @@ async function loadCache() {
         sb.from('bonus_milestones').select('*').eq('user_id', uid),
         sb.from('rewards').select('*').eq('user_id', uid),
         sb.from('reward_completions').select('*').eq('user_id', uid),
+        sb.from('distributions').select('*').eq('user_id', uid),
     ]);
     cache = {
         kids: kRes.data || [],
@@ -556,6 +557,7 @@ async function loadCache() {
         bonusMilestones: (bmRes.data || []).map(m => ({ ...m, assignedTo: m.assigned_to, bonusAmount: m.bonus_amount, claimedBy: m.claimed_by || [] })),
         rewards: (rwRes.data || []).map(r => ({ ...r, assignedTo: r.assigned_to })),
         rewardCompletions: (rcRes.data || []).map(c => ({ ...c, rewardId: c.reward_id, kidId: c.kid_id, claimedAt: c.claimed_at, approvedAt: c.approved_at })),
+        distributions: (distRes.data || []).map(d => ({ ...d, kidId: d.kid_id, createdAt: d.created_at })),
     };
 }
 
@@ -574,7 +576,7 @@ async function initApp() {
             render(); return;
         }
         if (currentUser) { await loadCache(); }
-        else { cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [] }; S.view = 'home'; }
+        else { cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [] }; S.view = 'home'; }
         render();
     });
     const { data: { session } } = await sb.auth.getSession();
@@ -682,6 +684,7 @@ const UI_ICON_PATHS = {
   home:   '<path d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/>',
   trophy: '<path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a2 2 0 0 0 0 4h1M17 5h3a2 2 0 0 1 0 4h-1"/>',
   user:   '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"/>',
+  banknote: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
 };
 function uiIcon(name, size = 16, stroke = 2) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round">${UI_ICON_PATHS[name] || ''}</svg>`;
@@ -1668,6 +1671,7 @@ function vParent() {
         { id: 'chores',   label: 'Chores',   svg: uiIcon('list', 18) },
         { id: 'kids',     label: 'Kids',     svg: uiIcon('users', 18) },
         { id: 'payouts',  label: 'Payouts',  svg: uiIcon('coin', 18) },
+        { id: 'distributions', label: 'Distributions', svg: uiIcon('banknote', 18) },
         { id: 'bonuses',  label: 'Bonuses',  svg: uiIcon('star', 18) },
         { id: 'rewards',  label: 'Rewards',  badge: pendingRewards, svg: uiIcon('trophy', 18) },
         { id: 'recon',    label: 'Recon',    svg: uiIcon('scale', 18) },
@@ -1737,11 +1741,12 @@ function vParent() {
           ${S.tab === 'overview'  ? pOverview(db) :
             S.tab === 'chores'    ? pChores(db) :
             S.tab === 'kids'      ? pKids(db) :
+            S.tab === 'payouts'   ? pPayouts(db) :
+            S.tab === 'distributions' ? pDistributions(db) :
             S.tab === 'bonuses'   ? pBonuses(db) :
             S.tab === 'rewards'   ? pRewards(db) :
             S.tab === 'recon'     ? pRecon(db) :
-            S.tab === 'settings'  ? pSettings() :
-                                    pPayouts(db)}
+                                    pSettings()}
         </div>
       </div>
     </div>`;
@@ -2068,6 +2073,89 @@ function pPayouts(db) {
         </div>
       </div>
     </div>`;
+}
+
+function owedSinceDistribution(db, kid) {
+    const since = kid.last_distribution_at ? new Date(kid.last_distribution_at) : null;
+    return db.transactions
+        .filter(t => t.kidId === kid.id && (!since || new Date(t.createdAt) > since))
+        .reduce((s, t) => s + (t.amount || 0), 0);
+}
+
+function pDistributions(db) {
+    const sortedKids = [...db.kids].sort((a, b) => a.name.localeCompare(b.name));
+
+    const kidRows = sortedKids.map(k => {
+        const ac = kidAccent(k);
+        const owed = owedSinceDistribution(db, k);
+        const sinceLabel = k.last_distribution_at ? `Since ${dateStr(k.last_distribution_at)}` : 'Since the beginning';
+        return `
+        <div class="card flex items-center gap-3" style="border-color:${ac.border}">
+          <div style="width:40px;height:40px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${kidIcon(k)}</div>
+          <div class="flex-1">
+            <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:14px">${esc(k.name)}</p>
+            <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${sinceLabel}</p>
+          </div>
+          <div class="text-right">
+            <p style="font-family:var(--font-family);font-weight:800;color:${ac.text};font-size:15px">${R(owed)}</p>
+            <div style="display:flex;justify-content:flex-end;margin-top:6px">
+              <button onclick="runDistribution('${k.id}')" class="chip-btn">Distribution Made</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    const recent = db.distributions
+        .slice()
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 20);
+
+    const historyRows = recent.length === 0
+        ? `<div class="card text-center py-8" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No distributions recorded yet.</div>`
+        : recent.map(d => {
+            const kid = db.kids.find(k => k.id === d.kidId);
+            return `
+            <div class="card flex items-center gap-3">
+              <div style="width:36px;height:36px;background:var(--color-green-100);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--color-green-700)">${uiIcon('banknote', 17)}</div>
+              <div class="flex-1">
+                <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary)">${esc(kid?.name) || '?'}</p>
+                <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${dateStr(d.createdAt)}</p>
+              </div>
+              <p style="font-family:var(--font-family);font-weight:800;color:var(--color-green-600)">${R(d.amount)}</p>
+            </div>`;
+        }).join('');
+
+    return `
+    <div style="margin-bottom:20px">
+      <h2 style="font-family:var(--font-family);font-size:22px;font-weight:900;color:var(--color-text-primary);letter-spacing:-0.02em">Distributions</h2>
+      <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-top:4px">Shows what you still owe each kid in cash since you last squared up with them. "Distribution Made" doesn't touch their balance — it just confirms you've handed it over, and starts the count fresh from today.</p>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div>
+        <p class="pr-section-label mb-4">Owed Now</p>
+        <div class="flex flex-col gap-2">${kidRows}</div>
+      </div>
+      <div>
+        <p class="pr-section-label mb-4">Distribution History</p>
+        <div class="flex flex-col gap-2">${historyRows}</div>
+      </div>
+    </div>`;
+}
+
+async function runDistribution(kidId) {
+    const db = DB.load();
+    const k = cache.kids.find(x => x.id === kidId);
+    if (!k) return;
+    const owed = owedSinceDistribution(db, k);
+    if (owed <= 0) return toast('Nothing owed since the last distribution.');
+    const id = uid();
+    const createdAt = new Date().toISOString();
+    await sb.from('distributions').insert({ id, user_id: currentUser.id, kid_id: kidId, amount: owed, created_at: createdAt });
+    await sb.from('kids').update({ last_distribution_at: createdAt }).eq('id', kidId).eq('user_id', currentUser.id);
+    k.last_distribution_at = createdAt;
+    cache.distributions.push({ id, kidId, amount: owed, createdAt });
+    toast(`${R(owed)} marked as distributed to ${k.name}.`);
+    render();
 }
 
 function pBonuses(db) {
