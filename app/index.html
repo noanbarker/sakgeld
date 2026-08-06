@@ -384,11 +384,13 @@
         .sp-recon-row > div:nth-child(3) { border-top: 1px solid var(--color-border); padding-top: 12px; margin-top: 8px; text-align: left !important; }
       }
 
-      /* ── Parent dashboard: animated tab transitions ──────────── */
-      .sp-tab-anim-fwd  { animation: spTabSlideRight 0.42s cubic-bezier(0.16,1,0.3,1); }
-      .sp-tab-anim-back { animation: spTabSlideLeft  0.42s cubic-bezier(0.16,1,0.3,1); }
-      .sp-tab-exit-fwd  { animation: spTabSlideOutLeft  0.32s cubic-bezier(0.16,1,0.3,1) both; }
-      .sp-tab-exit-back { animation: spTabSlideOutRight 0.32s cubic-bezier(0.16,1,0.3,1) both; }
+      /* ── Parent dashboard: animated tab transitions (mobile only) ── */
+      @media (max-width: 767px) {
+        .sp-tab-anim-fwd  { animation: spTabSlideRight 0.42s cubic-bezier(0.16,1,0.3,1); }
+        .sp-tab-anim-back { animation: spTabSlideLeft  0.42s cubic-bezier(0.16,1,0.3,1); }
+        .sp-tab-exit-fwd  { animation: spTabSlideOutLeft  0.32s cubic-bezier(0.16,1,0.3,1) both; }
+        .sp-tab-exit-back { animation: spTabSlideOutRight 0.32s cubic-bezier(0.16,1,0.3,1) both; }
+      }
       @media (prefers-reduced-motion: reduce) {
         .sp-tab-anim-fwd, .sp-tab-anim-back, .sp-tab-exit-fwd, .sp-tab-exit-back { animation: none !important; }
         .sp-mob-tab-svg, .sp-sidebar-icon, .sp-mob-thumb, .sp-mob-divider { transition: none !important; }
