@@ -828,7 +828,7 @@ function kidIcon(kidOrName) {
     return icons[h % icons.length];
 }
 function go(view, params = {}) { Object.assign(S, params); S.view = view; render(); }
-const PARENT_TAB_ORDER = ['overview', 'chores', 'kids', 'money', 'bonuses', 'rewards', 'recon', 'settings'];
+const PARENT_TAB_ORDER = ['overview', 'chores', 'kids', 'money', 'bonuses', 'rewards', 'settings'];
 function setTab(t) {
     const oldIdx = PARENT_TAB_ORDER.indexOf(S.tab);
     const newIdx = PARENT_TAB_ORDER.indexOf(t);
@@ -1756,7 +1756,6 @@ function vParent() {
         { id: 'money', label: 'Money', svg: uiIcon('banknote', 18) },
         { id: 'bonuses',  label: 'Bonuses',  svg: uiIcon('star', 18) },
         { id: 'rewards',  label: 'Rewards',  badge: pendingRewards, svg: uiIcon('trophy', 18) },
-        { id: 'recon',    label: 'Recon',    svg: uiIcon('scale', 18) },
         { id: 'settings', label: 'Settings', svg: uiIcon('gear', 18) },
     ];
     const sidebar = `
@@ -1826,7 +1825,6 @@ function vParent() {
             S.tab === 'money'     ? pMoney(db) :
             S.tab === 'bonuses'   ? pBonuses(db) :
             S.tab === 'rewards'   ? pRewards(db) :
-            S.tab === 'recon'     ? pRecon(db) :
                                     pSettings()}
         </div>
       </div>
@@ -2129,6 +2127,7 @@ function pMoney(db) {
         const sections = [
             { id: 'distributions', title: 'Distributions', subtitle: 'What you still owe each kid since you last squared up' },
             { id: 'expenditure',   title: 'Expenditure',   subtitle: 'A record of cash your kids have actually spent' },
+            { id: 'recon',         title: 'Reconciliation', subtitle: 'Compare each kid\'s expected balance against their actual bank or piggy bank' },
         ];
         const chevron = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex-shrink:0"><path d="M7 5l4 4-4 4" stroke="var(--color-text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
         return `
@@ -2149,6 +2148,7 @@ function pMoney(db) {
 
     if (S.moneySection === 'distributions') return `${backBtn}${pDistributions(db)}`;
     if (S.moneySection === 'expenditure')   return `${backBtn}${pExpenditure(db)}`;
+    if (S.moneySection === 'recon')         return `${backBtn}${pRecon(db)}`;
     return '';
 }
 
