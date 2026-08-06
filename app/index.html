@@ -1150,10 +1150,7 @@ function vLogin() {
               <button type="button" onclick="setAuthMode('signin')" style="background:none;border:none;cursor:pointer;font-family:var(--font-family);font-size:13px;font-weight:600;color:var(--color-text-muted)">&larr; Back to sign in</button>
             </div>
             ` : `
-            <div style="display:flex;background:#eef2ef;border-radius:14px;padding:5px;margin-bottom:22px">
-              <button onclick="setAuthMode('signup')" style="flex:1;border:none;cursor:pointer;font-family:var(--font-family);font-weight:800;font-size:14px;padding:11px;border-radius:10px;background:${isSignup ? '#fff' : 'transparent'};color:${isSignup ? '#14532d' : '#64748b'};${isSignup ? 'box-shadow:0 1px 3px rgba(15,40,25,.1)' : ''}">Create account</button>
-              <button onclick="setAuthMode('signin')" style="flex:1;border:none;cursor:pointer;font-family:var(--font-family);font-weight:800;font-size:14px;padding:11px;border-radius:10px;background:${!isSignup ? '#fff' : 'transparent'};color:${!isSignup ? '#14532d' : '#64748b'};${!isSignup ? 'box-shadow:0 1px 3px rgba(15,40,25,.1)' : ''}">Sign in</button>
-            </div>
+            <h1 style="font-family:var(--font-family);font-size:22px;font-weight:800;color:var(--color-text-primary);text-align:center;margin-bottom:22px">${isSignup ? 'Create your account' : 'Welcome back'}</h1>
             ${isSignup ? `<input type="text" id="l-name" placeholder="Your name" value="${esc(draft.name)}" class="mb-3">` : ''}
             <input type="email" id="l-email" placeholder="Email address" value="${esc(draft.email)}" class="mb-3"
               onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()">
@@ -1171,6 +1168,11 @@ function vLogin() {
             </div>` : ''}
             <p id="l-err" style="color:#f43f5e;font-size:14px;margin:4px 0 12px;min-height:20px"></p>
             <button onclick="${isSignup ? 'doSignUp()' : 'doSignIn()'}" class="btn-primary">${isSignup ? 'Create Account' : 'Sign In'}</button>
+            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-muted);text-align:center;margin-top:16px">
+              ${isSignup
+                ? `Already have an account? <button type="button" onclick="setAuthMode('signin')" style="background:none;border:none;cursor:pointer;color:#15803d;font-weight:700;font-family:var(--font-family);font-size:13px;padding:0">Sign in</button>`
+                : `New to Sprout? <button type="button" onclick="setAuthMode('signup')" style="background:none;border:none;cursor:pointer;color:#15803d;font-weight:700;font-family:var(--font-family);font-size:13px;padding:0">Start your free trial</button>`}
+            </p>
             `}
             <p style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-muted);text-align:center;margin-top:20px">
               Your family's data is stored securely in the cloud.
