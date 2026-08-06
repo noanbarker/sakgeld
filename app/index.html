@@ -2144,7 +2144,7 @@ function pMoney(db) {
         </div>`;
     }
 
-    const backBtn = `<button onclick="openMoneySection(null)" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:16px;background:none;border:none;cursor:pointer">← Back to Money</button>`;
+    const backBtn = `<button onclick="openMoneySection(null)" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:16px;background:none;border:none;cursor:pointer">← Back to Money Management</button>`;
 
     if (S.moneySection === 'distributions') return `${backBtn}${pDistributions(db)}`;
     if (S.moneySection === 'expenditure')   return `${backBtn}${pExpenditure(db)}`;
