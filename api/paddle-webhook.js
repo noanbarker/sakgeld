@@ -66,8 +66,20 @@ module.exports = async (req, res) => {
 
     if (userId) {
       const supabaseAdmin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+      // updateUserById replaces user_metadata wholesale rather than merging it,
+      // so we fetch what's already there first — otherwise every webhook wipes
+      // out the name/country/billing_cycle/signup_geo set at sign-up.
+      const { data: existing, error: fetchError } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (fetchError) {
+        console.error('Failed to fetch Supabase user from Paddle webhook:', fetchError.message);
+        res.status(500).json({ error: 'Failed to fetch user' });
+        return;
+      }
+
       const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         user_metadata: {
+          ...existing.user.user_metadata,
           subscription_status: sub.status || null,
           subscription_id: sub.id || null,
           paddle_customer_id: sub.customer_id || null,

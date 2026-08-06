@@ -1460,6 +1460,18 @@ async function doSignUp() {
         options: { data: { name, country, billing_cycle: billingCycle, signup_geo: geo } }
     });
     if (error) { if (errEl) errEl.textContent = error.message; return; }
+    // Supabase never errors for an already-registered email — it silently returns
+    // a fake user instead, to stop attackers probing which emails exist. The one
+    // reliable tell is an empty identities array; a real new signup always has one.
+    // Catching it here stops us ever sending Paddle a Supabase user id that
+    // doesn't actually exist.
+    if (!data?.user?.identities?.length) {
+        S.signupDraft = captureSignupDraft();
+        S.authMode = 'signin';
+        render();
+        toast('This email already has an account — please sign in.');
+        return;
+    }
     const userId = data?.user?.id;
     if (!userId) { if (errEl) errEl.textContent = 'Something went wrong creating your account.'; return; }
     if (errEl) errEl.textContent = '';
