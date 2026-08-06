@@ -3197,7 +3197,7 @@ function renderModal() {
             const ac = kidAccent(k);
             const sel = data.kidId === k.id;
             return `<button onclick="pickExpenseKid('${k.id}')" type="button"
-              style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? ac.border : 'var(--color-border)'};background:${sel ? ac.bg : 'white'};color:${sel ? ac.text : '#6b7280'};cursor:pointer;display:flex;align-items:center;gap:6px">
+              style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${ac.border};background:${sel ? ac.bg : 'white'};color:${sel ? ac.text : '#6b7280'};cursor:pointer;display:flex;align-items:center;gap:6px">
               <span style="font-size:18px">${kidIcon(k)}</span>${esc(k.name)}
             </button>`;
         }).join('');
