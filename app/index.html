@@ -828,7 +828,7 @@ function kidIcon(kidOrName) {
     return icons[h % icons.length];
 }
 function go(view, params = {}) { Object.assign(S, params); S.view = view; render(); }
-const PARENT_TAB_ORDER = ['overview', 'chores', 'kids', 'money', 'bonuses', 'rewards', 'settings'];
+const PARENT_TAB_ORDER = ['overview', 'money', 'chores', 'kids', 'bonuses', 'rewards', 'settings'];
 function setTab(t) {
     const oldIdx = PARENT_TAB_ORDER.indexOf(S.tab);
     const newIdx = PARENT_TAB_ORDER.indexOf(t);
@@ -1751,9 +1751,9 @@ function vParent() {
     const pendingRewards = (db.rewardCompletions || []).filter(c => !c.approved && !c.rejected).length;
     const navItems = [
         { id: 'overview', label: 'Overview', badge: pending, svg: uiIcon('grid', 18) },
+        { id: 'money', label: 'Money', svg: uiIcon('banknote', 18) },
         { id: 'chores',   label: 'Chores',   svg: uiIcon('list', 18) },
         { id: 'kids',     label: 'Kids',     svg: uiIcon('users', 18) },
-        { id: 'money', label: 'Money', svg: uiIcon('banknote', 18) },
         { id: 'bonuses',  label: 'Bonuses',  svg: uiIcon('star', 18) },
         { id: 'rewards',  label: 'Rewards',  badge: pendingRewards, svg: uiIcon('trophy', 18) },
         { id: 'settings', label: 'Settings', svg: uiIcon('gear', 18) },
