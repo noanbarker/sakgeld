@@ -826,7 +826,7 @@ function kidIcon(kidOrName) {
     return icons[h % icons.length];
 }
 function go(view, params = {}) { Object.assign(S, params); S.view = view; render(); }
-const PARENT_TAB_ORDER = ['overview', 'chores', 'kids', 'payouts', 'bonuses', 'rewards', 'recon', 'settings'];
+const PARENT_TAB_ORDER = ['overview', 'chores', 'kids', 'distributions', 'bonuses', 'rewards', 'recon', 'settings'];
 function setTab(t) {
     const oldIdx = PARENT_TAB_ORDER.indexOf(S.tab);
     const newIdx = PARENT_TAB_ORDER.indexOf(t);
@@ -1670,7 +1670,6 @@ function vParent() {
         { id: 'overview', label: 'Overview', badge: pending, svg: uiIcon('grid', 18) },
         { id: 'chores',   label: 'Chores',   svg: uiIcon('list', 18) },
         { id: 'kids',     label: 'Kids',     svg: uiIcon('users', 18) },
-        { id: 'payouts',  label: 'Payouts',  svg: uiIcon('coin', 18) },
         { id: 'distributions', label: 'Distributions', svg: uiIcon('banknote', 18) },
         { id: 'bonuses',  label: 'Bonuses',  svg: uiIcon('star', 18) },
         { id: 'rewards',  label: 'Rewards',  badge: pendingRewards, svg: uiIcon('trophy', 18) },
@@ -1741,7 +1740,6 @@ function vParent() {
           ${S.tab === 'overview'  ? pOverview(db) :
             S.tab === 'chores'    ? pChores(db) :
             S.tab === 'kids'      ? pKids(db) :
-            S.tab === 'payouts'   ? pPayouts(db) :
             S.tab === 'distributions' ? pDistributions(db) :
             S.tab === 'bonuses'   ? pBonuses(db) :
             S.tab === 'rewards'   ? pRewards(db) :
@@ -2031,50 +2029,6 @@ function pKids(db) {
         </div>`}`;
 }
 
-function pPayouts(db) {
-    const recent = db.transactions
-        .filter(t => t.type === 'payout')
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 20);
-    return `
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div>
-        <p class="pr-section-label mb-4">Record a Cash Payout</p>
-        <div class="card">
-          <select id="po-kid" class="mb-3">
-            <option value="">Select a kid...</option>
-            ${db.kids.map(k => `<option value="${k.id}">${esc(k.name)} (${R(k.balance)})</option>`).join('')}
-          </select>
-          <div class="relative mb-3">
-            <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
-            <input type="number" id="po-amount" placeholder="0.00" step="0.01" min="0" style="padding-left:38px !important">
-          </div>
-          <button onclick="recordPayout()" class="btn-primary">Record Payout</button>
-          <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-muted);margin-top:12px">This deducts the amount from the kid's balance.</p>
-        </div>
-      </div>
-      <div>
-        <p class="pr-section-label mb-4">Recent Payouts</p>
-        <div class="flex flex-col gap-2">
-          ${recent.length === 0
-            ? `<div class="card text-center py-8" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No payouts recorded yet.</div>`
-            : recent.map(t => {
-                const kid = db.kids.find(k => k.id === t.kidId);
-                return `
-                <div class="card flex items-center gap-3">
-                  <div style="width:36px;height:36px;background:var(--color-gold-50);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--color-gold-800)">${uiIcon('coin', 17)}</div>
-                  <div class="flex-1">
-                    <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary)">${esc(kid?.name) || '?'}</p>
-                    <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${dateStr(t.createdAt)}</p>
-                  </div>
-                  <p style="font-family:var(--font-family);font-weight:800;color:var(--color-coral)">${R(t.amount)}</p>
-                </div>`;
-              }).join('')}
-        </div>
-      </div>
-    </div>`;
-}
-
 function owedSinceDistribution(db, kid) {
     const since = kid.last_distribution_at ? new Date(kid.last_distribution_at) : null;
     return db.transactions
@@ -2134,6 +2088,16 @@ function pDistributions(db) {
       <div>
         <p class="pr-section-label mb-4">Owed Now</p>
         <div class="flex flex-col gap-2">${kidRows}</div>
+        <div class="card" style="margin-top:12px;background:var(--color-background);border-style:dashed">
+          <p style="font-family:var(--font-family);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted);margin-bottom:8px">What's included in this calculation?</p>
+          <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:6px">Any approved transactions since the last distribution, these include:</p>
+          <ul style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);list-style:disc;padding-left:18px;margin:0;display:flex;flex-direction:column;gap:4px">
+            <li style="display:list-item">Chore earnings</li>
+            <li style="display:list-item">Bonuses achieved</li>
+            <li style="display:list-item">Rewards achieved</li>
+            <li style="display:list-item">Any manual adjustments made for whatever reason</li>
+          </ul>
+        </div>
       </div>
       <div>
         <p class="pr-section-label mb-4">Distribution History</p>
@@ -3060,21 +3024,6 @@ function renderModal() {
         </div>`;
     }
 
-    if (type === 'payout') {
-        const kid = db.kids.find(k => k.id === data.kidId);
-        body = `
-        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Pay Out</h3>
-        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:14px;margin-bottom:16px">${esc(kid?.name)} · Balance: ${R(kid?.balance)}</p>
-        <div class="relative mb-4">
-          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
-          <input type="number" id="m-po-amt" placeholder="0.00" step="0.01" min="0" style="padding-left:38px !important">
-        </div>
-        <div style="display:flex;gap:8px">
-          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
-          <button onclick="doModalPayout('${data.kidId}')" class="btn-primary flex-1" style="padding:10px">Pay Out</button>
-        </div>`;
-    }
-
     if (type === 'add-bonus' || type === 'edit-bonus') {
         const m = type === 'edit-bonus' ? (db.bonusMilestones || []).find(x => x.id === data.milestoneId) : null;
         const isEdit = !!m;
@@ -3552,39 +3501,6 @@ async function rejectReward(cid) {
     if (c) c.rejected = true;
     render();
 }
-async function recordPayout() {
-    const kidId  = document.getElementById('po-kid').value;
-    const amount = parseFloat(document.getElementById('po-amount').value) || 0;
-    if (!kidId)    return toast('⚠️ Please select a kid.');
-    if (amount<=0) return toast('⚠️ Please enter a valid amount.');
-    const k = cache.kids.find(x => x.id === kidId);
-    if (!k) return;
-    const newBalance = (k.balance||0) - amount;
-    const id = uid();
-    const createdAt = new Date().toISOString();
-    await sb.from('kids').update({ balance: newBalance }).eq('id', kidId).eq('user_id', currentUser.id);
-    await sb.from('transactions').insert({ id, user_id: currentUser.id, kid_id: kidId, amount: -amount, type: 'payout', description: 'Cash payout', created_at: createdAt });
-    k.balance = newBalance;
-    cache.transactions.push({ id, kidId, amount: -amount, type: 'payout', description: 'Cash payout', createdAt });
-    document.getElementById('po-kid').value = '';
-    document.getElementById('po-amount').value = '';
-    toast(`${R(amount)} payout recorded for ${k.name}.`);
-}
-async function doModalPayout(kidId) {
-    const amount = parseFloat(document.getElementById('m-po-amt').value) || 0;
-    if (amount<=0) return toast('⚠️ Please enter a valid amount.');
-    const k = cache.kids.find(x => x.id === kidId);
-    if (!k) return;
-    const newBalance = (k.balance||0) - amount;
-    const id = uid();
-    const createdAt = new Date().toISOString();
-    await sb.from('kids').update({ balance: newBalance }).eq('id', kidId).eq('user_id', currentUser.id);
-    await sb.from('transactions').insert({ id, user_id: currentUser.id, kid_id: kidId, amount: -amount, type: 'payout', description: 'Cash payout', created_at: createdAt });
-    k.balance = newBalance;
-    cache.transactions.push({ id, kidId, amount: -amount, type: 'payout', description: 'Cash payout', createdAt });
-    closeModal(); toast(`${R(amount)} payout recorded for ${k.name}.`);
-}
-
 async function saveTreeThresholdsFromUI() {
     const vals = ['t1','t2','t3','t4'].map(k => parseFloat(document.getElementById('thresh-'+k)?.value));
     if (vals.some(v => isNaN(v) || v <= 0)) return toast('⚠️ All thresholds must be positive numbers.');
