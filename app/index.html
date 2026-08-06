@@ -473,20 +473,25 @@ function resumeCheckout() {
     const meta = currentUser?.user_metadata || {};
     openTrialCheckout({
         email: currentUser.email,
-        country: meta.country,
+        geo: meta.signup_geo || getGeoPref(),
         userId: currentUser.id,
         billingCycle: meta.billing_cycle || 'monthly'
     });
 }
-function openTrialCheckout({ email, country, userId, billingCycle }) {
+// `geo` here is the visitor's detected location (see getGeoPref), which is what
+// decided the price shown on the sign-up page — never the country dropdown,
+// which is kept purely for our own Supabase analytics (see doSignUp).
+function openTrialCheckout({ email, geo, userId, billingCycle }) {
     const isYearly = billingCycle === 'yearly';
-    const isZA = country === 'ZA';
+    const isZA = geo === 'ZA';
     const priceId = isZA
         ? (isYearly ? PADDLE_YEARLY_PRICE_ID_ZA : PADDLE_MONTHLY_PRICE_ID_ZA)
         : (isYearly ? PADDLE_YEARLY_PRICE_ID : PADDLE_MONTHLY_PRICE_ID);
+    // No customer.address here on purpose — leaving it out lets Paddle work
+    // out the customer's real billing country and tax itself.
     Paddle.Checkout.open({
         items: [{ priceId, quantity: 1 }],
-        customer: { email, address: { countryCode: country } },
+        customer: { email },
         customData: { supabase_user_id: userId }
     });
 }
@@ -1197,8 +1202,12 @@ function vLogin() {
 // price before they commit. See getGeoPref() / SIGNUP_PRICING above.
 function vSignupPage() {
     const draft = S.signupDraft || {};
-    const country = draft.country !== undefined ? draft.country : (getGeoPref() === 'ZA' ? 'ZA' : '');
-    const isZA = country === 'ZA';
+    // Pricing shown here is locked to the visitor's detected location (see
+    // getGeoPref) and never changes based on the country dropdown below —
+    // that dropdown is kept purely for our own Supabase analytics, so
+    // changing it must never make the price on screen jump around.
+    const isZA = getGeoPref() === 'ZA';
+    const country = draft.country !== undefined ? draft.country : (isZA ? 'ZA' : '');
     const pr = SIGNUP_PRICING[isZA ? 'ZA' : 'ROW'];
     const billing = S.billingCycle || 'monthly';
     const amt = pr.sym + (billing === 'monthly' ? pr.monthly : pr.yearly);
@@ -1255,7 +1264,7 @@ function vSignupPage() {
                   onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()">
                 <input type="password" id="l-pass" placeholder="Password" value="${esc(draft.pass)}" class="mb-3"
                   onkeydown="if(event.key==='Enter')doSignUp()">
-                <select id="l-country" class="mb-3" onchange="onCountryChange()">
+                <select id="l-country" class="mb-3">
                   <option value="">Select your country</option>
                   ${countryOptions}
                 </select>
@@ -1397,10 +1406,6 @@ function setBillingCycle(cycle) {
     S.billingCycle = cycle;
     render();
 }
-function onCountryChange() {
-    S.signupDraft = captureSignupDraft();
-    render();
-}
 
 // ─── SUBSCRIPTION GATE ───────────────────────────────────────────
 // Signing up creates the Supabase account immediately, but the subscription only
@@ -1448,15 +1453,17 @@ async function doSignUp() {
     const errEl = document.getElementById('l-err');
     if (!name || !email || !pass || !country) { if (errEl) errEl.textContent = 'Please fill in all fields.'; return; }
     if (errEl) errEl.textContent = 'Creating account…';
+    const geo = getGeoPref();
     const { data, error } = await sb.auth.signUp({
         email, password: pass,
-        options: { data: { name, country, billing_cycle: billingCycle } }
+        // `country` is only ever kept for analytics — it never decides pricing or tax.
+        options: { data: { name, country, billing_cycle: billingCycle, signup_geo: geo } }
     });
     if (error) { if (errEl) errEl.textContent = error.message; return; }
     const userId = data?.user?.id;
     if (!userId) { if (errEl) errEl.textContent = 'Something went wrong creating your account.'; return; }
     if (errEl) errEl.textContent = '';
-    openTrialCheckout({ email, country, userId, billingCycle });
+    openTrialCheckout({ email, geo, userId, billingCycle });
 }
 
 // ─── VIEWS ───────────────────────────────────────────────────────
