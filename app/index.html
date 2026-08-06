@@ -685,6 +685,7 @@ const UI_ICON_PATHS = {
   trophy: '<path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a2 2 0 0 0 0 4h1M17 5h3a2 2 0 0 1 0 4h-1"/>',
   user:   '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"/>',
   banknote: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
+  bag: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
 };
 function uiIcon(name, size = 16, stroke = 2) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round">${UI_ICON_PATHS[name] || ''}</svg>`;
@@ -826,7 +827,7 @@ function kidIcon(kidOrName) {
     return icons[h % icons.length];
 }
 function go(view, params = {}) { Object.assign(S, params); S.view = view; render(); }
-const PARENT_TAB_ORDER = ['overview', 'chores', 'kids', 'distributions', 'bonuses', 'rewards', 'recon', 'settings'];
+const PARENT_TAB_ORDER = ['overview', 'chores', 'kids', 'distributions', 'expenditure', 'bonuses', 'rewards', 'recon', 'settings'];
 function setTab(t) {
     const oldIdx = PARENT_TAB_ORDER.indexOf(S.tab);
     const newIdx = PARENT_TAB_ORDER.indexOf(t);
@@ -1103,7 +1104,14 @@ function snapModalInputs() {
         const v = document.getElementById('rw-val');
         if (n) S.modal.data = { ...S.modal.data, name: n.value, description: d?.value, value: v?.value };
     }
+    if (t === 'capture-expense') {
+        const a = document.getElementById('exp-amount');
+        const d = document.getElementById('exp-desc');
+        const dt = document.getElementById('exp-date');
+        if (a) S.modal.data = { ...S.modal.data, amount: a.value, description: d?.value, date: dt?.value };
+    }
 }
+function pickExpenseKid(kidId) { snapModalInputs(); S.modal.data = { ...S.modal.data, kidId }; render(); }
 function pickEmoji(em) { snapModalInputs(); S.selectedEmoji = em; render(); }
 function setSchedule(s) { snapModalInputs(); S.selectedSchedule = s; render(); }
 function setAllKids() { snapModalInputs(); S.selectedKids = 'all'; render(); }
@@ -1695,6 +1703,26 @@ async function recordReconSpend(kidId) {
     render();
 }
 
+async function captureExpense() {
+    snapModalInputs();
+    const { kidId, amount: amtStr, description, date } = S.modal.data;
+    const amount = parseFloat(amtStr) || 0;
+    if (!kidId)    return toast('⚠️ Please select a kid.');
+    if (amount<=0) return toast('⚠️ Please enter a valid amount.');
+    const k = cache.kids.find(x => x.id === kidId);
+    if (!k) return;
+    const desc = (description || '').trim() || 'Money spent';
+    const createdAt = date ? new Date(date + 'T12:00:00').toISOString() : new Date().toISOString();
+    const newBalance = (k.balance || 0) - amount;
+    const id = uid();
+    await sb.from('kids').update({ balance: newBalance }).eq('id', kidId).eq('user_id', currentUser.id);
+    await sb.from('transactions').insert({ id, user_id: currentUser.id, kid_id: kidId, amount: -amount, type: 'expense', description: desc, created_at: createdAt });
+    k.balance = newBalance;
+    cache.transactions.push({ id, kidId, amount: -amount, type: 'expense', description: desc, createdAt });
+    closeModal();
+    toast(`${R(amount)} recorded as spent for ${k.name}.`);
+}
+
 function vParent() {
     const db = DB.load();
     const pending = db.completions.filter(c => !c.approved && !c.rejected && !c.missed).length;
@@ -1704,6 +1732,7 @@ function vParent() {
         { id: 'chores',   label: 'Chores',   svg: uiIcon('list', 18) },
         { id: 'kids',     label: 'Kids',     svg: uiIcon('users', 18) },
         { id: 'distributions', label: 'Distributions', svg: uiIcon('banknote', 18) },
+        { id: 'expenditure', label: 'Expenditure', svg: uiIcon('bag', 18) },
         { id: 'bonuses',  label: 'Bonuses',  svg: uiIcon('star', 18) },
         { id: 'rewards',  label: 'Rewards',  badge: pendingRewards, svg: uiIcon('trophy', 18) },
         { id: 'recon',    label: 'Recon',    svg: uiIcon('scale', 18) },
@@ -1774,6 +1803,7 @@ function vParent() {
             S.tab === 'chores'    ? pChores(db) :
             S.tab === 'kids'      ? pKids(db) :
             S.tab === 'distributions' ? pDistributions(db) :
+            S.tab === 'expenditure' ? pExpenditure(db) :
             S.tab === 'bonuses'   ? pBonuses(db) :
             S.tab === 'rewards'   ? pRewards(db) :
             S.tab === 'recon'     ? pRecon(db) :
@@ -2156,6 +2186,36 @@ async function runDistribution(kidId) {
     cache.distributions.push({ id, kidId, amount: owed, createdAt });
     toast(`${R(owed)} marked as distributed to ${k.name}.`);
     render();
+}
+
+function pExpenditure(db) {
+    const recent = db.transactions
+        .filter(t => t.type === 'expense')
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 20);
+
+    const rows = recent.length === 0
+        ? `<div class="card text-center py-8" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No spending recorded yet.</div>`
+        : recent.map(t => {
+            const kid = db.kids.find(k => k.id === t.kidId);
+            return `
+            <div class="card flex items-center gap-3">
+              <div style="width:36px;height:36px;background:var(--color-coral-bg);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--color-coral-text)">${uiIcon('bag', 17)}</div>
+              <div class="flex-1">
+                <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary)">${esc(kid?.name) || '?'}</p>
+                <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${esc(t.description) || 'Money spent'} · ${dateStr(t.createdAt)}</p>
+              </div>
+              <p style="font-family:var(--font-family);font-weight:800;color:var(--color-coral)">${R(Math.abs(t.amount))}</p>
+            </div>`;
+        }).join('');
+
+    return `
+    <div class="flex justify-between items-center mb-2">
+      <p class="pr-section-label">Expenditure</p>
+      <button onclick="openModal('capture-expense')" class="btn-primary" style="width:auto;padding:8px 16px;font-size:13px">+ Capture Money Spent</button>
+    </div>
+    <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:20px">A record of cash your kids have actually spent, out of their bank account or piggy bank.</p>
+    <div class="flex flex-col gap-2">${rows}</div>`;
 }
 
 function pBonuses(db) {
@@ -3129,6 +3189,41 @@ function renderModal() {
         <div style="display:flex;gap:8px">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
           <button onclick="saveReward(${isEdit ? `'${data.id}'` : 'null'})" class="btn-primary flex-1" style="padding:10px">${isEdit ? 'Save Changes' : 'Add Reward'}</button>
+        </div>`;
+    }
+
+    if (type === 'capture-expense') {
+        const kidBtns = db.kids.map(k => {
+            const ac = kidAccent(k);
+            const sel = data.kidId === k.id;
+            return `<button onclick="pickExpenseKid('${k.id}')" type="button"
+              style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? ac.border : 'var(--color-border)'};background:${sel ? ac.bg : 'white'};color:${sel ? ac.text : '#6b7280'};cursor:pointer;display:flex;align-items:center;gap:6px">
+              <span style="font-size:18px">${kidIcon(k)}</span>${esc(k.name)}
+            </button>`;
+        }).join('');
+        const todayStr = toLocalDateStr(new Date());
+        body = `
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Capture Money Spent</h3>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:13px;margin-bottom:16px">Log cash a kid has spent so their app balance stays accurate.</p>
+
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Kid</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">${kidBtns}</div>
+
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Amount</p>
+        <div class="relative mb-4">
+          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
+          <input type="number" id="exp-amount" placeholder="0.00" step="0.01" min="0" value="${esc(data.amount)}" style="padding-left:38px !important">
+        </div>
+
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">What was it spent on?</p>
+        <input id="exp-desc" placeholder="e.g. Comic book" value="${esc(data.description)}" class="mb-4">
+
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Date</p>
+        <input type="date" id="exp-date" value="${data.date || todayStr}" max="${todayStr}" class="mb-5">
+
+        <div style="display:flex;gap:8px">
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+          <button onclick="captureExpense()" class="btn-primary flex-1" style="padding:10px">Capture</button>
         </div>`;
     }
 
