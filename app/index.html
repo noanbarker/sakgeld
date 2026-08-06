@@ -1570,7 +1570,7 @@ function vOnboarding() {
     if (step === 'currency') {
         const currCode = getCurrencyCode();
         body = `
-        <h2 style="font-family:var(--font-family);font-size:20px;font-weight:900;color:var(--color-text-primary);margin-bottom:6px">Welcome to Sprout! 🌱</h2>
+        <h2 style="font-family:var(--font-family);font-size:20px;font-weight:900;color:var(--color-text-primary);margin-bottom:6px">Welcome to <span style="color:#16a34a">Sprout</span></h2>
         <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:20px">Let's get your family set up — it only takes a minute. First, what currency should we use?</p>
         <select onchange="saveCurrency(this.value)" class="mb-5">
           ${CURRENCIES.map(c => `<option value="${c.code}" ${c.code === currCode ? 'selected' : ''}>${c.name}</option>`).join('')}
