@@ -612,6 +612,7 @@ const S = {
     historyOpen: false,
     settingsSection: null,
     moneySection: null,
+    onboardStep: 0,
     authMode: new URLSearchParams(window.location.search).get('mode') === 'signin' ? 'signin' : 'signup',
     billingCycle: 'monthly'
 };
@@ -1539,6 +1540,133 @@ function vHome() {
                 Sign out
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+const ONBOARD_STEPS = ['currency', 'kid', 'chores', 'bonus', 'money'];
+function onboardNext() { S.onboardStep = Math.min(S.onboardStep + 1, ONBOARD_STEPS.length - 1); render(); }
+function onboardBack() { S.onboardStep = Math.max(S.onboardStep - 1, 0); render(); }
+async function finishOnboarding() {
+    const { data } = await sb.auth.updateUser({ data: { onboarding_complete: true } });
+    if (data?.user) currentUser = data.user;
+    go('parent', { tab: 'overview' });
+}
+
+function vOnboarding() {
+    const db = DB.load();
+    const stepIdx = S.onboardStep;
+    const step = ONBOARD_STEPS[stepIdx] || 'currency';
+
+    const progress = `
+    <div style="display:flex;gap:6px;margin-bottom:24px">
+      ${ONBOARD_STEPS.map((_, i) => `<div style="flex:1;height:4px;border-radius:99px;background:${i <= stepIdx ? 'var(--color-green-600)' : 'var(--color-border)'}"></div>`).join('')}
+    </div>`;
+
+    let body = '';
+
+    if (step === 'currency') {
+        const currCode = getCurrencyCode();
+        body = `
+        <h2 style="font-family:var(--font-family);font-size:20px;font-weight:900;color:var(--color-text-primary);margin-bottom:6px">Welcome to Sprout! 🌱</h2>
+        <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:20px">Let's get your family set up — it only takes a minute. First, what currency should we use?</p>
+        <select onchange="saveCurrency(this.value)" class="mb-5">
+          ${CURRENCIES.map(c => `<option value="${c.code}" ${c.code === currCode ? 'selected' : ''}>${c.name}</option>`).join('')}
+        </select>
+        <button onclick="onboardNext()" class="btn-primary">Continue</button>`;
+    }
+
+    if (step === 'kid') {
+        const kidRows = db.kids.map(k => `
+          <div class="card flex items-center gap-3" style="padding:10px 14px">
+            <span style="font-size:20px">${kidIcon(k)}</span>
+            <span style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:14px">${esc(k.name)}</span>
+          </div>`).join('');
+        body = `
+        <h2 style="font-family:var(--font-family);font-size:20px;font-weight:900;color:var(--color-text-primary);margin-bottom:6px">Add your first kid</h2>
+        <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:20px">You can add more any time from the Kids tab — let's start with one.</p>
+        ${db.kids.length > 0 ? `<div class="flex flex-col gap-2 mb-4">${kidRows}</div>` : ''}
+        <button onclick="openModal('add-kid')" class="btn-outline mb-3" style="width:100%">+ Add Kid</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="onboardBack()" class="btn-outline flex-1">Back</button>
+          <button onclick="onboardNext()" class="btn-primary flex-1">Continue</button>
+        </div>`;
+    }
+
+    if (step === 'chores') {
+        const choreRows = db.chores.map(c => `
+          <div class="card flex items-center gap-3" style="padding:10px 14px">
+            <span style="font-size:18px">${uiIcon('list', 16)}</span>
+            <span style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:14px;flex:1">${esc(c.name)}</span>
+            <span style="font-family:var(--font-family);font-weight:800;color:var(--color-green-600);font-size:13px">${R(c.value)}</span>
+          </div>`).join('');
+        body = `
+        <h2 style="font-family:var(--font-family);font-size:20px;font-weight:900;color:var(--color-text-primary);margin-bottom:6px">Add a chore or two</h2>
+        <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:20px">Chores are what your kids earn money for. Add one or two to get going.</p>
+        ${db.chores.length > 0 ? `<div class="flex flex-col gap-2 mb-4">${choreRows}</div>` : ''}
+        <button onclick="openModal('add-chore')" class="btn-outline mb-3" style="width:100%">+ Add Chore</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="onboardBack()" class="btn-outline flex-1">Back</button>
+          <button onclick="onboardNext()" class="btn-primary flex-1">Continue</button>
+        </div>`;
+    }
+
+    if (step === 'bonus') {
+        const bonusRows = (db.bonusMilestones || []).map(m => `
+          <div class="card flex items-center gap-3" style="padding:10px 14px">
+            <span style="font-size:18px">${uiIcon('star', 16)}</span>
+            <span style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:14px;flex:1">${esc(m.name) || 'Balance Milestone'}</span>
+            <span style="font-family:var(--font-family);font-weight:800;color:var(--color-green-600);font-size:13px">+${R(m.bonusAmount)}</span>
+          </div>`).join('');
+        body = `
+        <h2 style="font-family:var(--font-family);font-size:20px;font-weight:900;color:var(--color-text-primary);margin-bottom:6px">Reward saving with a bonus? (optional)</h2>
+        <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:20px">Bonuses pay out automatically when a kid's balance hits a threshold you set. You can skip this and add one later from the Bonuses tab.</p>
+        ${(db.bonusMilestones || []).length > 0 ? `<div class="flex flex-col gap-2 mb-4">${bonusRows}</div>` : ''}
+        <button onclick="openModal('add-bonus')" class="btn-outline mb-3" style="width:100%">+ Add Bonus Milestone</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="onboardBack()" class="btn-outline flex-1">Back</button>
+          <button onclick="onboardNext()" class="btn-primary flex-1">Continue</button>
+        </div>`;
+    }
+
+    if (step === 'money') {
+        const cards = [
+            { icon: 'banknote', title: 'Distributions', desc: 'Shows what you still owe each kid in cash since you last paid them out.' },
+            { icon: 'bag',      title: 'Expenditure',   desc: 'Log cash a kid has actually spent, so their balance stays accurate.' },
+            { icon: 'scale',    title: 'Reconciliation', desc: 'Compare their app balance against their real bank or piggy bank balance.' },
+        ];
+        body = `
+        <h2 style="font-family:var(--font-family);font-size:20px;font-weight:900;color:var(--color-text-primary);margin-bottom:6px">One more thing — the Money tab</h2>
+        <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:20px">Everything about cash moving in and out of your kids' balances lives under one place.</p>
+        <div class="flex flex-col gap-2 mb-5">
+          ${cards.map(c => `
+          <div class="card flex items-center gap-3">
+            <div style="width:36px;height:36px;background:var(--color-green-100);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--color-green-700);flex-shrink:0">${uiIcon(c.icon, 17)}</div>
+            <div>
+              <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">${c.title}</p>
+              <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${c.desc}</p>
+            </div>
+          </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="onboardBack()" class="btn-outline flex-1">Back</button>
+          <button onclick="finishOnboarding()" class="btn-primary flex-1">Finish setup</button>
+        </div>`;
+    }
+
+    return `
+    <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
+      <div style="width:100%;max-width:480px">
+        <div class="pr-card" style="padding:44px 36px">
+          <div class="pr-stripe"></div>
+          <div class="pr-blob-top"></div>
+          <div class="pr-blob-bottom"></div>
+          <div style="position:relative;z-index:1">
+            ${progress}
+            ${body}
+            <div style="text-align:center;margin-top:16px"><button onclick="finishOnboarding()" style="font-family:var(--font-family);font-size:12px;color:var(--color-text-muted);background:none;border:none;cursor:pointer">Skip setup</button></div>
           </div>
         </div>
       </div>
@@ -2608,7 +2736,13 @@ function checkPin() {
 
 function goParent() {
     const pin = currentUser?.user_metadata?.parent_pin;
-    if (pin) { S.parentPin = ''; go('parent-pin'); } else { go('parent', { tab: 'overview' }); }
+    if (pin) { S.parentPin = ''; go('parent-pin'); } else { enterParentDashboard(); }
+}
+function enterParentDashboard() {
+    const forcePreview = new URLSearchParams(window.location.search).get('onboarding') === '1';
+    const onboarded = currentUser?.user_metadata?.onboarding_complete;
+    if (forcePreview || (!onboarded && cache.kids.length === 0)) { S.onboardStep = 0; go('parent-onboarding'); }
+    else { go('parent', { tab: 'overview' }); }
 }
 
 function vParentPin() {
@@ -2643,7 +2777,7 @@ function parentPinPress(k) {
 function checkParentPin() {
     const correctPin = currentUser?.user_metadata?.parent_pin;
     if (S.parentPin === correctPin) {
-        S.parentPin = ''; go('parent', { tab: 'overview' });
+        S.parentPin = ''; enterParentDashboard();
     } else {
         if (navigator.vibrate) navigator.vibrate([40,40,40]);
         const el = document.getElementById('ppin-err');
@@ -3773,7 +3907,7 @@ function render() {
         document.getElementById('app').innerHTML = vSubscriptionGate() + toastHtml;
         return;
     }
-    const views = { home: vHome, parent: vParent, 'kid-pin': vKidPin, kid: vKid, 'parent-pin': vParentPin };
+    const views = { home: vHome, parent: vParent, 'kid-pin': vKidPin, kid: vKid, 'parent-pin': vParentPin, 'parent-onboarding': vOnboarding };
     const html  = (views[S.view] || vHome)();
     document.getElementById('app').innerHTML = html + renderModal() + toastHtml;
     S.tabAnim = null;
