@@ -1536,6 +1536,21 @@ function vHome() {
     </div>`;
 }
 
+function reconDiffHTML(db, kid, bankVal) {
+    const appBal = kid.balance || 0;
+    const owed = owedSinceDistribution(db, kid);
+    const expected = appBal - owed;
+    const bankBal = (bankVal !== undefined && bankVal !== '') ? parseFloat(bankVal) : null;
+    const diff = (bankBal !== null && !isNaN(bankBal)) ? bankBal - expected : null;
+    const diffColor = diff === null ? '#94a3b8' : diff === 0 ? '#16a34a' : diff > 0 ? '#f59e0b' : '#f43f5e';
+    const diffLabel = diff === null ? '—' : diff === 0 ? '✓ Balanced' : diff > 0 ? `+${R(diff)} more in bank` : `${R(Math.abs(diff))} likely spent`;
+    const diffSub = diff === null ? 'Enter bank balance' : diff === 0 ? 'Matches what\'s expected' : diff > 0 ? 'Unexplained extra — check for an unlogged distribution' : 'Missing vs. expected';
+    const spendBtn = (diff !== null && diff < 0)
+        ? `<button onclick="recordReconSpend('${kid.id}')" class="chip-btn" style="margin-top:6px">Record as spent</button>`
+        : '';
+    return `<p style="font-family:var(--font-family);font-weight:800;font-size:15px;color:${diffColor}">${diffLabel}</p><p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-muted);margin-top:2px">${diffSub}</p>${spendBtn}`;
+}
+
 function pRecon(db) {
     const sortedKids = [...db.kids].sort((a, b) => a.name.localeCompare(b.name));
     const saved = JSON.parse(localStorage.getItem('sprout_recon') || '{}');
@@ -1543,11 +1558,9 @@ function pRecon(db) {
     const rows = sortedKids.map(k => {
         const ac = kidAccent(k);
         const appBal = k.balance || 0;
+        const owed = owedSinceDistribution(db, k);
+        const expected = appBal - owed;
         const bankVal = saved[k.id] !== undefined ? saved[k.id] : '';
-        const bankBal = bankVal !== '' ? parseFloat(bankVal) : null;
-        const diff = bankBal !== null ? bankBal - appBal : null;
-        const diffColor = diff === null ? '#94a3b8' : diff === 0 ? '#16a34a' : diff > 0 ? '#f59e0b' : '#f43f5e';
-        const diffLabel = diff === null ? '—' : diff === 0 ? '✓ Balanced' : diff > 0 ? `+${R(diff)} more in bank` : `${R(Math.abs(diff))} less in bank`;
 
         return `
         <div class="card sp-recon-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;gap:12px;padding:16px 20px">
@@ -1556,14 +1569,15 @@ function pRecon(db) {
             <div style="width:36px;height:36px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${kidIcon(k)}</div>
             <div>
               <p style="font-family:var(--font-family);font-weight:800;font-size:14px;color:var(--color-text-primary)">${esc(k.name)}</p>
-              <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">App balance</p>
+              <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">Expected vs. bank</p>
             </div>
           </div>
-          <!-- App balance + bank input -->
+          <!-- Expected in bank + bank input -->
           <div style="display:flex;align-items:center;gap:10px">
-            <div style="text-align:right;min-width:64px">
-              <p style="font-family:var(--font-family);font-weight:800;font-size:15px;color:${ac.text}">${R(appBal)}</p>
-              <p style="font-family:var(--font-family);font-size:10px;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.08em">In app</p>
+            <div style="text-align:right;min-width:78px">
+              <p style="font-family:var(--font-family);font-weight:800;font-size:15px;color:${ac.text}">${R(expected)}</p>
+              <p style="font-family:var(--font-family);font-size:10px;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.08em">Expected in bank</p>
+              <p style="font-family:var(--font-family);font-size:10px;color:var(--color-text-muted);margin-top:2px">${R(appBal)} app − ${R(owed)} owed</p>
             </div>
             <div style="color:#cbd5e1;font-size:18px;font-weight:300">↔</div>
             <div>
@@ -1574,27 +1588,26 @@ function pRecon(db) {
                   oninput="reconUpdate('${k.id}', this.value)"
                   style="font-family:var(--font-family);font-size:14px;font-weight:700;color:var(--color-text-primary);border:none;outline:none;width:100%;background:transparent"/>
               </div>
-              <p style="font-family:var(--font-family);font-size:10px;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;padding-left:2px">Bank balance</p>
+              <p style="font-family:var(--font-family);font-size:10px;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;padding-left:2px">Actual bank balance</p>
             </div>
           </div>
           <!-- Difference -->
           <div id="recon-diff-${k.id}" style="text-align:right">
-            <p style="font-family:var(--font-family);font-weight:800;font-size:15px;color:${diffColor}">${diffLabel}</p>
-            <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-muted);margin-top:2px">${diff === null ? 'Enter bank balance' : diff === 0 ? 'App matches bank' : 'Bank vs app'}</p>
+            ${reconDiffHTML(db, k, bankVal)}
           </div>
         </div>`;
     }).join('');
 
     const allEntered = sortedKids.every(k => saved[k.id] !== undefined && saved[k.id] !== '');
-    const totalApp = sortedKids.reduce((s, k) => s + (k.balance || 0), 0);
+    const totalExpected = sortedKids.reduce((s, k) => s + (k.balance || 0) - owedSinceDistribution(db, k), 0);
     const totalBank = allEntered ? sortedKids.reduce((s, k) => s + parseFloat(saved[k.id] || 0), 0) : null;
-    const totalDiff = totalBank !== null ? totalBank - totalApp : null;
+    const totalDiff = totalBank !== null ? totalBank - totalExpected : null;
 
     const summary = allEntered ? `
         <div class="card" style="background:linear-gradient(132deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;padding:16px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:center">
           <div>
-            <p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total in app</p>
-            <p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d">${R(totalApp)}</p>
+            <p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total expected</p>
+            <p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d">${R(totalExpected)}</p>
           </div>
           <div>
             <p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total in bank</p>
@@ -1610,7 +1623,7 @@ function pRecon(db) {
     <div style="max-width:760px">
       <div style="margin-bottom:24px">
         <h2 style="font-family:var(--font-family);font-size:22px;font-weight:900;color:var(--color-text-primary);letter-spacing:-0.02em">Reconciliation</h2>
-        <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-top:4px">Enter each child's actual bank balance to see how it compares to the app. Differences highlight what may need adjusting.</p>
+        <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-top:4px">"Expected in bank" is each kid's app balance minus whatever's still an outstanding distribution — in other words, what should realistically be sitting in their bank or piggy bank right now. Enter their actual balance to compare. A shortfall usually means money's been spent — you can log it straight from here.</p>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
         ${rows}
@@ -1631,15 +1644,8 @@ function reconUpdate(kidId, value) {
     const kid = db.kids.find(k => k.id === kidId);
     if (!kid) return;
 
-    // Update this kid's diff in-place
-    const appBal = kid.balance || 0;
-    const bankBal = value !== '' ? parseFloat(value) : null;
-    const diff = (bankBal !== null && !isNaN(bankBal)) ? bankBal - appBal : null;
-    const diffColor = diff === null ? '#94a3b8' : diff === 0 ? '#16a34a' : diff > 0 ? '#f59e0b' : '#f43f5e';
-    const diffLabel = diff === null ? '—' : diff === 0 ? '✓ Balanced' : diff > 0 ? `+${R(diff)} more in bank` : `${R(Math.abs(diff))} less in bank`;
-    const diffSub = diff === null ? 'Enter bank balance' : diff === 0 ? 'App matches bank' : 'Bank vs app';
     const el = document.getElementById(`recon-diff-${kidId}`);
-    if (el) el.innerHTML = `<p style="font-family:var(--font-family);font-weight:800;font-size:15px;color:${diffColor}">${diffLabel}</p><p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-muted);margin-top:2px">${diffSub}</p>`;
+    if (el) el.innerHTML = reconDiffHTML(db, kid, value);
 
     // Update summary in-place
     const sortedKids = [...db.kids].sort((a, b) => a.name.localeCompare(b.name));
@@ -1647,10 +1653,10 @@ function reconUpdate(kidId, value) {
     const summaryEl = document.getElementById('recon-summary');
     if (summaryEl) {
         if (allEntered) {
-            const totalApp = sortedKids.reduce((s, k) => s + (k.balance || 0), 0);
+            const totalExpected = sortedKids.reduce((s, k) => s + (k.balance || 0) - owedSinceDistribution(db, k), 0);
             const totalBank = sortedKids.reduce((s, k) => s + parseFloat(saved[k.id] || 0), 0);
-            const totalDiff = totalBank - totalApp;
-            summaryEl.innerHTML = `<div class="card" style="background:linear-gradient(132deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;padding:16px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:center"><div><p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total in app</p><p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d">${R(totalApp)}</p></div><div><p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total in bank</p><p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d">${R(totalBank)}</p></div><div style="text-align:right"><p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Difference</p><p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:${totalDiff === 0 ? '#16a34a' : '#f43f5e'}">${totalDiff === 0 ? '✓ All balanced' : R(totalDiff)}</p></div></div>`;
+            const totalDiff = totalBank - totalExpected;
+            summaryEl.innerHTML = `<div class="card" style="background:linear-gradient(132deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;padding:16px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:center"><div><p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total expected</p><p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d">${R(totalExpected)}</p></div><div><p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total in bank</p><p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d">${R(totalBank)}</p></div><div style="text-align:right"><p style="font-family:var(--font-family);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Difference</p><p style="font-family:var(--font-family);font-size:22px;font-weight:900;color:${totalDiff === 0 ? '#16a34a' : '#f43f5e'}">${totalDiff === 0 ? '✓ All balanced' : R(totalDiff)}</p></div></div>`;
         } else {
             summaryEl.innerHTML = '';
         }
@@ -1659,6 +1665,33 @@ function reconUpdate(kidId, value) {
 
 function reconClear() {
     localStorage.removeItem('sprout_recon');
+    render();
+}
+
+async function recordReconSpend(kidId) {
+    const saved = JSON.parse(localStorage.getItem('sprout_recon') || '{}');
+    const bankVal = saved[kidId];
+    const bankBal = (bankVal !== undefined && bankVal !== '') ? parseFloat(bankVal) : null;
+    if (bankBal === null || isNaN(bankBal)) return;
+
+    const db = DB.load();
+    const k = cache.kids.find(x => x.id === kidId);
+    if (!k) return;
+    const appBal = k.balance || 0;
+    const owed = owedSinceDistribution(db, k);
+    const expected = appBal - owed;
+    const diff = bankBal - expected;
+    if (diff >= 0) return toast('Nothing to record — bank balance already matches or exceeds expected.');
+
+    const amount = Math.abs(diff);
+    const id = uid();
+    const createdAt = new Date().toISOString();
+    const newBalance = appBal - amount;
+    await sb.from('kids').update({ balance: newBalance }).eq('id', kidId).eq('user_id', currentUser.id);
+    await sb.from('transactions').insert({ id, user_id: currentUser.id, kid_id: kidId, amount: -amount, type: 'expense', description: 'Recorded from reconciliation', created_at: createdAt });
+    k.balance = newBalance;
+    cache.transactions.push({ id, kidId, amount: -amount, type: 'expense', description: 'Recorded from reconciliation', createdAt });
+    toast(`${R(amount)} recorded as spent for ${k.name}.`);
     render();
 }
 
@@ -2031,8 +2064,11 @@ function pKids(db) {
 
 function owedSinceDistribution(db, kid) {
     const since = kid.last_distribution_at ? new Date(kid.last_distribution_at) : null;
+    // 'expense' transactions are spending against cash already handed over in a
+    // past distribution, not against what's still owed — so they reduce the kid's
+    // balance but must not reduce (or inflate) the owed figure itself.
     return db.transactions
-        .filter(t => t.kidId === kid.id && (!since || new Date(t.createdAt) > since))
+        .filter(t => t.kidId === kid.id && t.type !== 'expense' && (!since || new Date(t.createdAt) > since))
         .reduce((s, t) => s + (t.amount || 0), 0);
 }
 
@@ -2524,7 +2560,7 @@ function vKid() {
     const ready     = allChores.filter(c => !doneTodayIds.includes(c.id));
     const txns      = db.transactions.filter(t => t.kidId === kid.id)
                         .sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt));
-    const typeIcon  = { payout:'💸', weekly:'📅', chore:'✅', manual:'💰', bonus: milestoneStarSVG(16), reward:'🏆' };
+    const typeIcon  = { payout:'💸', weekly:'📅', chore:'✅', manual:'💰', bonus: milestoneStarSVG(16), reward:'🏆', expense:'🛍️' };
     const treeStageIdx = getTreeStage(kid.balance);
     const treeThresh   = loadTreeThresholds();
     const threshArr    = [treeThresh.t1, treeThresh.t2, treeThresh.t3, treeThresh.t4];
