@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <script>(function(){var m=document.cookie.match(/(?:^|; )sprout_geo=([^;]+)/);document.documentElement.setAttribute('data-geo', m ? decodeURIComponent(m[1]) : 'ZA');})();</script>
 <style>.geo-row{display:none}html[data-geo="ROW"] .geo-za{display:none}html[data-geo="ROW"] .geo-row{display:inline}</style>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>About, Sprout</title>
 <meta name="description" content="Sprout was built by a parent of four looking for a simpler way to teach kids about earning, saving and spending. Here's our story and what we believe.">
 <link rel="canonical" href="https://www.sproutearnsave.com/about.html">
@@ -261,6 +261,9 @@
   .pr-tagline-mobile{display:flex!important}
   #pr-hamburger{display:inline-flex!important}
   #pr-menu-toggle:checked ~ #pr-mobmenu{display:flex!important}
+  .pr-sticky-cta{display:block!important}
+  .pr-sticky-cta.pr-sticky-visible{opacity:1!important;transform:translateY(0)!important;pointer-events:auto!important}
+  #pr-menu-toggle:checked ~ .pr-sticky-cta{display:none!important}
   .pr-grid-footer{grid-template-columns:repeat(2,1fr)!important;gap:28px!important}
   .pr-grid-2col{grid-template-columns:1fr!important;gap:28px!important}
   .pr-grid-3col{grid-template-columns:1fr!important}
@@ -293,6 +296,9 @@
   <a href="app/index.html" style="text-decoration:none;background:linear-gradient(132deg,#16a34a,#15803d);color:#fff;font-weight:800;font-size:16px;padding:13px 20px;border-radius:14px;text-align:center;margin-top:8px">Start Free Trial</a>
 </div>
 <div class="pr-header-spacer" style="display:none;height:76px"></div>
+<div id="pr-sticky-cta" class="pr-sticky-cta" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:60;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:rgba(255,255,255,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid #e5ece7;box-shadow:0 -4px 16px rgba(15,40,25,.06);box-sizing:border-box;opacity:0;transform:translateY(100%);transition:opacity .25s ease,transform .25s ease;pointer-events:none">
+  <a href="app/index.html" id="pr-sticky-cta-btn" style="display:flex;align-items:center;justify-content:center;width:100%;height:52px;background:linear-gradient(132deg,#16a34a,#15803d);color:#fff;font-weight:800;font-size:16px;text-decoration:none;border-radius:14px;box-shadow:0 8px 20px rgba(22,163,74,.32);box-sizing:border-box">Start Free Trial</a>
+</div>
 
   <div style="max-width:820px;margin:0 auto;padding:76px clamp(20px,5vw,44px) 40px;text-align:center;position:relative">
     <div style="font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#2563eb">Our story</div>
@@ -396,6 +402,29 @@
 </div>
 </div>
 
-
+<script>
+(function(){
+  var bar = document.getElementById('pr-sticky-cta');
+  var btn = document.getElementById('pr-sticky-cta-btn');
+  if(!bar || !btn) return;
+  var showAt = window.innerHeight * 0.8;
+  var onScroll = function(){
+    if(window.scrollY > showAt){ bar.classList.add('pr-sticky-visible'); }
+    else { bar.classList.remove('pr-sticky-visible'); }
+  };
+  window.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+  var pricingSection = document.getElementById('pr-pricing-section');
+  if(pricingSection && 'IntersectionObserver' in window){
+    var defaultLabel = btn.textContent;
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        btn.textContent = entry.isIntersecting ? 'Start 14-Day Free Trial' : defaultLabel;
+      });
+    }, {rootMargin:'-40% 0px -40% 0px'});
+    io.observe(pricingSection);
+  }
+})();
+</script>
 
 </body></html>
