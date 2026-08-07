@@ -539,10 +539,11 @@ const COUNTRIES = [
   ['ZM','Zambia'],['ZW','Zimbabwe']
 ];
 
+let hasParentPin = false;
 async function loadCache() {
     const uid = currentUser.id;
-    const [kRes, cRes, compRes, txRes, bmRes, rwRes, rcRes, distRes] = await Promise.all([
-        sb.from('kids').select('*').eq('user_id', uid),
+    const [kRes, cRes, compRes, txRes, bmRes, rwRes, rcRes, distRes, pinRes] = await Promise.all([
+        sb.from('kids').select('id,user_id,name,emoji,balance,created_at,color_key,date_of_birth,last_distribution_at').eq('user_id', uid),
         sb.from('chores').select('*').eq('user_id', uid),
         sb.from('completions').select('*').eq('user_id', uid),
         sb.from('transactions').select('*').eq('user_id', uid),
@@ -550,7 +551,9 @@ async function loadCache() {
         sb.from('rewards').select('*').eq('user_id', uid),
         sb.from('reward_completions').select('*').eq('user_id', uid),
         sb.from('distributions').select('*').eq('user_id', uid),
+        sb.rpc('has_parent_pin'),
     ]);
+    hasParentPin = !!pinRes.data;
     cache = {
         kids: kRes.data || [],
         chores: (cRes.data || []).map(c => ({ ...c, assignedTo: c.assigned_to, oneOff: c.one_off || false, expiresOn: c.expires_on || null })),
@@ -1406,7 +1409,7 @@ async function doResetParentPin() {
     const errEl = document.getElementById('rpp-err');
     if (!/^\d{4}$/.test(pin)) { if (errEl) errEl.textContent = 'PIN must be exactly 4 digits.'; return; }
     if (errEl) errEl.textContent = 'Saving…';
-    const { error } = await sb.auth.updateUser({ data: { parent_pin: pin } });
+    const { error } = await sb.rpc('set_parent_pin', { p_new_pin: pin });
     if (error) { if (errEl) errEl.textContent = error.message; return; }
     S.authMode = 'signin';
     toast('PIN updated! Sign in to continue.');
@@ -2217,9 +2220,7 @@ function pKids(db) {
                 <div style="width:48px;height:48px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px">${kidIcon(k)}</div>
                 <div style="flex:1;min-width:0">
                   <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary)">${esc(k.name)}</p>
-                  <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);display:flex;align-items:center;gap:5px">PIN: <span id="pin-val-${k.id}">••••</span>
-                    <button onclick="const el=document.getElementById('pin-val-${k.id}');el.textContent=el.textContent==='••••'?'${esc(k.pin)}':'••••'" title="Show/hide PIN" style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);padding:0;display:inline-flex">${uiIcon('eye', 13)}</button>
-                  </p>
+                  <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">PIN protected — tap edit to change</p>
                 </div>
                 <div style="display:flex;gap:4px">
                   <button onclick="editKid('${k.id}')" title="Edit" class="icon-btn">${uiIcon('pencil', 15)}</button>
@@ -2585,7 +2586,7 @@ function pSettings() {
     const sections = [
         { id: 'currency', title: 'Currency / Value Display', subtitle: 'Choose how values are displayed' },
         { id: 'tree',     title: 'Tree Growth Stages',       subtitle: 'Set the balance thresholds for each tree stage' },
-        { id: 'pin',      title: 'Parent PIN',               subtitle: currentUser?.user_metadata?.parent_pin ? 'A PIN is currently set' : 'No PIN set' },
+        { id: 'pin',      title: 'Parent PIN',               subtitle: hasParentPin ? 'A PIN is currently set' : 'No PIN set' },
     ];
     const chevron = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex-shrink:0"><path d="M7 5l4 4-4 4" stroke="var(--color-text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -2636,8 +2637,8 @@ function pSettings() {
           ${backBtn}
           <div class="card">
             <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Parent PIN</p>
-            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">${currentUser?.user_metadata?.parent_pin ? 'A PIN is currently set to protect the parent dashboard.' : 'No PIN set — anyone can access the parent dashboard.'}</p>
-            <button onclick="openModal('set-parent-pin')" class="btn-primary" style="width:auto;padding:10px 28px">${currentUser?.user_metadata?.parent_pin ? 'Change PIN' : 'Set PIN'}</button>
+            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">${hasParentPin ? 'A PIN is currently set to protect the parent dashboard.' : 'No PIN set — anyone can access the parent dashboard.'}</p>
+            <button onclick="openModal('set-parent-pin')" class="btn-primary" style="width:auto;padding:10px 28px">${hasParentPin ? 'Change PIN' : 'Set PIN'}</button>
           </div>
         </div>`;
     }
@@ -2723,11 +2724,10 @@ function pinPress(k) {
     S.pin += k; render();
     if (S.pin.length === 4) setTimeout(checkPin, 120);
 }
-function checkPin() {
-    const db = DB.load();
-    const kid = db.kids.find(k => k.id === S.pinKidId);
-    if (kid && S.pin === kid.pin) {
-        const kidId = S.pinKidId;
+async function checkPin() {
+    const kidId = S.pinKidId;
+    const { data: ok, error } = await sb.rpc('verify_kid_pin', { p_kid_id: kidId, p_guess: S.pin });
+    if (!error && ok) {
         S.kidId = kidId; S.pin = ''; go('kid');
         writeMissedChores(kidId);
     } else {
@@ -2741,8 +2741,7 @@ function checkPin() {
 }
 
 function goParent() {
-    const pin = currentUser?.user_metadata?.parent_pin;
-    if (pin) { S.parentPin = ''; go('parent-pin'); } else { enterParentDashboard(); }
+    if (hasParentPin) { S.parentPin = ''; go('parent-pin'); } else { enterParentDashboard(); }
 }
 function enterParentDashboard() {
     const forcePreview = new URLSearchParams(window.location.search).get('onboarding') === '1';
@@ -2780,9 +2779,9 @@ function parentPinPress(k) {
     S.parentPin += k; render();
     if (S.parentPin.length === 4) setTimeout(checkParentPin, 120);
 }
-function checkParentPin() {
-    const correctPin = currentUser?.user_metadata?.parent_pin;
-    if (S.parentPin === correctPin) {
+async function checkParentPin() {
+    const { data: ok, error } = await sb.rpc('verify_parent_pin', { p_guess: S.parentPin });
+    if (!error && ok) {
         S.parentPin = ''; enterParentDashboard();
     } else {
         if (navigator.vibrate) navigator.vibrate([40,40,40]);
@@ -3107,7 +3106,7 @@ function renderModal() {
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Name</p>
         <input id="k-name" placeholder="Name" value="${esc(data.name)}" class="mb-3">
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">PIN</p>
-        <input id="k-pin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" value="${esc(data.pin)}" class="mb-3">
+        <input id="k-pin" placeholder="${e ? 'Leave blank to keep current PIN' : '4-digit PIN'}" maxlength="4" inputmode="numeric" value="" class="mb-3">
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Date of birth</p>
         <input id="k-dob" type="date" value="${data.date_of_birth||''}" max="${new Date().toISOString().slice(0,10)}" class="mb-4">
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:10px">Theme Colour</p>
@@ -3233,7 +3232,7 @@ function renderModal() {
     }
 
     if (type === 'set-parent-pin') {
-        const hasPin = !!currentUser?.user_metadata?.parent_pin;
+        const hasPin = hasParentPin;
         body = `
         <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Parent PIN</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:14px;margin-bottom:16px">${hasPin ? '🔐 A PIN is currently set.' : '⚠️ No PIN set — anyone can access the parent dashboard.'}</p>
@@ -3435,9 +3434,11 @@ async function addKid() {
     if (!/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits (e.g. 1234).');
     if (!date_of_birth)        return toast('⚠️ Please enter a date of birth.');
     const id = uid();
-    const { error } = await sb.from('kids').insert({ id, user_id: currentUser.id, name, pin, emoji, color_key, date_of_birth, balance: 0 });
+    const { error } = await sb.from('kids').insert({ id, user_id: currentUser.id, name, emoji, color_key, date_of_birth, balance: 0 });
     if (error) return toast('❌ Could not save. Check your connection.');
-    cache.kids.push({ id, name, pin, emoji, color_key, date_of_birth, balance: 0 });
+    const { error: pinError } = await sb.rpc('set_kid_pin', { p_kid_id: id, p_new_pin: pin });
+    if (pinError) return toast('❌ Kid saved, but PIN could not be set.');
+    cache.kids.push({ id, name, emoji, color_key, date_of_birth, balance: 0 });
     closeModal(); toast(`${name} added! 🎉`);
 }
 function editKid(id) {
@@ -3451,12 +3452,16 @@ async function saveKid(id) {
     const emoji     = S.selectedEmoji || '😀';
     const color_key = S.selectedColor || 'blue';
     if (!name)                 return toast('⚠️ Please enter a name.');
-    if (!/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits (e.g. 1234).');
+    if (pin && !/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits (e.g. 1234).');
     if (!date_of_birth)        return toast('⚠️ Please enter a date of birth.');
-    const { error } = await sb.from('kids').update({ name, pin, emoji, color_key, date_of_birth }).eq('id', id).eq('user_id', currentUser.id);
+    const { error } = await sb.from('kids').update({ name, emoji, color_key, date_of_birth }).eq('id', id).eq('user_id', currentUser.id);
     if (error) return toast('❌ Could not save.');
+    if (pin) {
+        const { error: pinError } = await sb.rpc('set_kid_pin', { p_kid_id: id, p_new_pin: pin });
+        if (pinError) return toast('❌ Saved, but PIN could not be updated.');
+    }
     const k = cache.kids.find(x => x.id === id);
-    if (k) { k.name = name; k.pin = pin; k.emoji = emoji; k.color_key = color_key; k.date_of_birth = date_of_birth; }
+    if (k) { k.name = name; k.emoji = emoji; k.color_key = color_key; k.date_of_birth = date_of_birth; }
     closeModal(); toast('Saved!');
 }
 function deleteKid(id) {
@@ -3879,15 +3884,15 @@ function saveCurrency(code) {
 async function saveParentPin() {
     const pin = document.getElementById('pp-pin').value.trim();
     if (!/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits.');
-    const { data, error } = await sb.auth.updateUser({ data: { parent_pin: pin } });
+    const { error } = await sb.rpc('set_parent_pin', { p_new_pin: pin });
     if (error) return toast('❌ Could not save PIN.');
-    if (data?.user) currentUser = data.user;
+    hasParentPin = true;
     closeModal(); toast('Parent PIN saved! 🔐');
 }
 async function removeParentPin() {
-    const { data, error } = await sb.auth.updateUser({ data: { parent_pin: null } });
+    const { error } = await sb.rpc('remove_parent_pin');
     if (error) return toast('❌ Could not remove PIN.');
-    if (data?.user) currentUser = data.user;
+    hasParentPin = false;
     closeModal(); toast('Parent PIN removed.');
 }
 
