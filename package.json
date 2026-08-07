@@ -1,8 +1,14 @@
 {
   "name": "sprout-api",
   "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i css/tailwind-input.css -o css/app.css --minify"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "@vercel/functions": "^3.7.7"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
   }
 }

@@ -1,5 +1,6 @@
 .DS_Store
 *.zip
+node_modules/
 Sprout-Design-Assessment.md
 design_handoff_pocket_rocket/
 .claude/
