@@ -48,11 +48,10 @@
     wrap.setAttribute('role', 'region');
     wrap.setAttribute('aria-label', 'Cookie consent');
     wrap.style.cssText = [
-      'position:fixed', 'left:16px', 'right:16px', 'bottom:16px', 'z-index:1000',
-      'max-width:560px', 'margin:0 auto',
+      'position:fixed', 'z-index:1000',
       'background:#ffffff', 'border:1px solid #e5ece7', 'border-radius:16px',
       'box-shadow:0 12px 32px rgba(15,40,25,.16)',
-      'padding:18px 20px', 'box-sizing:border-box',
+      'padding:16px 18px', 'box-sizing:border-box',
       'font-family:\'Nunito\',system-ui,sans-serif',
       'display:flex', 'flex-direction:column', 'gap:12px',
       'opacity:0', 'transform:translateY(12px)',
@@ -94,13 +93,25 @@
     wrap.appendChild(actions);
     document.body.appendChild(wrap);
 
-    // Keep clear of the mobile sticky "Start Free Trial" bar.
+    // On narrow screens, a full-width sheet (above the mobile sticky CTA bar).
+    // On wider screens, a compact card docked to the corner so it never
+    // covers centered page content or a form's submit button.
     var mq = window.matchMedia('(max-width:640px)');
-    function applyOffset() {
-      wrap.style.bottom = mq.matches ? '96px' : '16px';
+    function applyLayout() {
+      if (mq.matches) {
+        wrap.style.left = '16px';
+        wrap.style.right = '16px';
+        wrap.style.bottom = '96px';
+        wrap.style.maxWidth = 'none';
+      } else {
+        wrap.style.left = 'auto';
+        wrap.style.right = '20px';
+        wrap.style.bottom = '20px';
+        wrap.style.maxWidth = '360px';
+      }
     }
-    applyOffset();
-    if (mq.addEventListener) mq.addEventListener('change', applyOffset);
+    applyLayout();
+    if (mq.addEventListener) mq.addEventListener('change', applyLayout);
 
     requestAnimationFrame(function () {
       wrap.style.opacity = '1';
