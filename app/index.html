@@ -2768,7 +2768,7 @@ function pSettings() {
         { stage: 4, name: 'Forest',     range: `${R(t.t4)} and above` },
     ];
     const sections = [
-        { id: 'allowance', title: 'Allowance System',         subtitle: isCycleMode() ? `Allowance per cycle — ${CYCLE_PERIOD_LABELS[getCyclePeriod()]}` : 'Value per chore' },
+        { id: 'allowance', title: 'Allowance System',         subtitle: isCycleMode() ? `Amount per cycle — ${CYCLE_PERIOD_LABELS[getCyclePeriod()]}` : 'Amount per chore' },
         { id: 'currency', title: 'Currency / Value Display', subtitle: 'Choose how values are displayed' },
         { id: 'tree',     title: 'Tree Growth Stages',       subtitle: 'Set the balance thresholds for each tree stage' },
         { id: 'pin',      title: 'Parent PIN',               subtitle: hasParentPin ? 'A PIN is currently set' : 'No PIN set' },
@@ -2812,16 +2812,16 @@ function pSettings() {
           ${backBtn}
           <div class="card mb-4">
             <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Allowance System</p>
-            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">Choose how chores turn into allowance for your kids. This applies to the whole family — each child can still get a different amount.</p>
+            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">Choose how chores turn into allowance for your kids. This applies to the whole family, each child can still be assigned a different amount.</p>
             <div style="display:flex;flex-direction:column;gap:10px">
               <button onclick="chooseAllowanceMode('per_chore')" type="button"
                 style="text-align:left;padding:14px 16px;border-radius:14px;border:2px solid ${mode==='per_chore'?'var(--color-green-600)':'var(--color-border)'};background:${mode==='per_chore'?'var(--color-green-100)':'white'};cursor:pointer">
-                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Value per chore</p>
+                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Amount per chore</p>
                 <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">Each chore has its own amount. A kid earns it the moment that chore is approved.</p>
               </button>
               <button onclick="chooseAllowanceMode('per_cycle')" type="button"
                 style="text-align:left;padding:14px 16px;border-radius:14px;border:2px solid ${mode==='per_cycle'?'var(--color-green-600)':'var(--color-border)'};background:${mode==='per_cycle'?'var(--color-green-100)':'white'};cursor:pointer">
-                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Allowance per cycle</p>
+                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Amount per cycle</p>
                 <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">Set a total amount for the week, fortnight, or month. A kid's share is worked out from the percentage of their chores they complete by the end of the cycle — nothing pays out until then.</p>
               </button>
             </div>
@@ -3482,7 +3482,7 @@ function renderModal() {
         });
         const total = rows.reduce((s, r) => s + r.amountPaid, 0);
         body = `
-        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:12px">Switch to Value per Chore?</h3>
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:12px">Switch to Amount per Chore?</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:13px;margin-bottom:16px">You're partway through a cycle that started ${dateStr(anchor)}. Switching now closes it early — each child gets their share for the days completed so far, worked out the usual way.</p>
         <div class="flex flex-col gap-2 mb-4">
           ${rows.length === 0 ? `<p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-muted)">No kids yet.</p>` : rows.map(r => `
@@ -4195,7 +4195,7 @@ async function activateCycleMode() {
     const { data } = await sb.auth.updateUser({ data: { allowance_mode: 'per_cycle', cycle_period: period, cycle_period_pending: null, cycle_anchor_date: today } });
     if (data?.user) currentUser = data.user;
     render();
-    toast(`Allowance per cycle turned on! This first cycle runs to ${dateStr(cycleEndDate(period, today))}.`);
+    toast(`Amount per cycle turned on! This first cycle runs to ${dateStr(cycleEndDate(period, today))}.`);
 }
 async function queueCyclePeriodChange(period) {
     if (period === getCyclePeriod()) { cancelPendingCyclePeriod(); return; }
@@ -4237,7 +4237,7 @@ async function confirmSwitchToPerChore() {
     const { data } = await sb.auth.updateUser({ data: { allowance_mode: 'per_chore', cycle_period_pending: null, cycle_anchor_date: null } });
     if (data?.user) currentUser = data.user;
     closeModal();
-    toast('Switched to value per chore. Check your chores — each one needs its own amount before it pays out.');
+    toast('Switched to amount per chore. Check your chores — each one needs its own amount before it pays out.');
 }
 function saveCurrency(code) {
     localStorage.setItem('sprout_currency', code);
