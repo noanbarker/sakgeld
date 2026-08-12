@@ -212,71 +212,150 @@ body{margin:0}
   </div>
 
   <div style="max-width:760px;margin:0 auto;padding:20px clamp(20px,5vw,44px)">
-      <div class="faq-item" style="background:#fff;border:1px solid #e5ece7;border-radius:18px;box-shadow:0 1px 3px rgba(15,40,25,.06);margin-bottom:12px;overflow:hidden">
-        <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:20px 24px;display:flex;align-items:center;gap:16px;justify-content:space-between">
-          <span style="font-size:16.5px;font-weight:800;color:#15803d">What ages is Sprout for?</span>
+      <div class="faq-category" style="background:#fff;border:1px solid #e5ece7;border-radius:18px;box-shadow:0 1px 3px rgba(15,40,25,.06);margin-bottom:12px;overflow:hidden">
+        <button class="faq-category-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:20px 24px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+          <span style="font-size:16.5px;font-weight:800;color:#15803d">Subscription FAQs</span>
           <span class="faq-sign" style="font-size:22px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
         </button>
-        <div class="faq-answer" style="display:none;padding:0 24px 22px;font-size:15px;line-height:1.65;color:#475569;white-space:pre-line">It works well from age 3 up to age 13.
+        <div class="faq-category-body" style="display:none;padding:0 12px 12px">
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">What ages is Sprout for?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">It works well from age 3 up to age 13.
 Kids ages 3-5 need some assistance at first.
 Kids ages 6-13 can use the app completely unassisted.</div>
-      </div>
-      <div class="faq-item" style="background:#fff;border:1px solid #e5ece7;border-radius:18px;box-shadow:0 1px 3px rgba(15,40,25,.06);margin-bottom:12px;overflow:hidden">
-        <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:20px 24px;display:flex;align-items:center;gap:16px;justify-content:space-between">
-          <span style="font-size:16.5px;font-weight:800;color:#15803d">Do I need to give my kids a phone?</span>
-          <span class="faq-sign" style="font-size:22px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
-        </button>
-        <div class="faq-answer" style="display:none;padding:0 24px 22px;font-size:15px;line-height:1.65;color:#475569;white-space:pre-line">No. Kids can sign in on any shared device, a family tablet, your phone, a computer or any smart TV with a browser, with their own PIN. Everything stays in sync.</div>
-      </div>
-      <div class="faq-item" style="background:#fff;border:1px solid #e5ece7;border-radius:18px;box-shadow:0 1px 3px rgba(15,40,25,.06);margin-bottom:12px;overflow:hidden">
-        <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:20px 24px;display:flex;align-items:center;gap:16px;justify-content:space-between">
-          <span style="font-size:16.5px;font-weight:800;color:#15803d">Does Sprout hold real money?</span>
-          <span class="faq-sign" style="font-size:22px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
-        </button>
-        <div class="faq-answer" style="display:none;padding:0 24px 22px;font-size:15px;line-height:1.65;color:#475569;white-space:pre-line">Sprout functions as a automated ledger for your kids chores, allowance, savings and rewards.
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">Do I need to give my kids a phone?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">No. Kids can sign in on any shared device, a family tablet, your phone, a computer or any smart TV with a browser, with their own PIN. Everything stays in sync.</div>
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">Does Sprout hold real money?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">Sprout functions as a automated ledger for your kids chores, allowance, savings and rewards.
 Sprout does not require access to your bank account.</div>
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">Is Sprout available in my country?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">Yes, Sprout is available in all countries with a custom home currency to match that of the country that you live in or operate in.</div>
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">Is my family’s data safe?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">Yes. We never sell any family data. Parents sign into the app on any device with their own account and password. From there kids can sign in to their account with a simple PIN.</div>
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">What happens after the free trial?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">If you do not cancel your subscription during the 14 day trial you will be billed based on the plan you chose, i.e either monthly or annually upfront.</div>
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">What happens if I cancel?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">You can cancel anytime and keep access until the end of your billing period. We keep your family's app data for 60 days after cancellation in case you want to come back, then delete it permanently.</div>
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">Can more than one parent manage it?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">Yes, simply share the login details and parents pin with your spouse and they will be able to log in and manage the account as well.</div>
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">Can I use my own currency?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">Absolutely. You choose your preferred home currency in the settings and it automatically applies to all values in the app.</div>
+          </div>
+        </div>
       </div>
-      <div class="faq-item" style="background:#fff;border:1px solid #e5ece7;border-radius:18px;box-shadow:0 1px 3px rgba(15,40,25,.06);margin-bottom:12px;overflow:hidden">
-        <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:20px 24px;display:flex;align-items:center;gap:16px;justify-content:space-between">
-          <span style="font-size:16.5px;font-weight:800;color:#15803d">Is Sprout available in my country?</span>
+      <div class="faq-category" style="background:#fff;border:1px solid #e5ece7;border-radius:18px;box-shadow:0 1px 3px rgba(15,40,25,.06);margin-bottom:12px;overflow:hidden">
+        <button class="faq-category-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:20px 24px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+          <span style="font-size:16.5px;font-weight:800;color:#15803d">Operational FAQs</span>
           <span class="faq-sign" style="font-size:22px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
         </button>
-        <div class="faq-answer" style="display:none;padding:0 24px 22px;font-size:15px;line-height:1.65;color:#475569;white-space:pre-line">Yes, Sprout is available in all countries with a custom home currency to match that of the country that you live in or operate in.</div>
-      </div>
-      <div class="faq-item" style="background:#fff;border:1px solid #e5ece7;border-radius:18px;box-shadow:0 1px 3px rgba(15,40,25,.06);margin-bottom:12px;overflow:hidden">
-        <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:20px 24px;display:flex;align-items:center;gap:16px;justify-content:space-between">
-          <span style="font-size:16.5px;font-weight:800;color:#15803d">Is my family’s data safe?</span>
-          <span class="faq-sign" style="font-size:22px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
-        </button>
-        <div class="faq-answer" style="display:none;padding:0 24px 22px;font-size:15px;line-height:1.65;color:#475569;white-space:pre-line">Yes. We never sell any family data. Parents sign into the app on any device with their own account and password. From there kids can sign in to their account with a simple PIN.</div>
-      </div>
-      <div class="faq-item" style="background:#fff;border:1px solid #e5ece7;border-radius:18px;box-shadow:0 1px 3px rgba(15,40,25,.06);margin-bottom:12px;overflow:hidden">
-        <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:20px 24px;display:flex;align-items:center;gap:16px;justify-content:space-between">
-          <span style="font-size:16.5px;font-weight:800;color:#15803d">What happens after the free trial?</span>
-          <span class="faq-sign" style="font-size:22px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
-        </button>
-        <div class="faq-answer" style="display:none;padding:0 24px 22px;font-size:15px;line-height:1.65;color:#475569;white-space:pre-line">If you do not cancel your subscription during the 14 day trial you will be billed based on the plan you chose, i.e either monthly or annually upfront.</div>
-      </div>
-      <div class="faq-item" style="background:#fff;border:1px solid #e5ece7;border-radius:18px;box-shadow:0 1px 3px rgba(15,40,25,.06);margin-bottom:12px;overflow:hidden">
-        <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:20px 24px;display:flex;align-items:center;gap:16px;justify-content:space-between">
-          <span style="font-size:16.5px;font-weight:800;color:#15803d">What happens if I cancel?</span>
-          <span class="faq-sign" style="font-size:22px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
-        </button>
-        <div class="faq-answer" style="display:none;padding:0 24px 22px;font-size:15px;line-height:1.65;color:#475569;white-space:pre-line">You can cancel anytime and keep access until the end of your billing period. We keep your family's app data for 60 days after cancellation in case you want to come back, then delete it permanently.</div>
-      </div>
-      <div class="faq-item" style="background:#fff;border:1px solid #e5ece7;border-radius:18px;box-shadow:0 1px 3px rgba(15,40,25,.06);margin-bottom:12px;overflow:hidden">
-        <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:20px 24px;display:flex;align-items:center;gap:16px;justify-content:space-between">
-          <span style="font-size:16.5px;font-weight:800;color:#15803d">Can more than one parent manage it?</span>
-          <span class="faq-sign" style="font-size:22px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
-        </button>
-        <div class="faq-answer" style="display:none;padding:0 24px 22px;font-size:15px;line-height:1.65;color:#475569;white-space:pre-line">Yes, simply share the login details and parents pin with your spouse and they will be able to log in and manage the account as well.</div>
-      </div>
-      <div class="faq-item" style="background:#fff;border:1px solid #e5ece7;border-radius:18px;box-shadow:0 1px 3px rgba(15,40,25,.06);margin-bottom:12px;overflow:hidden">
-        <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:20px 24px;display:flex;align-items:center;gap:16px;justify-content:space-between">
-          <span style="font-size:16.5px;font-weight:800;color:#15803d">Can I use my own currency?</span>
-          <span class="faq-sign" style="font-size:22px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
-        </button>
-        <div class="faq-answer" style="display:none;padding:0 24px 22px;font-size:15px;line-height:1.65;color:#475569;white-space:pre-line">Absolutely. You choose your preferred home currency in the settings and it automatically applies to all values in the app.</div>
+        <div class="faq-category-body" style="display:none;padding:0 12px 12px">
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">Operational question 1?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">Placeholder answer — to be replaced with real content.</div>
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">Operational question 2?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">Placeholder answer — to be replaced with real content.</div>
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">Operational question 3?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">Placeholder answer — to be replaced with real content.</div>
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">Operational question 4?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">Placeholder answer — to be replaced with real content.</div>
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">Operational question 5?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">Placeholder answer — to be replaced with real content.</div>
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">Operational question 6?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">Placeholder answer — to be replaced with real content.</div>
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">Operational question 7?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">Placeholder answer — to be replaced with real content.</div>
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">Operational question 8?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">Placeholder answer — to be replaced with real content.</div>
+          </div>
+          <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;overflow:hidden">
+            <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:15.5px;font-weight:800;color:#15803d">Operational question 9?</span>
+              <span class="faq-sign" style="font-size:20px;font-weight:800;color:#16a34a;flex:none;line-height:1">+</span>
+            </button>
+            <div class="faq-answer" style="display:none;padding:0 18px 18px;font-size:14.5px;line-height:1.65;color:#475569;white-space:pre-line">Placeholder answer — to be replaced with real content.</div>
+          </div>
+        </div>
       </div>
   </div>
 
@@ -328,13 +407,30 @@ Sprout does not require access to your bank account.</div>
 </div>
 </div>
 <script>
+document.querySelectorAll('.faq-category-toggle').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var cat = btn.closest('.faq-category');
+    var body = cat.querySelector('.faq-category-body');
+    var sign = btn.querySelector('.faq-sign');
+    var isOpen = body.style.display !== 'none';
+    document.querySelectorAll('.faq-category').forEach(function(c) {
+      c.querySelector('.faq-category-body').style.display = 'none';
+      c.querySelector('.faq-category-toggle .faq-sign').textContent = '+';
+    });
+    if (!isOpen) {
+      body.style.display = 'block';
+      sign.textContent = '−';
+    }
+  });
+});
 document.querySelectorAll('.faq-toggle').forEach(function(btn) {
   btn.addEventListener('click', function() {
     var item = btn.closest('.faq-item');
     var answer = item.querySelector('.faq-answer');
     var sign = item.querySelector('.faq-sign');
     var isOpen = answer.style.display !== 'none';
-    document.querySelectorAll('.faq-item').forEach(function(i) {
+    var scope = item.closest('.faq-category-body') || document;
+    scope.querySelectorAll('.faq-item').forEach(function(i) {
       i.querySelector('.faq-answer').style.display = 'none';
       i.querySelector('.faq-sign').textContent = '+';
     });
