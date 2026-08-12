@@ -1135,6 +1135,17 @@ function cycleAmountCeiling(fullAmount, period, startStr, endStr) {
     return Math.round((fullAmount || 0) * Math.min(1, actualDays / naturalDays) * 100) / 100;
 }
 function cycleAmountPaid(ceiling, pct) { return Math.round((ceiling || 0) * (pct || 0) / 100 * 100) / 100; }
+// A live, display-only estimate of what a kid would be paid if the cycle
+// closed right now — same maths as the switch-away preview, just re-run daily.
+// Not guaranteed to only go up: if new chores are assigned before they're
+// done, the underlying percentage (and this figure) can dip until they're caught up.
+function cycleTrendingEarned(db, kid) {
+    const period = getCyclePeriod(), anchor = getCycleAnchorDate();
+    const today = toLocalDateStr(new Date());
+    const ceiling = cycleAmountCeiling(kid.cycle_amount, period, anchor, today);
+    const { assigned, completed } = cycleWeightTotals(db, kid.id, anchor, today);
+    return cycleAmountPaid(ceiling, cyclePercent(assigned, completed));
+}
 
 // Closes out the current cycle once its natural end date has passed: pays each
 // kid their share, logs the cycle, applies any pending amount/period change,
@@ -2220,14 +2231,11 @@ function pOverview(db) {
     const cycleMode = isCycleMode();
     let weekPct, statCardLabel, statCardFooter;
     if (cycleMode) {
-        const period = getCyclePeriod(), anchor = getCycleAnchorDate();
-        const totals = db.kids.reduce((s, k) => {
-            const t = cycleWeightTotals(db, k.id, anchor, cycleEndDate(period, anchor));
-            return { assigned: s.assigned + t.assigned, completed: s.completed + t.completed };
-        }, { assigned: 0, completed: 0 });
-        weekPct = cyclePercent(totals.assigned, totals.completed);
-        statCardLabel = `This ${CYCLE_PERIOD_LABELS[period].toLowerCase()} cycle`;
-        statCardFooter = `<span style="font-size:15px;font-weight:800;color:var(--color-green-700)">${weekPct}% of chores done</span>`;
+        const totalTarget   = db.kids.reduce((s, k) => s + (k.cycle_amount || 0), 0);
+        const totalTrending = db.kids.reduce((s, k) => s + cycleTrendingEarned(db, k), 0);
+        weekPct = totalTarget > 0 ? Math.min(100, Math.round(totalTrending / totalTarget * 100)) : 0;
+        statCardLabel = 'Estimated earnings this cycle';
+        statCardFooter = `${R(totalTrending)} <span style="font-size:13px;font-weight:700;color:var(--color-text-secondary)">of</span> <span style="font-size:15px;font-weight:800;color:var(--color-green-700)">${R(totalTarget)}</span>`;
     } else {
         const totalWeekly = db.kids.reduce((s, k) => s + weeklyPossible(db, k.id), 0);
         const totalEarned = db.kids.reduce((s, k) => s + weeklyEarned(db, k.id), 0);
@@ -2373,11 +2381,11 @@ function pKids(db) {
             const cycleMode = isCycleMode();
             let pct, statLabel, statValue;
             if (cycleMode) {
-                const period = getCyclePeriod(), anchor = getCycleAnchorDate();
-                const { assigned, completed } = cycleWeightTotals(db, k.id, anchor, cycleEndDate(period, anchor));
-                pct = cyclePercent(assigned, completed);
+                const trending = cycleTrendingEarned(db, k);
+                const target = k.cycle_amount || 0;
+                pct = target > 0 ? Math.min(100, Math.round(trending / target * 100)) : 0;
                 statLabel = 'This cycle';
-                statValue = `${pct}% of chores`;
+                statValue = `${R(trending)} / ${R(target)}`;
             } else {
                 const earned   = weeklyEarned(db, k.id);
                 const possible = weeklyPossible(db, k.id);
@@ -3096,11 +3104,11 @@ function vKid() {
             const cycleMode = isCycleMode();
             let pct, earningsLabel, earningsFooter;
             if (cycleMode) {
-                const period = getCyclePeriod(), anchor = getCycleAnchorDate();
-                const { assigned, completed } = cycleWeightTotals(db, kid.id, anchor, cycleEndDate(period, anchor));
-                pct = cyclePercent(assigned, completed);
-                earningsLabel = `This ${CYCLE_PERIOD_LABELS[period].toLowerCase()} cycle`;
-                earningsFooter = `<span style="font-size:12px;font-weight:700;color:${ac.text}">chores done</span>`;
+                const trending = cycleTrendingEarned(db, kid);
+                const target = kid.cycle_amount || 0;
+                pct = target > 0 ? Math.min(100, Math.round(trending / target * 100)) : 0;
+                earningsLabel = 'Estimated earnings this cycle';
+                earningsFooter = `${R(trending)} <span style="font-size:12px;font-weight:700;color:${ac.text}">of</span> <span style="font-size:13px;font-weight:800;color:${ac.header}">${R(target)}</span>`;
             } else {
                 const earned   = weeklyEarned(db, kid.id);
                 const possible = weeklyPossible(db, kid.id);
@@ -3126,6 +3134,7 @@ function vKid() {
                 </div>
               </div>
               <p style="font-family:var(--font-family);font-size:13px;font-weight:800;color:${ac.header}">${earningsFooter}</p>
+              ${cycleMode ? `<p style="font-family:var(--font-family);font-size:10px;font-weight:600;color:${ac.text};opacity:0.85;line-height:1.3">Updates as chores are approved — added to balance when the cycle ends</p>` : ''}
             </div>`;
             const treeRing = nextThresh ? `
             <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;text-align:center">
@@ -3466,14 +3475,10 @@ function renderModal() {
     }
 
     if (type === 'switch-to-per-chore') {
-        const period = getCyclePeriod();
         const anchor = getCycleAnchorDate();
-        const today = toLocalDateStr(new Date());
         const rows = db.kids.map(k => {
-            const ceiling = cycleAmountCeiling(k.cycle_amount, period, anchor, today);
-            const { assigned, completed } = cycleWeightTotals(db, k.id, anchor, today);
-            const pct = cyclePercent(assigned, completed);
-            return { kid: k, pct, amountPaid: cycleAmountPaid(ceiling, pct) };
+            const { assigned, completed } = cycleWeightTotals(db, k.id, anchor, toLocalDateStr(new Date()));
+            return { kid: k, pct: cyclePercent(assigned, completed), amountPaid: cycleTrendingEarned(db, k) };
         });
         const total = rows.reduce((s, r) => s + r.amountPaid, 0);
         body = `
