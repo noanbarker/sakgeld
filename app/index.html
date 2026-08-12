@@ -430,7 +430,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
 
 let currentUser = null;
-let cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [] };
+let cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [] };
 const DB = { load: () => cache };
 
 // ─── PADDLE ──────────────────────────────────────────────────────
@@ -544,8 +544,8 @@ const COUNTRIES = [
 let hasParentPin = false;
 async function loadCache() {
     const uid = currentUser.id;
-    const [kRes, cRes, compRes, txRes, bmRes, rwRes, rcRes, distRes, pinRes] = await Promise.all([
-        sb.from('kids').select('id,user_id,name,emoji,balance,created_at,color_key,date_of_birth,last_distribution_at').eq('user_id', uid),
+    const [kRes, cRes, compRes, txRes, bmRes, rwRes, rcRes, distRes, chRes, pinRes] = await Promise.all([
+        sb.from('kids').select('id,user_id,name,emoji,balance,created_at,color_key,date_of_birth,last_distribution_at,cycle_amount,cycle_amount_pending').eq('user_id', uid),
         sb.from('chores').select('*').eq('user_id', uid),
         sb.from('completions').select('*').eq('user_id', uid),
         sb.from('transactions').select('*').eq('user_id', uid),
@@ -553,6 +553,7 @@ async function loadCache() {
         sb.from('rewards').select('*').eq('user_id', uid),
         sb.from('reward_completions').select('*').eq('user_id', uid),
         sb.from('distributions').select('*').eq('user_id', uid),
+        sb.from('cycle_history').select('*').eq('user_id', uid),
         sb.rpc('has_parent_pin'),
     ]);
     hasParentPin = !!pinRes.data;
@@ -565,6 +566,7 @@ async function loadCache() {
         rewards: (rwRes.data || []).map(r => ({ ...r, assignedTo: r.assigned_to })),
         rewardCompletions: (rcRes.data || []).map(c => ({ ...c, rewardId: c.reward_id, kidId: c.kid_id, claimedAt: c.claimed_at, approvedAt: c.approved_at })),
         distributions: (distRes.data || []).map(d => ({ ...d, kidId: d.kid_id, createdAt: d.created_at })),
+        cycleHistory: (chRes.data || []).map(h => ({ ...h, kidId: h.kid_id, periodType: h.period_type, startDate: h.start_date, endDate: h.end_date, weightCompleted: h.weight_completed, weightAssigned: h.weight_assigned, amountCeiling: h.amount_ceiling, amountPaid: h.amount_paid, createdAt: h.created_at })),
     };
 }
 
@@ -582,8 +584,8 @@ async function initApp() {
             S.authMode = intent === 'pin' ? 'reset-pin' : 'reset';
             render(); return;
         }
-        if (currentUser) { await loadCache(); }
-        else { cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [] }; S.view = 'home'; }
+        if (currentUser) { await loadCache(); await checkCycleCloseOut(); }
+        else { cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [] }; S.view = 'home'; }
         render();
     });
     const { data: { session } } = await sb.auth.getSession();
@@ -592,6 +594,7 @@ async function initApp() {
         const savedCurrency = session.user?.user_metadata?.currency;
         if (savedCurrency) localStorage.setItem('sprout_currency', savedCurrency);
         await loadCache();
+        await checkCycleCloseOut();
     }
     render();
 }
@@ -1053,12 +1056,136 @@ function choreAssignmentLabel(c, kids) {
     return kids.find(k => k.id === c.assignedTo)?.name || '?';
 }
 
+// ─── ALLOWANCE-PER-CYCLE SYSTEM ──────────────────────────────────
+// Family-wide settings (stored alongside currency in user_metadata):
+//   allowance_mode        'per_chore' | 'per_cycle'
+//   cycle_period           'weekly' | 'biweekly' | 'monthly'
+//   cycle_period_pending    queued period change, applied at the next cycle close
+//   cycle_anchor_date       start date (YYYY-MM-DD) of the cycle currently running
+const CYCLE_PERIOD_LABELS = { weekly: 'Weekly', biweekly: 'Biweekly', monthly: 'Monthly' };
+function getAllowanceMode() { return currentUser?.user_metadata?.allowance_mode || 'per_chore'; }
+function isCycleMode() { return getAllowanceMode() === 'per_cycle'; }
+function getCyclePeriod() { return currentUser?.user_metadata?.cycle_period || 'weekly'; }
+function getCyclePeriodPending() { return currentUser?.user_metadata?.cycle_period_pending || null; }
+function getCycleAnchorDate() { return currentUser?.user_metadata?.cycle_anchor_date || toLocalDateStr(new Date()); }
+
+// The natural boundary a cycle ends on: Sunday for weekly (and the short first
+// biweekly cycle), the Sunday one week later for a biweekly cycle that starts
+// on a Monday, and the last day of the month for monthly. This one rule covers
+// both a clean full cycle and a short first cycle after activating mid-period.
+function cycleEndDate(period, startDateStr) {
+    const start = new Date(startDateStr + 'T00:00:00');
+    if (period === 'monthly') {
+        return toLocalDateStr(new Date(start.getFullYear(), start.getMonth() + 1, 0));
+    }
+    const day = start.getDay(); // 0 = Sun .. 6 = Sat
+    const end = new Date(start);
+    end.setDate(start.getDate() + (day === 0 ? 0 : 7 - day));
+    if (period === 'biweekly' && day === 1) end.setDate(end.getDate() + 7); // full 2nd week, only when starting clean on a Monday
+    return toLocalDateStr(end);
+}
+function cycleDayCount(period, startDateStr) {
+    const start = new Date(startDateStr + 'T00:00:00');
+    const end = new Date(cycleEndDate(period, startDateStr) + 'T00:00:00');
+    return Math.round((end - start) / 86400000) + 1;
+}
+// Full-length day count for the period type — the proration denominator.
+function naturalCycleDayCount(period, refDateStr) {
+    if (period === 'monthly') {
+        const d = new Date(refDateStr + 'T00:00:00');
+        return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    }
+    return period === 'biweekly' ? 14 : 7;
+}
+function choreWeight(c) { return c.weight == null ? 1 : (+c.weight || 1); }
+
+// Weighted chores-assigned vs chores-completed for a kid over [startStr, endStr]
+// inclusive. Quick (one-off) chores are excluded — they're a flat bonus, never
+// part of the weighted cycle total. Days after today aren't counted yet.
+function cycleWeightTotals(db, kidId, startStr, endStr) {
+    let assigned = 0, completed = 0;
+    const start = new Date(startStr + 'T00:00:00');
+    const end = new Date(endStr + 'T00:00:00');
+    const todayStr = toLocalDateStr(new Date());
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dStr = toLocalDateStr(d);
+        if (dStr > todayStr) continue;
+        const scheduled = db.chores.filter(c => !c.oneOff && choreAssignedTo(c, kidId) && choreIsForDate(c, d) && choreScheduleWasActiveOn(c, d));
+        for (const chore of scheduled) {
+            const w = choreWeight(chore);
+            assigned += w;
+            const done = db.completions.some(comp => comp.choreId === chore.id && comp.kidId === kidId && comp.dueDate === dStr && comp.approved && !comp.rejected);
+            if (done) completed += w;
+        }
+    }
+    return { assigned, completed };
+}
+function cyclePercent(assigned, completed) {
+    if (assigned <= 0) return 0;
+    return Math.min(100, Math.ceil((completed / assigned) * 100));
+}
+// The amount ceiling for a cycle spanning [startStr, endStr] — a kid's full
+// per-cycle amount, scaled down when that span is shorter than a natural full
+// period (a first cycle after activating mid-period, or an early close-out).
+function cycleAmountCeiling(fullAmount, period, startStr, endStr) {
+    const naturalDays = naturalCycleDayCount(period, startStr);
+    const start = new Date(startStr + 'T00:00:00');
+    const end = new Date(endStr + 'T00:00:00');
+    const actualDays = Math.round((end - start) / 86400000) + 1;
+    return Math.round((fullAmount || 0) * Math.min(1, actualDays / naturalDays) * 100) / 100;
+}
+function cycleAmountPaid(ceiling, pct) { return Math.round((ceiling || 0) * (pct || 0) / 100 * 100) / 100; }
+
+// Closes out the current cycle once its natural end date has passed: pays each
+// kid their share, logs the cycle, applies any pending amount/period change,
+// and advances the family's cycle_anchor_date to the day after. Lazy and
+// idempotent-by-date, same pattern as writeMissedChores — checked once per app load.
+async function checkCycleCloseOut() {
+    if (!isCycleMode()) return;
+    const period = getCyclePeriod();
+    const anchor = getCycleAnchorDate();
+    const end = cycleEndDate(period, anchor);
+    const today = toLocalDateStr(new Date());
+    if (today <= end) return;
+    const db = DB.load();
+    for (const kid of db.kids) {
+        const ceiling = cycleAmountCeiling(kid.cycle_amount, period, anchor, end);
+        const { assigned, completed } = cycleWeightTotals(db, kid.id, anchor, end);
+        const pct = cyclePercent(assigned, completed);
+        const amountPaid = cycleAmountPaid(ceiling, pct);
+        const historyId = uid();
+        const createdAt = new Date(end + 'T23:59:59').toISOString();
+        const desc = `${CYCLE_PERIOD_LABELS[period]} allowance (${pct}% of chores)`;
+        if (amountPaid > 0) {
+            const newBalance = (kid.balance || 0) + amountPaid;
+            const txId = uid();
+            await sb.from('kids').update({ balance: newBalance }).eq('id', kid.id).eq('user_id', currentUser.id);
+            await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, kid_id: kid.id, amount: amountPaid, type: 'cycle_allowance', description: desc, created_at: createdAt });
+            kid.balance = newBalance;
+            cache.transactions.push({ id: txId, kidId: kid.id, amount: amountPaid, type: 'cycle_allowance', description: desc, createdAt });
+        }
+        await sb.from('cycle_history').insert({ id: historyId, user_id: currentUser.id, kid_id: kid.id, period_type: period, start_date: anchor, end_date: end, weight_completed: completed, weight_assigned: assigned, percent: pct, amount_ceiling: ceiling, amount_paid: amountPaid, created_at: createdAt });
+        cache.cycleHistory.push({ id: historyId, kidId: kid.id, periodType: period, startDate: anchor, endDate: end, weightCompleted: completed, weightAssigned: assigned, percent: pct, amountCeiling: ceiling, amountPaid: amountPaid, createdAt });
+
+        const nextAmount = kid.cycle_amount_pending != null ? kid.cycle_amount_pending : kid.cycle_amount;
+        await sb.from('kids').update({ cycle_amount: nextAmount, cycle_amount_pending: null }).eq('id', kid.id).eq('user_id', currentUser.id);
+        kid.cycle_amount = nextAmount; kid.cycle_amount_pending = null;
+    }
+    const nextPeriod = getCyclePeriodPending() || period;
+    const nextAnchorDate = new Date(end + 'T00:00:00'); nextAnchorDate.setDate(nextAnchorDate.getDate() + 1);
+    const nextAnchor = toLocalDateStr(nextAnchorDate);
+    const { data } = await sb.auth.updateUser({ data: { cycle_period: nextPeriod, cycle_period_pending: null, cycle_anchor_date: nextAnchor } });
+    if (data?.user) currentUser = data.user;
+    render();
+}
+
 function openModal(type, data = {}) {
     const defaultEmoji = (type === 'add-kid' || type === 'edit-kid') ? '😀' : '1';
     S.selectedEmoji    = data.emoji     || defaultEmoji;
     S.selectedColor    = data.color_key || 'blue';
     S.selectedSchedule = data.schedule  || 'daily';
     S.selectedDays     = data.days      ? [...data.days] : [];
+    S.selectedWeight   = data.weight == null ? 1 : (+data.weight || 1);
     if (type === 'quick-task') {
         S.selectedKids = [];
     } else if (type === 'add-bonus') {
@@ -1123,6 +1250,7 @@ function snapModalInputs() {
 function pickExpenseKid(kidId) { snapModalInputs(); S.modal.data = { ...S.modal.data, kidId }; render(); }
 function pickEmoji(em) { snapModalInputs(); S.selectedEmoji = em; render(); }
 function setSchedule(s) { snapModalInputs(); S.selectedSchedule = s; render(); }
+function setWeight(w) { snapModalInputs(); S.selectedWeight = w; render(); }
 function setAllKids() { snapModalInputs(); S.selectedKids = 'all'; render(); }
 function toggleKidAssignment(id) {
     snapModalInputs();
@@ -1993,12 +2121,15 @@ function pOverview(db) {
     const kidRows = sortedKids.map((k, i) => {
         const ac = kidAccent(k);
         const kBalance = k.balance || 0;
+        const subtitle = isCycleMode()
+            ? `Cycle amount: ${R(k.cycle_amount)}`
+            : `Weekly potential: ${R(weeklyPossible(db, k.id))}`;
         return `
         <div class="card flex items-center gap-3" style="border-color:${ac.border}">
           <div style="width:40px;height:40px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${kidIcon(k)}</div>
           <div class="flex-1">
             <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:14px">${esc(k.name)}</p>
-            <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">Weekly potential: ${R(weeklyPossible(db, k.id))}</p>
+            <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${subtitle}</p>
           </div>
           <div class="text-right">
             <p style="font-family:var(--font-family);font-weight:800;color:${ac.text};font-size:15px">${R(kBalance)}</p>
@@ -2014,17 +2145,20 @@ function pOverview(db) {
         .filter(g => g.comps.length > 0);
     const pendingRows = pendingByKid.map(({ kid: k, comps }) => {
         const ac = kidAccent(k);
+        const cycleMode = isCycleMode();
         const total = comps.reduce((s, c) => {
             const chore = db.chores.find(x => x.id === c.choreId);
-            return s + (chore?.value || 0);
+            if (!chore) return s;
+            return s + (cycleMode && !chore.oneOff ? 0 : (chore.value || 0));
         }, 0);
         const rows = comps.map(c => {
             const chore = db.chores.find(x => x.id === c.choreId);
+            const detail = cycleMode && chore && !chore.oneOff ? `${choreWeight(chore)}× weighting` : R(chore?.value);
             return `
             <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;background:var(--color-background)">
               <div class="flex-1 min-w-0">
                 <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:13px">${esc(chore?.name) || 'Deleted chore'}</p>
-                <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary);margin-top:1px">${R(chore?.value)} · ${dateStr(c.completedAt)}</p>
+                <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary);margin-top:1px">${detail} · ${dateStr(c.completedAt)}</p>
               </div>
               <button onclick="approveChore('${c.id}')" title="Approve" style="background:var(--color-green-100);color:var(--color-green-700);padding:6px 11px;border-radius:8px;border:none;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center">${uiIcon('check', 13, 3)}</button>
               <button onclick="rejectChore('${c.id}')" title="Reject" style="background:var(--color-coral-bg);color:var(--color-coral-text);padding:6px 11px;border-radius:8px;border:none;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center">${uiIcon('cross', 13, 3)}</button>
@@ -2036,7 +2170,7 @@ function pOverview(db) {
             <div style="width:32px;height:32px;background:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;border:1.5px solid ${ac.border}">${kidIcon(k)}</div>
             <div class="flex-1">
               <p style="font-family:var(--font-family);font-weight:800;color:${ac.text};font-size:13px">${esc(k.name)}</p>
-              <p style="font-family:var(--font-family);font-size:11px;color:${ac.text};opacity:0.75">${comps.length} task${comps.length > 1 ? 's' : ''} · ${R(total)} total</p>
+              <p style="font-family:var(--font-family);font-size:11px;color:${ac.text};opacity:0.75">${comps.length} task${comps.length > 1 ? 's' : ''}${cycleMode ? (total > 0 ? ` · ${R(total)} from quick chores` : '') : ` · ${R(total)} total`}</p>
             </div>
             <button onclick="approveAllForKid('${k.id}')" style="background:${ac.header};color:white;padding:6px 12px;border-radius:8px;font-family:var(--font-family);font-size:11px;font-weight:800;border:none;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;gap:5px">${uiIcon('check', 11, 3)} Approve all</button>
           </div>
@@ -2083,16 +2217,35 @@ function pOverview(db) {
         </div>`;
     }).join('');
 
-    const totalWeekly   = db.kids.reduce((s, k) => s + weeklyPossible(db, k.id), 0);
-    const totalEarned   = db.kids.reduce((s, k) => s + weeklyEarned(db, k.id), 0);
+    const cycleMode = isCycleMode();
+    let weekPct, statCardLabel, statCardFooter;
+    if (cycleMode) {
+        const period = getCyclePeriod(), anchor = getCycleAnchorDate();
+        const totals = db.kids.reduce((s, k) => {
+            const t = cycleWeightTotals(db, k.id, anchor, cycleEndDate(period, anchor));
+            return { assigned: s.assigned + t.assigned, completed: s.completed + t.completed };
+        }, { assigned: 0, completed: 0 });
+        weekPct = cyclePercent(totals.assigned, totals.completed);
+        statCardLabel = `This ${CYCLE_PERIOD_LABELS[period].toLowerCase()} cycle`;
+        statCardFooter = `<span style="font-size:15px;font-weight:800;color:var(--color-green-700)">${weekPct}% of chores done</span>`;
+    } else {
+        const totalWeekly = db.kids.reduce((s, k) => s + weeklyPossible(db, k.id), 0);
+        const totalEarned = db.kids.reduce((s, k) => s + weeklyEarned(db, k.id), 0);
+        weekPct = totalWeekly > 0 ? Math.min(100, Math.round(totalEarned / totalWeekly * 100)) : 0;
+        statCardLabel = 'Earnings this week';
+        statCardFooter = `${R(totalEarned)} <span style="font-size:13px;font-weight:700;color:var(--color-text-secondary)">of</span> <span style="font-size:15px;font-weight:800;color:var(--color-green-700)">${R(totalWeekly)}</span>`;
+    }
     const totalBalances = db.kids.reduce((s, k) => s + (k.balance || 0), 0);
-    const pendingValue  = pending.reduce((s, c) => { const ch = db.chores.find(x => x.id === c.choreId); return s + (ch?.value || 0); }, 0);
-    const weekPct       = totalWeekly > 0 ? Math.min(100, Math.round(totalEarned / totalWeekly * 100)) : 0;
+    const pendingValue  = pending.reduce((s, c) => {
+        const ch = db.chores.find(x => x.id === c.choreId);
+        if (!ch) return s;
+        return s + (cycleMode && !ch.oneOff ? 0 : (ch.value || 0));
+    }, 0);
     const ringR = 37, ringC = 2 * Math.PI * ringR, ringOffset = ringC * (1 - weekPct / 100);
     const weeklyCard  = db.kids.length === 0 ? '' : `
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
       <div class="stat-card" style="grid-column: span 2 / span 2; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center; background:#dcfce7; border-color:#16a34a">
-        <p class="pr-section-label">Earnings this week</p>
+        <p class="pr-section-label">${statCardLabel}</p>
         <div style="position:relative;width:88px;height:88px">
           <svg width="88" height="88" viewBox="0 0 88 88" style="transform:rotate(-90deg)">
             <circle cx="44" cy="44" r="${ringR}" fill="none" stroke="#ffffff" stroke-width="10"/>
@@ -2105,12 +2258,12 @@ function pOverview(db) {
             <p style="font-family:var(--font-family);font-size:20px;font-weight:800;color:var(--color-green-700);line-height:1">${weekPct}%</p>
           </div>
         </div>
-        <p style="font-family:var(--font-family);font-size:15px;font-weight:800;color:var(--color-green-700);margin-top:2px">${R(totalEarned)} <span style="font-size:13px;font-weight:700;color:var(--color-text-secondary)">of</span> <span style="font-size:15px;font-weight:800;color:var(--color-green-700)">${R(totalWeekly)}</span></p>
+        <p style="font-family:var(--font-family);font-size:15px;font-weight:800;color:var(--color-green-700);margin-top:2px">${statCardFooter}</p>
       </div>
       <div class="stat-card" style="background:rgba(244,63,94,0.22);border-color:#f43f5e">
         <p class="pr-section-label">Pending approvals</p>
         <p style="font-family:var(--font-family);font-size:24px;font-weight:800;color:#f43f5e;margin-top:4px">${pending.length}</p>
-        <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:8px">Worth ${R(pendingValue)}</p>
+        <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:8px">${pendingValue > 0 ? `Worth ${R(pendingValue)}` : 'Waiting for review'}</p>
       </div>
       <div class="stat-card" style="background:rgba(37,99,235,0.22);border-color:#2563eb">
         <p class="pr-section-label">Total balances</p>
@@ -2185,12 +2338,16 @@ function pChores(db) {
         : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           ${visibleChores.map(c => {
             const who = choreAssignmentLabel(c, db.kids);
+            const needsValue = !isCycleMode() && !c.oneOff && !c.value;
+            const valueLine = c.oneOff || !isCycleMode()
+                ? `${who} · ${R(c.value)}${needsValue ? ` <span style="color:var(--color-coral-text);font-weight:700">— needs an amount</span>` : ''}`
+                : `${who} · ${choreWeight(c)}× weighting`;
             return `
             <div class="card flex items-center gap-3">
               <div style="width:96px;height:96px;background:var(--color-green-50);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${choreIconSVG(c.emoji, 72)}</div>
               <div class="flex-1 min-w-0">
                 <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary)">${esc(c.name)}</p>
-                <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${who} · ${R(c.value)}</p>
+                <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${valueLine}</p>
                 <p style="font-family:var(--font-family);font-size:12px;color:var(--color-green-600);font-weight:600;margin-top:2px">${choreScheduleLabel(c)}</p>
               </div>
               <div class="flex flex-col gap-1 flex-shrink-0">
@@ -2213,9 +2370,21 @@ function pKids(db) {
         : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
           ${db.kids.map((k, i) => {
             const ac = kidAccent(k);
-            const earned   = weeklyEarned(db, k.id);
-            const possible = weeklyPossible(db, k.id);
-            const pct      = possible > 0 ? Math.min(100, Math.round(earned / possible * 100)) : 0;
+            const cycleMode = isCycleMode();
+            let pct, statLabel, statValue;
+            if (cycleMode) {
+                const period = getCyclePeriod(), anchor = getCycleAnchorDate();
+                const { assigned, completed } = cycleWeightTotals(db, k.id, anchor, cycleEndDate(period, anchor));
+                pct = cyclePercent(assigned, completed);
+                statLabel = 'This cycle';
+                statValue = `${pct}% of chores`;
+            } else {
+                const earned   = weeklyEarned(db, k.id);
+                const possible = weeklyPossible(db, k.id);
+                pct      = possible > 0 ? Math.min(100, Math.round(earned / possible * 100)) : 0;
+                statLabel = 'This week';
+                statValue = `${R(earned)} / ${R(possible)}`;
+            }
             return `
             <div class="card">
               <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
@@ -2234,9 +2403,14 @@ function pKids(db) {
                   <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">Balance</p>
                   <p style="font-family:var(--font-family);font-weight:800;color:${ac.text}">${R(k.balance)}</p>
                 </div>
+                ${cycleMode ? `
                 <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
-                  <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">This week</p>
-                  <p style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-primary)">${R(earned)} / ${R(possible)}</p>
+                  <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">Cycle amount</p>
+                  <p style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-primary)">${R(k.cycle_amount)}${k.cycle_amount_pending != null ? ` <span style="color:var(--color-text-muted)">(then ${R(k.cycle_amount_pending)})</span>` : ''}</p>
+                </div>` : ''}
+                <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+                  <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${statLabel}</p>
+                  <p style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-primary)">${statValue}</p>
                 </div>
                 <div style="background:${ac.bg};border-radius:99px;height:6px;overflow:hidden">
                   <div style="background:${ac.header};width:${pct}%;height:100%;border-radius:99px"></div>
@@ -2586,6 +2760,7 @@ function pSettings() {
         { stage: 4, name: 'Forest',     range: `${R(t.t4)} and above` },
     ];
     const sections = [
+        { id: 'allowance', title: 'Allowance System',         subtitle: isCycleMode() ? `Allowance per cycle — ${CYCLE_PERIOD_LABELS[getCyclePeriod()]}` : 'Value per chore' },
         { id: 'currency', title: 'Currency / Value Display', subtitle: 'Choose how values are displayed' },
         { id: 'tree',     title: 'Tree Growth Stages',       subtitle: 'Set the balance thresholds for each tree stage' },
         { id: 'pin',      title: 'Parent PIN',               subtitle: hasParentPin ? 'A PIN is currently set' : 'No PIN set' },
@@ -2617,6 +2792,50 @@ function pSettings() {
     }
 
     const backBtn = `<button onclick="openSettingsSection(null)" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:16px;background:none;border:none;cursor:pointer">← Back to Settings</button>`;
+
+    if (S.settingsSection === 'allowance') {
+        const mode = getAllowanceMode();
+        const period = getCyclePeriod();
+        const pendingPeriod = getCyclePeriodPending();
+        const anchor = getCycleAnchorDate();
+        const end = cycleEndDate(period, anchor);
+        return `
+        <div style="max-width:600px">
+          ${backBtn}
+          <div class="card mb-4">
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Allowance System</p>
+            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">Choose how chores turn into allowance for your kids. This applies to the whole family — each child can still get a different amount.</p>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <button onclick="chooseAllowanceMode('per_chore')" type="button"
+                style="text-align:left;padding:14px 16px;border-radius:14px;border:2px solid ${mode==='per_chore'?'var(--color-green-600)':'var(--color-border)'};background:${mode==='per_chore'?'var(--color-green-100)':'white'};cursor:pointer">
+                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Value per chore</p>
+                <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">Each chore has its own amount. A kid earns it the moment that chore is approved.</p>
+              </button>
+              <button onclick="chooseAllowanceMode('per_cycle')" type="button"
+                style="text-align:left;padding:14px 16px;border-radius:14px;border:2px solid ${mode==='per_cycle'?'var(--color-green-600)':'var(--color-border)'};background:${mode==='per_cycle'?'var(--color-green-100)':'white'};cursor:pointer">
+                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Allowance per cycle</p>
+                <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">Set a total amount for the week, fortnight, or month. A kid's share is worked out from the percentage of their chores they complete by the end of the cycle — nothing pays out until then.</p>
+              </button>
+            </div>
+          </div>
+          ${mode === 'per_cycle' ? `
+          <div class="card">
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Cycle Length</p>
+            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">Changing your cycle length won't affect the cycle that's already running — it'll only apply once the next one starts.</p>
+            <select onchange="queueCyclePeriodChange(this.value)">
+              ${Object.keys(CYCLE_PERIOD_LABELS).map(p => `<option value="${p}" ${p===period?'selected':''}>${CYCLE_PERIOD_LABELS[p]}</option>`).join('')}
+            </select>
+            <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:12px">This cycle runs from <strong>${dateStr(anchor)}</strong> to <strong>${dateStr(end)}</strong>, and closes out automatically once that date passes.</p>
+            ${pendingPeriod ? `
+            <div style="margin-top:14px;padding:12px 14px;background:#fef9c3;border:1.5px solid #fde68a;border-radius:12px">
+              <p style="font-family:var(--font-family);font-size:13px;font-weight:800;color:#78350f">Starting next cycle: ${CYCLE_PERIOD_LABELS[pendingPeriod]}</p>
+              <p style="font-family:var(--font-family);font-size:12px;color:#92400e;margin-top:2px">Each child's amount for the new cycle can be set on their profile under Kids.</p>
+              <button onclick="cancelPendingCyclePeriod()" style="font-family:var(--font-family);font-size:12px;font-weight:700;color:#92400e;background:none;border:1.5px solid #fde68a;border-radius:8px;padding:4px 10px;cursor:pointer;margin-top:8px">Cancel this change</button>
+            </div>` : ''}
+            <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:14px">Each child's amount for this cycle is set on their profile under Kids.</p>
+          </div>` : ''}
+        </div>`;
+    }
 
     if (S.settingsSection === 'currency') {
         return `
@@ -2874,14 +3093,26 @@ function vKid() {
       <div class="sp-kid-content" style="flex:1;overflow:auto;padding:24px 32px;background:var(--color-background)">
         <div class="max-w-5xl mx-auto">
         ${(() => {
-            const earned   = weeklyEarned(db, kid.id);
-            const possible = weeklyPossible(db, kid.id);
-            const pct      = possible > 0 ? Math.min(100, Math.round(earned / possible * 100)) : 0;
+            const cycleMode = isCycleMode();
+            let pct, earningsLabel, earningsFooter;
+            if (cycleMode) {
+                const period = getCyclePeriod(), anchor = getCycleAnchorDate();
+                const { assigned, completed } = cycleWeightTotals(db, kid.id, anchor, cycleEndDate(period, anchor));
+                pct = cyclePercent(assigned, completed);
+                earningsLabel = `This ${CYCLE_PERIOD_LABELS[period].toLowerCase()} cycle`;
+                earningsFooter = `<span style="font-size:12px;font-weight:700;color:${ac.text}">chores done</span>`;
+            } else {
+                const earned   = weeklyEarned(db, kid.id);
+                const possible = weeklyPossible(db, kid.id);
+                pct      = possible > 0 ? Math.min(100, Math.round(earned / possible * 100)) : 0;
+                earningsLabel = 'Earnings this week';
+                earningsFooter = `${R(earned)} <span style="font-size:12px;font-weight:700;color:${ac.text}">of</span> <span style="font-size:13px;font-weight:800;color:${ac.header}">${R(possible)}</span>`;
+            }
             const ringR = 26, ringC = 2 * Math.PI * ringR, ringOffset = ringC * (1 - pct / 100);
             const treeRingOffset = ringC * (1 - stagePct / 100);
             const earningsRing = `
             <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;text-align:center">
-              <p class="pr-section-label" style="color:${ac.text}">Earnings this week</p>
+              <p class="pr-section-label" style="color:${ac.text}">${earningsLabel}</p>
               <div style="position:relative;width:64px;height:64px">
                 <svg width="64" height="64" viewBox="0 0 64 64" style="transform:rotate(-90deg)">
                   <circle cx="32" cy="32" r="${ringR}" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="8"/>
@@ -2894,7 +3125,7 @@ function vKid() {
                   <p style="font-family:var(--font-family);font-size:14px;font-weight:800;color:${ac.header};line-height:1">${pct}%</p>
                 </div>
               </div>
-              <p style="font-family:var(--font-family);font-size:13px;font-weight:800;color:${ac.header}">${R(earned)} <span style="font-size:12px;font-weight:700;color:${ac.text}">of</span> <span style="font-size:13px;font-weight:800;color:${ac.header}">${R(possible)}</span></p>
+              <p style="font-family:var(--font-family);font-size:13px;font-weight:800;color:${ac.header}">${earningsFooter}</p>
             </div>`;
             const treeRing = nextThresh ? `
             <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;text-align:center">
@@ -2944,7 +3175,7 @@ function vKid() {
                     <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary)">${esc(c.name)}</p>
                     ${c.description ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${esc(c.description)}</p>` : ''}
                     <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:4px">
-                      <p style="font-family:var(--font-family);color:${ac.header};font-weight:800;white-space:nowrap">+ ${R(c.value)}</p>
+                      <p style="font-family:var(--font-family);color:${ac.header};font-weight:800;white-space:nowrap">${c.oneOff || !isCycleMode() ? `+ ${R(c.value)}` : `${choreWeight(c)}× weighting`}</p>
                       <span style="font-size:10px;background:${ac.bg};color:${ac.text};border-radius:6px;padding:2px 7px;font-family:var(--font-family);font-weight:700;white-space:nowrap">${choreScheduleLabel(c)}</span>
                     </div>
                   </div>
@@ -2963,7 +3194,7 @@ function vKid() {
                 <div class="flex-1 min-w-0">
                   <p style="font-family:var(--font-family);font-weight:800;color:#92400e">${esc(chore?.name) || 'Deleted chore'}</p>
                   <p style="font-family:var(--font-family);font-size:12px;color:#b45309;margin-top:2px">Waiting for parent ⏳</p>
-                  <p style="font-family:var(--font-family);font-weight:800;color:var(--color-warning);margin-top:4px">+ ${R(chore?.value)}</p>
+                  <p style="font-family:var(--font-family);font-weight:800;color:var(--color-warning);margin-top:4px">${chore?.oneOff || !isCycleMode() ? `+ ${R(chore?.value)}` : `${choreWeight(chore || {})}× weighting`}</p>
                 </div>
               </div>`;
             }).join('')}
@@ -3111,6 +3342,20 @@ function renderModal() {
         <input id="k-pin" placeholder="${e ? 'Leave blank to keep current PIN' : '4-digit PIN'}" maxlength="4" inputmode="numeric" value="" class="mb-3">
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Date of birth</p>
         <input id="k-dob" type="date" value="${data.date_of_birth||''}" max="${new Date().toISOString().slice(0,10)}" class="mb-4">
+        ${isCycleMode() ? `
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">This cycle's amount (${CYCLE_PERIOD_LABELS[getCyclePeriod()]})</p>
+        <div class="relative mb-2">
+          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
+          <input id="k-cycle-amount" type="number" placeholder="Amount" value="${data.cycle_amount||''}" step="0.01" min="0" style="padding-left:38px !important">
+        </div>
+        <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-bottom:16px">Changes here apply straight away — this cycle's amount is only worked out once the cycle ends.</p>
+        ${getCyclePeriodPending() ? `
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Starting next cycle's amount (${CYCLE_PERIOD_LABELS[getCyclePeriodPending()]})</p>
+        <div class="relative mb-4">
+          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
+          <input id="k-cycle-amount-pending" type="number" placeholder="Amount" value="${data.cycle_amount_pending ?? data.cycle_amount ?? ''}" step="0.01" min="0" style="padding-left:38px !important">
+        </div>` : ''}
+        ` : ''}
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:10px">Theme Colour</p>
         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:20px">
           ${KID_ACCENT_OPTIONS.map(opt => {
@@ -3159,10 +3404,22 @@ function renderModal() {
         <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:12px">${e ? 'Edit' : 'Add'} Chore</h3>
         <input id="c-name" placeholder="Chore name" value="${esc(data.name)}" class="mb-3">
         <input id="c-desc" placeholder="Description (optional)" value="${esc(data.description)}" class="mb-3">
+        ${isCycleMode() ? `
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Weighting</p>
+        <div style="display:flex;gap:8px;margin-bottom:6px">
+          ${[0.5, 1, 1.5, 2].map(w => `
+          <button onclick="setWeight(${w})" type="button"
+            style="flex:1;padding:10px;border-radius:12px;font-size:14px;font-weight:800;font-family:var(--font-family);border:2px solid ${S.selectedWeight===w?'var(--color-green-600)':'var(--color-border)'};background:${S.selectedWeight===w?'var(--color-green-100)':'white'};color:${S.selectedWeight===w?'var(--color-green-700)':'#6b7280'};cursor:pointer">
+            ${w}×
+          </button>`).join('')}
+        </div>
+        <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-bottom:16px">This doesn't set an amount — it decides how much this chore counts toward the cycle's overall progress. 2× counts double, 0.5× counts half.</p>
+        ` : `
         <div class="relative mb-3">
           <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:15px;line-height:1;pointer-events:none">${currSymbol()}</span>
           <input id="c-val" type="number" placeholder="Value" value="${data.value||''}" step="0.01" min="0" style="padding-left:38px !important">
         </div>
+        `}
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Assigned to</p>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
           <button onclick="setAllKids()" type="button"
@@ -3205,6 +3462,34 @@ function renderModal() {
         <div style="display:flex;gap:8px">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
           <button onclick="${e ? `saveChore('${data.id}')` : 'addChore()'}" class="btn-primary flex-1" style="padding:10px">${e ? 'Save' : 'Add'}</button>
+        </div>`;
+    }
+
+    if (type === 'switch-to-per-chore') {
+        const period = getCyclePeriod();
+        const anchor = getCycleAnchorDate();
+        const today = toLocalDateStr(new Date());
+        const rows = db.kids.map(k => {
+            const ceiling = cycleAmountCeiling(k.cycle_amount, period, anchor, today);
+            const { assigned, completed } = cycleWeightTotals(db, k.id, anchor, today);
+            const pct = cyclePercent(assigned, completed);
+            return { kid: k, pct, amountPaid: cycleAmountPaid(ceiling, pct) };
+        });
+        const total = rows.reduce((s, r) => s + r.amountPaid, 0);
+        body = `
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:12px">Switch to Value per Chore?</h3>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:13px;margin-bottom:16px">You're partway through a cycle that started ${dateStr(anchor)}. Switching now closes it early — each child gets their share for the days completed so far, worked out the usual way.</p>
+        <div class="flex flex-col gap-2 mb-4">
+          ${rows.length === 0 ? `<p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-muted)">No kids yet.</p>` : rows.map(r => `
+          <div class="card flex items-center justify-between" style="padding:10px 14px">
+            <p style="font-family:var(--font-family);font-weight:700;font-size:13px">${esc(r.kid.name)}</p>
+            <p style="font-family:var(--font-family);font-weight:800;font-size:14px">${r.pct}% · ${R(r.amountPaid)}</p>
+          </div>`).join('')}
+        </div>
+        <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">Total added to balances: <strong>${R(total)}</strong>. After switching, every chore needs its own amount before it pays out again — we'll flag the ones that still need one.</p>
+        <div style="display:flex;gap:8px">
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+          <button onclick="confirmSwitchToPerChore()" class="btn-primary flex-1" style="padding:10px">Switch Now</button>
         </div>`;
     }
 
@@ -3435,13 +3720,23 @@ async function addKid() {
     if (!name)                 return toast('⚠️ Please enter a name.');
     if (!/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits (e.g. 1234).');
     if (!date_of_birth)        return toast('⚠️ Please enter a date of birth.');
+    const cycleFields = readCycleAmountFields();
     const id = uid();
-    const { error } = await sb.from('kids').insert({ id, user_id: currentUser.id, name, emoji, color_key, date_of_birth, balance: 0 });
+    const { error } = await sb.from('kids').insert({ id, user_id: currentUser.id, name, emoji, color_key, date_of_birth, balance: 0, ...cycleFields });
     if (error) return toast('❌ Could not save. Check your connection.');
     const { error: pinError } = await sb.rpc('set_kid_pin', { p_kid_id: id, p_new_pin: pin });
     if (pinError) return toast('❌ Kid saved, but PIN could not be set.');
-    cache.kids.push({ id, name, emoji, color_key, date_of_birth, balance: 0 });
+    cache.kids.push({ id, name, emoji, color_key, date_of_birth, balance: 0, ...cycleFields });
     closeModal(); toast(`${name} added! 🎉`);
+}
+// Reads the cycle-amount modal fields when in per-cycle mode; {} otherwise so
+// the insert/update below leaves those columns untouched in per-chore mode.
+function readCycleAmountFields() {
+    if (!isCycleMode()) return {};
+    const cycle_amount = parseFloat(document.getElementById('k-cycle-amount')?.value) || 0;
+    const pendingEl = document.getElementById('k-cycle-amount-pending');
+    const cycle_amount_pending = pendingEl ? (parseFloat(pendingEl.value) || 0) : null;
+    return { cycle_amount, cycle_amount_pending };
 }
 function editKid(id) {
     const k = cache.kids.find(x => x.id === id);
@@ -3456,14 +3751,15 @@ async function saveKid(id) {
     if (!name)                 return toast('⚠️ Please enter a name.');
     if (pin && !/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits (e.g. 1234).');
     if (!date_of_birth)        return toast('⚠️ Please enter a date of birth.');
-    const { error } = await sb.from('kids').update({ name, emoji, color_key, date_of_birth }).eq('id', id).eq('user_id', currentUser.id);
+    const cycleFields = readCycleAmountFields();
+    const { error } = await sb.from('kids').update({ name, emoji, color_key, date_of_birth, ...cycleFields }).eq('id', id).eq('user_id', currentUser.id);
     if (error) return toast('❌ Could not save.');
     if (pin) {
         const { error: pinError } = await sb.rpc('set_kid_pin', { p_kid_id: id, p_new_pin: pin });
         if (pinError) return toast('❌ Saved, but PIN could not be updated.');
     }
     const k = cache.kids.find(x => x.id === id);
-    if (k) { k.name = name; k.emoji = emoji; k.color_key = color_key; k.date_of_birth = date_of_birth; }
+    if (k) { k.name = name; k.emoji = emoji; k.color_key = color_key; k.date_of_birth = date_of_birth; Object.assign(k, cycleFields); }
     closeModal(); toast('Saved!');
 }
 function deleteKid(id) {
@@ -3482,7 +3778,8 @@ async function doDeleteKid(id) {
 async function addChore() {
     const name       = document.getElementById('c-name').value.trim();
     const desc       = document.getElementById('c-desc').value.trim();
-    const val        = parseFloat(document.getElementById('c-val').value) || 0;
+    const val        = parseFloat(document.getElementById('c-val')?.value) || 0;
+    const weight     = S.selectedWeight || 1;
     const assignedTo = S.selectedKids;
     const emoji      = S.selectedEmoji || '⭐';
     const schedule   = S.selectedSchedule || 'daily';
@@ -3492,9 +3789,9 @@ async function addChore() {
     if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('⚠️ Please select at least one kid.');
     const id = uid();
     const now = new Date().toISOString();
-    const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: desc, value: val, assigned_to: assignedTo, emoji, schedule, days, created_at: now, schedule_updated_at: now });
+    const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: desc, value: val, weight, assigned_to: assignedTo, emoji, schedule, days, created_at: now, schedule_updated_at: now });
     if (error) return toast('❌ Could not save. Check your connection.');
-    cache.chores.push({ id, name, description: desc, value: val, assignedTo, emoji, schedule, days, created_at: now, schedule_updated_at: now });
+    cache.chores.push({ id, name, description: desc, value: val, weight, assignedTo, emoji, schedule, days, created_at: now, schedule_updated_at: now });
     closeModal(); toast('Chore added!');
 }
 function editChore(id) {
@@ -3504,7 +3801,8 @@ function editChore(id) {
 async function saveChore(id) {
     const name       = document.getElementById('c-name').value.trim();
     const desc       = document.getElementById('c-desc').value.trim();
-    const val        = parseFloat(document.getElementById('c-val').value) || 0;
+    const val        = parseFloat(document.getElementById('c-val')?.value) || 0;
+    const weight     = S.selectedWeight || 1;
     const assignedTo = S.selectedKids;
     const emoji      = S.selectedEmoji || '⭐';
     const schedule   = S.selectedSchedule || 'daily';
@@ -3514,12 +3812,15 @@ async function saveChore(id) {
     if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('⚠️ Please select at least one kid.');
     const c = cache.chores.find(x => x.id === id);
     const scheduleChanged = c && (c.schedule !== schedule || JSON.stringify(c.days || []) !== JSON.stringify(days));
-    const update = { name, description: desc, value: val, assigned_to: assignedTo, emoji, schedule, days };
+    const update = isCycleMode()
+        ? { name, description: desc, weight, assigned_to: assignedTo, emoji, schedule, days }
+        : { name, description: desc, value: val, assigned_to: assignedTo, emoji, schedule, days };
     if (scheduleChanged) update.schedule_updated_at = new Date().toISOString();
     const { error } = await sb.from('chores').update(update).eq('id', id).eq('user_id', currentUser.id);
     if (error) return toast('❌ Could not save.');
     if (c) {
-        c.name = name; c.description = desc; c.value = val; c.assignedTo = assignedTo; c.emoji = emoji; c.schedule = schedule; c.days = days;
+        c.name = name; c.description = desc; c.assignedTo = assignedTo; c.emoji = emoji; c.schedule = schedule; c.days = days;
+        if (isCycleMode()) c.weight = weight; else c.value = val;
         if (scheduleChanged) c.schedule_updated_at = update.schedule_updated_at;
     }
     closeModal(); toast('Saved!');
@@ -3701,7 +4002,11 @@ async function approveChore(cid) {
     const { data: won } = await sb.from('completions').update({ approved: true })
         .eq('id', cid).eq('user_id', currentUser.id).eq('approved', false).select('id');
     if (!won || !won.length) return;
-    if (chore && kid) {
+    // In allowance-per-cycle mode, a normal chore's weight only feeds the cycle
+    // progress bar — the payout happens once at cycle close, not per chore.
+    // Quick (one-off) chores are a flat bonus and still pay out immediately in both modes.
+    const paysOut = !isCycleMode() || chore?.oneOff;
+    if (chore && kid && paysOut) {
         const newBalance = (kid.balance || 0) + chore.value;
         const txId = uid();
         const txCreatedAt = new Date((comp.dueDate || toLocalDateStr(new Date())) + 'T12:00:00').toISOString();
@@ -3711,7 +4016,7 @@ async function approveChore(cid) {
         cache.transactions.push({ id: txId, kidId: kid.id, amount: chore.value, type: 'chore', description: chore.name, createdAt: txCreatedAt });
         await checkBonusMilestones(kid.id, newBalance);
     }
-    toast(`✓ Approved! ${R(chore?.value)} added to ${kid?.name}.`);
+    toast(paysOut ? `✓ Approved! ${R(chore?.value)} added to ${kid?.name}.` : `✓ Approved! Counts toward ${kid?.name}'s cycle progress.`);
     render();
 }
 async function approveAllForKid(kidId) {
@@ -3730,7 +4035,7 @@ async function approveAllForKid(kidId) {
     let totalAdded = 0;
     wonComps.forEach(comp => {
         const chore = cache.chores.find(x => x.id === comp.choreId);
-        if (chore) {
+        if (chore && (!isCycleMode() || chore.oneOff)) {
             totalAdded += chore.value;
             const txCreatedAt = new Date((comp.dueDate || toLocalDateStr(new Date())) + 'T12:00:00').toISOString();
             txInserts.push({ id: uid(), user_id: currentUser.id, kid_id: kidId, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt });
@@ -3746,7 +4051,7 @@ async function approveAllForKid(kidId) {
         await sb.from('transactions').insert(txInserts);
         txInserts.forEach(t => cache.transactions.push({ id: t.id, kidId, amount: t.amount, type: t.type, description: t.description, createdAt: t.created_at }));
     }
-    toast(`✓ All approved! ${R(totalAdded)} added to ${kid.name}.`);
+    toast(isCycleMode() ? `✓ All approved! Counts toward ${kid.name}'s cycle progress${totalAdded > 0 ? ` (plus ${R(totalAdded)} from quick chores)` : ''}.` : `✓ All approved! ${R(totalAdded)} added to ${kid.name}.`);
     render();
 }
 async function rejectChore(cid) {
@@ -3874,6 +4179,61 @@ async function openManageSubscription() {
     }
 }
 
+function chooseAllowanceMode(mode) {
+    if (mode === getAllowanceMode()) return;
+    if (mode === 'per_cycle') activateCycleMode();
+    else openModal('switch-to-per-chore');
+}
+async function activateCycleMode() {
+    const period = getCyclePeriod();
+    const today = toLocalDateStr(new Date());
+    const { data } = await sb.auth.updateUser({ data: { allowance_mode: 'per_cycle', cycle_period: period, cycle_period_pending: null, cycle_anchor_date: today } });
+    if (data?.user) currentUser = data.user;
+    render();
+    toast(`Allowance per cycle turned on! This first cycle runs to ${dateStr(cycleEndDate(period, today))}.`);
+}
+async function queueCyclePeriodChange(period) {
+    if (period === getCyclePeriod()) { cancelPendingCyclePeriod(); return; }
+    const { data } = await sb.auth.updateUser({ data: { cycle_period_pending: period } });
+    if (data?.user) currentUser = data.user;
+    render();
+    toast(`Starting next cycle: ${CYCLE_PERIOD_LABELS[period]}`);
+}
+async function cancelPendingCyclePeriod() {
+    const { data } = await sb.auth.updateUser({ data: { cycle_period_pending: null } });
+    if (data?.user) currentUser = data.user;
+    render();
+    toast('Pending cycle length change cancelled.');
+}
+async function confirmSwitchToPerChore() {
+    const db = DB.load();
+    const period = getCyclePeriod();
+    const anchor = getCycleAnchorDate();
+    const today = toLocalDateStr(new Date());
+    for (const kid of db.kids) {
+        const ceiling = cycleAmountCeiling(kid.cycle_amount, period, anchor, today);
+        const { assigned, completed } = cycleWeightTotals(db, kid.id, anchor, today);
+        const pct = cyclePercent(assigned, completed);
+        const amountPaid = cycleAmountPaid(ceiling, pct);
+        const historyId = uid();
+        const createdAt = new Date().toISOString();
+        const desc = `${CYCLE_PERIOD_LABELS[period]} allowance (${pct}% of chores, cycle closed early)`;
+        if (amountPaid > 0) {
+            const newBalance = (kid.balance || 0) + amountPaid;
+            const txId = uid();
+            await sb.from('kids').update({ balance: newBalance }).eq('id', kid.id).eq('user_id', currentUser.id);
+            await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, kid_id: kid.id, amount: amountPaid, type: 'cycle_allowance', description: desc, created_at: createdAt });
+            kid.balance = newBalance;
+            cache.transactions.push({ id: txId, kidId: kid.id, amount: amountPaid, type: 'cycle_allowance', description: desc, createdAt });
+        }
+        await sb.from('cycle_history').insert({ id: historyId, user_id: currentUser.id, kid_id: kid.id, period_type: period, start_date: anchor, end_date: today, weight_completed: completed, weight_assigned: assigned, percent: pct, amount_ceiling: ceiling, amount_paid: amountPaid, created_at: createdAt });
+        cache.cycleHistory.push({ id: historyId, kidId: kid.id, periodType: period, startDate: anchor, endDate: today, weightCompleted: completed, weightAssigned: assigned, percent: pct, amountCeiling: ceiling, amountPaid: amountPaid, createdAt });
+    }
+    const { data } = await sb.auth.updateUser({ data: { allowance_mode: 'per_chore', cycle_period_pending: null, cycle_anchor_date: null } });
+    if (data?.user) currentUser = data.user;
+    closeModal();
+    toast('Switched to value per chore. Check your chores — each one needs its own amount before it pays out.');
+}
 function saveCurrency(code) {
     localStorage.setItem('sprout_currency', code);
     render();
