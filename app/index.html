@@ -887,7 +887,8 @@ function setTab(t) {
 function toast(msg, icon = null) {
     if (S.toastTimer) clearTimeout(S.toastTimer);
     S.toast = msg; S.toastIcon = icon; render();
-    S.toastTimer = setTimeout(() => { S.toast = null; S.toastIcon = null; render(); }, 2800);
+    const duration = Math.min(6000, Math.max(2800, msg.length * 60));
+    S.toastTimer = setTimeout(() => { S.toast = null; S.toastIcon = null; render(); }, duration);
 }
 const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
@@ -4266,7 +4267,7 @@ async function removeParentPin() {
 // ─── RENDER ──────────────────────────────────────────────────────
 function render() {
     const toastHtml = S.toast
-        ? `<div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:6px;background:#1e293b;color:white;font-family:var(--font-family);font-size:14px;font-weight:600;padding:10px 20px;border-radius:var(--radius-full);box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:99;max-width:320px;text-align:center;white-space:nowrap">${S.toastIcon || ''}${esc(S.toast)}</div>`
+        ? `<div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:6px;background:#1e293b;color:white;font-family:var(--font-family);font-size:14px;font-weight:600;padding:10px 20px;border-radius:var(--radius-full);box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:99;max-width:320px;text-align:center">${S.toastIcon || ''}${esc(S.toast)}</div>`
         : '';
     if (S.authMode === 'reset') {
         document.getElementById('app').innerHTML = vResetPassword() + toastHtml;
