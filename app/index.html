@@ -584,7 +584,20 @@ async function initApp() {
             S.authMode = intent === 'pin' ? 'reset-pin' : 'reset';
             render(); return;
         }
-        if (currentUser) { await loadCache(); await checkCycleCloseOut(); }
+        if (currentUser) {
+            await loadCache();
+            // Only re-check for a cycle close-out on a genuinely new session, not
+            // on every auth event. USER_UPDATED fires on every settings save
+            // (including the close-out's own anchor-date rollover) and
+            // TOKEN_REFRESHED fires periodically in the background — each carries
+            // its own closure-captured `session` snapshot, so a delayed one of
+            // these firing after a close-out has already run can hand
+            // checkCycleCloseOut() stale, not-yet-advanced data and cause it to
+            // process the same cycle a second time.
+            if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+                await checkCycleCloseOut();
+            }
+        }
         else { cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [] }; S.view = 'home'; }
         render();
     });
@@ -970,7 +983,7 @@ function weeklyPossible(db, kidId) {
     const sunStr = toLocalDateStr(sun);
 
     return db.chores
-        .filter(c => choreAssignedTo(c, kidId))
+        .filter(c => !c.archived && choreAssignedTo(c, kidId))
         .reduce((s, c) => {
             if (c.oneOff) {
                 // Include ad hoc chores that fall within the current week
@@ -1020,7 +1033,7 @@ async function writeMissedChores(kidId) {
         const d = new Date();
         d.setDate(d.getDate() - ago);
         const due = toLocalDateStr(d);
-        const scheduled = db.chores.filter(c => choreAssignedTo(c, kidId) && choreIsForDate(c, d) && choreScheduleWasActiveOn(c, d));
+        const scheduled = db.chores.filter(c => !c.archived && choreAssignedTo(c, kidId) && choreIsForDate(c, d) && choreScheduleWasActiveOn(c, d));
         for (const chore of scheduled) {
             const exists = cache.completions.some(c =>
                 c.choreId === chore.id && c.kidId === kidId && c.dueDate === due
@@ -1152,8 +1165,22 @@ function cycleTrendingEarned(db, kid) {
 // kid their share, logs the cycle, applies any pending amount/period change,
 // and advances the family's cycle_anchor_date to the day after. Lazy and
 // idempotent-by-date, same pattern as writeMissedChores — checked once per app load.
+// Guarded by cycleCloseOutRunning: onAuthStateChange fires on every auth event
+// (including the redundant initial getSession() call in initApp), so without this
+// guard two overlapping invocations can both read the same not-yet-advanced anchor
+// and pay every kid twice for the same cycle.
+let cycleCloseOutRunning = false;
 async function checkCycleCloseOut() {
     if (!isCycleMode()) return;
+    if (cycleCloseOutRunning) return;
+    cycleCloseOutRunning = true;
+    try {
+        await runCycleCloseOut();
+    } finally {
+        cycleCloseOutRunning = false;
+    }
+}
+async function runCycleCloseOut() {
     const period = getCyclePeriod();
     const anchor = getCycleAnchorDate();
     const end = cycleEndDate(period, anchor);
@@ -1166,7 +1193,10 @@ async function checkCycleCloseOut() {
         const pct = cyclePercent(assigned, completed);
         const amountPaid = cycleAmountPaid(ceiling, pct);
         const historyId = uid();
-        const createdAt = new Date(end + 'T23:59:59').toISOString();
+        // Real time the payout happened, not the cycle's end date — an end-date
+        // timestamp can land before the kid's last distribution (e.g. a late
+        // close-out), silently hiding the payout from "amount owed".
+        const createdAt = new Date().toISOString();
         const desc = `${CYCLE_PERIOD_LABELS[period]} allowance (${pct}% of chores)`;
         if (amountPaid > 0) {
             const newBalance = (kid.balance || 0) + amountPaid;
@@ -1227,7 +1257,8 @@ function snapModalInputs() {
     if (t === 'add-kid' || t === 'edit-kid') {
         const n = document.getElementById('k-name');
         const p = document.getElementById('k-pin');
-        if (n) S.modal.data = { ...S.modal.data, name: n.value, pin: p?.value };
+        const dob = document.getElementById('k-dob');
+        if (n) S.modal.data = { ...S.modal.data, name: n.value, pin: p?.value, date_of_birth: dob?.value };
     }
     if (t === 'quick-task') {
         const n = document.getElementById('qt-name');
@@ -2336,7 +2367,7 @@ function pOverview(db) {
 
 function pChores(db) {
     const todayDate = toLocalDateStr(new Date());
-    const visibleChores = db.chores.filter(c => !c.oneOff || c.expiresOn >= todayDate);
+    const visibleChores = db.chores.filter(c => !c.archived && (!c.oneOff || c.expiresOn >= todayDate));
     return `
     <div class="flex justify-between items-center mb-4">
       <p class="pr-section-label">Chores</p>
@@ -3030,7 +3061,7 @@ function vKid() {
     const ac       = kidAccent(kid);
     const today    = new Date().toDateString();
     const todayDate = toLocalDateStr(new Date());
-    const allChores = db.chores.filter(c => choreAssignedTo(c, kid.id) && choreIsForToday(c));
+    const allChores = db.chores.filter(c => !c.archived && choreAssignedTo(c, kid.id) && choreIsForToday(c));
     const doneToday = db.completions.filter(c =>
         c.kidId === kid.id && !c.rejected && !c.missed &&
         (c.dueDate ? c.dueDate === todayDate : new Date(c.completedAt).toDateString() === today)
@@ -3349,7 +3380,7 @@ function renderModal() {
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Name</p>
         <input id="k-name" placeholder="Name" value="${esc(data.name)}" class="mb-3">
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">PIN</p>
-        <input id="k-pin" placeholder="${e ? 'Leave blank to keep current PIN' : '4-digit PIN'}" maxlength="4" inputmode="numeric" value="" class="mb-3">
+        <input id="k-pin" placeholder="${e ? 'Leave blank to keep current PIN' : '4-digit PIN'}" maxlength="4" inputmode="numeric" value="${esc(data.pin || '')}" class="mb-3">
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Date of birth</p>
         <input id="k-dob" type="date" value="${data.date_of_birth||''}" max="${new Date().toISOString().slice(0,10)}" class="mb-4">
         ${isCycleMode() ? `
@@ -3886,9 +3917,13 @@ async function addQuickTask() {
     closeModal(); toast('Quick task assigned! 🎯');
 }
 async function doDeleteChore(id) {
-    const { error } = await sb.from('chores').delete().eq('id', id).eq('user_id', currentUser.id);
+    // Archived, not hard-deleted: a hard delete would make cycleWeightTotals
+    // recompute every already-elapsed day of the current cycle without this
+    // chore, silently changing a kid's percentage and payout after the fact.
+    const { error } = await sb.from('chores').update({ archived: true }).eq('id', id).eq('user_id', currentUser.id);
     if (error) return toast('❌ Could not delete.');
-    cache.chores = cache.chores.filter(x => x.id !== id);
+    const c = cache.chores.find(x => x.id === id);
+    if (c) c.archived = true;
     closeModal(); render();
 }
 
@@ -3921,6 +3956,14 @@ async function saveBonusMilestone(editId) {
         if (error) return toast('❌ ' + (error.message || 'Could not save.'));
         cache.bonusMilestones.push({ id, name, threshold, bonusAmount: bonusAmt, assignedTo, claimedBy: [], createdAt });
         closeModal(); toast('Milestone added!', milestoneStarSVG(16));
+        // Award immediately to any kid who already has enough saved, rather than
+        // leaving it dangling until their next unrelated transaction happens to
+        // trigger the check — until then their own screen would misleadingly show
+        // "Threshold reached!" on a bonus they haven't actually been paid.
+        const eligibleKids = assignedTo === 'all' ? cache.kids : cache.kids.filter(k => Array.isArray(assignedTo) && assignedTo.includes(k.id));
+        for (const k of eligibleKids) {
+            await checkBonusMilestones(k.id, k.balance || 0);
+        }
     }
 }
 async function deleteBonusMilestone(id) {
@@ -4015,7 +4058,12 @@ async function approveChore(cid) {
     if (chore && kid && paysOut) {
         const newBalance = (kid.balance || 0) + chore.value;
         const txId = uid();
-        const txCreatedAt = new Date((comp.dueDate || toLocalDateStr(new Date())) + 'T12:00:00').toISOString();
+        // Real approval time, not the due date at noon — a due-date-derived
+        // timestamp can land in the future relative to "now" (e.g. approving before
+        // midday), which made same-day earnings vanish from "amount owed" right
+        // after a distribution, since the Distributions filter only counts
+        // transactions strictly after last_distribution_at.
+        const txCreatedAt = new Date().toISOString();
         await sb.from('kids').update({ balance: newBalance }).eq('id', kid.id).eq('user_id', currentUser.id);
         await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, kid_id: kid.id, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt });
         kid.balance = newBalance;
@@ -4043,7 +4091,7 @@ async function approveAllForKid(kidId) {
         const chore = cache.chores.find(x => x.id === comp.choreId);
         if (chore && (!isCycleMode() || chore.oneOff)) {
             totalAdded += chore.value;
-            const txCreatedAt = new Date((comp.dueDate || toLocalDateStr(new Date())) + 'T12:00:00').toISOString();
+            const txCreatedAt = new Date().toISOString();
             txInserts.push({ id: uid(), user_id: currentUser.id, kid_id: kidId, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt });
         }
     });
