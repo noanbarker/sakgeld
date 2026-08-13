@@ -3460,11 +3460,11 @@ function renderModal() {
           }).join('')}
         </div>
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Emoji <span style="font-size:20px;margin-left:6px;letter-spacing:0">${S.selectedEmoji || data.emoji || '😀'}</span></p>
-        <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:3px;max-height:150px;overflow-y:auto;border:1.5px solid var(--color-border);border-radius:12px;padding:8px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(32px,1fr));gap:3px;max-height:150px;overflow-y:auto;overflow-x:hidden;border:1.5px solid var(--color-border);border-radius:12px;padding:8px;margin-bottom:16px">
           ${KID_EMOJIS.map(em => {
             const sel = (S.selectedEmoji || data.emoji || '😀') === em;
             return `<button onclick="pickEmoji('${em}')" type="button"
-              style="font-size:20px;width:36px;height:36px;border-radius:8px;border:2px solid ${sel?'var(--color-green-600)':'transparent'};background:${sel?'var(--color-green-100)':'transparent'};cursor:pointer">
+              style="font-size:20px;width:100%;aspect-ratio:1;min-width:0;border-radius:8px;border:2px solid ${sel?'var(--color-green-600)':'transparent'};background:${sel?'var(--color-green-100)':'transparent'};cursor:pointer">
               ${em}</button>`;
           }).join('')}
         </div>
@@ -3789,7 +3789,7 @@ function renderModal() {
 
     return `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;justify-content:center;z-index:50" onclick="if(event.target===this)closeModal()">
-      <div class="modal-sheet" style="background:var(--color-surface);border-radius:32px 32px 0 0;padding:28px 24px 36px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto">${body}</div>
+      <div class="modal-sheet" style="background:var(--color-surface);border-radius:32px 32px 0 0;padding:28px 24px 36px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;overflow-x:hidden">${body}</div>
     </div>`;
 }
 
