@@ -1728,7 +1728,7 @@ function vHome() {
     </div>`;
 }
 
-const ONBOARD_STEPS = ['currency', 'kid', 'chores', 'bonus', 'money'];
+const ONBOARD_STEPS = ['currency', 'allowance-mode', 'kid', 'chores', 'bonus', 'parent-pin', 'money'];
 function onboardNext() { S.onboardStep = Math.min(S.onboardStep + 1, ONBOARD_STEPS.length - 1); render(); }
 function onboardBack() { S.onboardStep = Math.max(S.onboardStep - 1, 0); render(); }
 async function finishOnboarding() {
@@ -1760,6 +1760,37 @@ function vOnboarding() {
         <button onclick="onboardNext()" class="btn-primary">Continue</button>`;
     }
 
+    if (step === 'allowance-mode') {
+        const mode = getAllowanceMode();
+        const period = getCyclePeriod();
+        body = `
+        <h2 style="font-family:var(--font-family);font-size:20px;font-weight:900;color:var(--color-text-primary);margin-bottom:6px">How should chores turn into allowance?</h2>
+        <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:20px">You can change this later in Settings, but it's easiest to pick it before you start adding chores.</p>
+        <div style="display:flex;flex-direction:column;gap:10px" class="mb-4">
+          <button onclick="chooseAllowanceMode('per_chore')" type="button"
+            style="text-align:left;padding:14px 16px;border-radius:14px;border:2px solid ${mode==='per_chore'?'var(--color-green-600)':'var(--color-border)'};background:${mode==='per_chore'?'var(--color-green-100)':'white'};cursor:pointer">
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Amount per chore</p>
+            <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">Each chore has its own amount. A kid earns it the moment that chore is approved.</p>
+          </button>
+          <button onclick="chooseAllowanceMode('per_cycle')" type="button"
+            style="text-align:left;padding:14px 16px;border-radius:14px;border:2px solid ${mode==='per_cycle'?'var(--color-green-600)':'var(--color-border)'};background:${mode==='per_cycle'?'var(--color-green-100)':'white'};cursor:pointer">
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Amount per cycle</p>
+            <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">Set a total amount for the week, fortnight, or month. A kid's share is worked out from the percentage of their chores they complete by the end of the cycle, nothing is added to their balance until then.</p>
+          </button>
+        </div>
+        ${mode === 'per_cycle' ? `
+        <div class="card mb-4">
+          <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:13px;margin-bottom:8px">Cycle length</p>
+          <select onchange="onboardSetCyclePeriod(this.value)">
+            ${Object.keys(CYCLE_PERIOD_LABELS).map(p => `<option value="${p}" ${p===period?'selected':''}>${CYCLE_PERIOD_LABELS[p]}</option>`).join('')}
+          </select>
+        </div>` : ''}
+        <div style="display:flex;gap:8px">
+          <button onclick="onboardBack()" class="btn-outline flex-1">Back</button>
+          <button onclick="onboardNext()" class="btn-primary flex-1">Continue</button>
+        </div>`;
+    }
+
     if (step === 'kid') {
         const kidRows = db.kids.map(k => `
           <div class="card flex items-center gap-3" style="padding:10px 14px">
@@ -1782,7 +1813,7 @@ function vOnboarding() {
           <div class="card flex items-center gap-3" style="padding:10px 14px">
             <span style="font-size:18px">${uiIcon('list', 16)}</span>
             <span style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:14px;flex:1">${esc(c.name)}</span>
-            <span style="font-family:var(--font-family);font-weight:800;color:var(--color-green-600);font-size:13px">${R(c.value)}</span>
+            <span style="font-family:var(--font-family);font-weight:800;color:var(--color-green-600);font-size:13px">${c.oneOff || !isCycleMode() ? R(c.value) : `${choreWeight(c)}× weighting`}</span>
           </div>`).join('');
         body = `
         <h2 style="font-family:var(--font-family);font-size:20px;font-weight:900;color:var(--color-text-primary);margin-bottom:6px">Add a chore or two</h2>
@@ -1807,6 +1838,21 @@ function vOnboarding() {
         <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:20px">Bonuses pay out automatically when a kid's balance hits a threshold you set. You can skip this and add one later from the Bonuses tab.</p>
         ${(db.bonusMilestones || []).length > 0 ? `<div class="flex flex-col gap-2 mb-4">${bonusRows}</div>` : ''}
         <button onclick="openModal('add-bonus')" class="btn-outline mb-3" style="width:100%">+ Add Bonus Milestone</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="onboardBack()" class="btn-outline flex-1">Back</button>
+          <button onclick="onboardNext()" class="btn-primary flex-1">Continue</button>
+        </div>`;
+    }
+
+    if (step === 'parent-pin') {
+        body = `
+        <h2 style="font-family:var(--font-family);font-size:20px;font-weight:900;color:var(--color-text-primary);margin-bottom:6px">Protect the parent dashboard? (optional)</h2>
+        <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:20px">A PIN stops kids from wandering into Settings, approvals, or balances on a shared device. You can skip this and set one later from Settings.</p>
+        <div class="card mb-4" style="padding:14px 16px">
+          <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">${hasParentPin ? '🔐 A PIN is set' : '⚠️ No PIN set'}</p>
+          <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${hasParentPin ? 'Anyone opening the Parent dashboard on this device will need it.' : 'Anyone can currently open the Parent dashboard without one.'}</p>
+        </div>
+        <button onclick="openModal('set-parent-pin')" class="btn-outline mb-3" style="width:100%">${hasParentPin ? 'Change PIN' : '+ Set Parent PIN'}</button>
         <div style="display:flex;gap:8px">
           <button onclick="onboardBack()" class="btn-outline flex-1">Back</button>
           <button onclick="onboardNext()" class="btn-primary flex-1">Continue</button>
@@ -4245,6 +4291,14 @@ async function activateCycleMode() {
     if (data?.user) currentUser = data.user;
     render();
     toast(`Amount per cycle turned on! This first cycle runs to ${dateStr(cycleEndDate(period, today))}.`);
+}
+// Applied directly, not queued as "pending" — during onboarding there's no
+// real cycle running yet to protect, so the length can just change outright.
+async function onboardSetCyclePeriod(period) {
+    if (period === getCyclePeriod()) return;
+    const { data } = await sb.auth.updateUser({ data: { cycle_period: period } });
+    if (data?.user) currentUser = data.user;
+    render();
 }
 async function queueCyclePeriodChange(period) {
     if (period === getCyclePeriod()) { cancelPendingCyclePeriod(); return; }
