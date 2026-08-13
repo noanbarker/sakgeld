@@ -3789,7 +3789,7 @@ function renderModal() {
 
     return `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;justify-content:center;z-index:50" onclick="if(event.target===this)closeModal()">
-      <div class="modal-sheet" style="background:var(--color-surface);border-radius:32px 32px 0 0;padding:28px 24px 36px;width:100%;max-width:440px">${body}</div>
+      <div class="modal-sheet" style="background:var(--color-surface);border-radius:32px 32px 0 0;padding:28px 24px 36px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto">${body}</div>
     </div>`;
 }
 
