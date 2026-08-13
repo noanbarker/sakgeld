@@ -6,6 +6,45 @@ const crypto = require('crypto');
 // cold-start latency. 5 minutes still blocks stale replayed requests.
 const SIGNATURE_MAX_AGE_SECONDS = 300;
 
+// Loops transactional template IDs (Sprout Loops workspace).
+const LOOPS_TEMPLATE = {
+  trialCancelled: 'cmsrg9qi31iax0jworozfr5np', // TXN-03
+  subscriptionActivated: 'cmsrggo270dw90jxpkllonwyb', // TXN-04
+  subscriptionCancelled: 'cmsrglb7x005x0kyfia2hspaa', // TXN-05
+};
+
+function formatDate(isoString) {
+  if (!isoString) return '';
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(isoString));
+}
+
+function billingIntervalLabel(interval) {
+  if (interval === 'year') return 'annual';
+  if (interval === 'month') return 'monthly';
+  return interval || '';
+}
+
+// Fire-and-forget: a Loops outage should never fail the webhook or trigger a
+// Paddle retry, since the Supabase subscription-state update already succeeded.
+async function sendLoopsEmail(transactionalId, email, dataVariables) {
+  if (!process.env.LOOPS_API_KEY || !email) return;
+  try {
+    const response = await fetch('https://app.loops.so/api/v1/transactional', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.LOOPS_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ transactionalId, email, dataVariables }),
+    });
+    if (!response.ok) {
+      console.error('Loops transactional email failed:', response.status, await response.text());
+    }
+  } catch (err) {
+    console.error('Loops transactional email error:', err.message);
+  }
+}
+
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
     let data = '';
@@ -97,6 +136,26 @@ module.exports = async (req, res) => {
         console.error('Failed to update Supabase user from Paddle webhook:', error.message);
         res.status(500).json({ error: 'Failed to update user' });
         return;
+      }
+
+      // Only fire on an actual status transition, so a duplicate Paddle
+      // delivery (they don't guarantee exactly-once) doesn't resend the email.
+      const previousStatus = existing.user.user_metadata.subscription_status || null;
+      const newStatus = sub.status || null;
+      if (newStatus && newStatus !== previousStatus) {
+        const email = existing.user.email;
+        const firstName = ((existing.user.user_metadata.name || '').split(' ')[0]) || 'there';
+        const accessEndsAt = formatDate(sub.current_billing_period ? sub.current_billing_period.ends_at : null);
+
+        if (previousStatus === 'trialing' && newStatus === 'canceled') {
+          await sendLoopsEmail(LOOPS_TEMPLATE.trialCancelled, email, { firstName, accessEndsAt });
+        } else if (previousStatus === 'trialing' && newStatus === 'active') {
+          const billingInterval = billingIntervalLabel(sub.billing_cycle && sub.billing_cycle.interval);
+          const nextBillingDate = formatDate(sub.next_billed_at);
+          await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionActivated, email, { firstName, billingInterval, nextBillingDate });
+        } else if (previousStatus && previousStatus !== 'trialing' && newStatus === 'canceled') {
+          await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionCancelled, email, { firstName, accessEndsAt });
+        }
       }
     }
   }
