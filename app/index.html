@@ -4370,6 +4370,7 @@ async function removeParentPin() {
 
 // ─── RENDER ──────────────────────────────────────────────────────
 function render() {
+    document.title = currentUser ? 'Sprout' : 'Sign In or Start Your Free Trial | Sprout';
     const toastHtml = S.toast
         ? `<div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:6px;background:#1e293b;color:white;font-family:var(--font-family);font-size:14px;font-weight:600;padding:10px 20px;border-radius:var(--radius-full);box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:99;max-width:320px;text-align:center">${S.toastIcon || ''}${esc(S.toast)}</div>`
         : '';
