@@ -2137,10 +2137,10 @@ function vParent() {
             ${t.badge ? `<span class="badge">${t.badge}</span>` : ''}
           </button>`;
         }).join('')}
-        <div style="padding:12px 4px 0;margin-top:8px;border-top:1px solid var(--color-border)">
-          <button onclick="go('home')" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer"><span style="font-size:16px;line-height:1">←</span> Home</button>
+        <div style="padding:12px 4px 0;margin-top:8px;border-top:1px solid #f43f5e">
+          <button onclick="go('home')" style="color:var(--color-text-secondary);font-size:13px;font-weight:700;font-family:var(--font-family);display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer"><span style="font-size:16px;line-height:1">←</span> Family Portal</button>
         </div>
-        <div style="padding:12px 4px 0;margin-top:8px;border-top:1px solid var(--color-border)">
+        <div style="padding:12px 4px 0;margin-top:8px;border-top:1px solid #f43f5e">
           <button class="manage-sub-btn" onclick="openManageSubscription()" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('card', 16)} Manage Subscription</button>
           <button onclick="signOut()" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer">${uiIcon('logout', 16)} Sign out</button>
         </div>
