@@ -2143,8 +2143,9 @@ function vParent() {
     </aside>`;
 
     const mobileHeader = `
-    <div class="md:hidden" style="height:5px;background:var(--gradient-stripe)"></div>
-    <div class="md:hidden pl-2 pr-5 pt-0 pb-0 flex justify-between items-center" style="background:var(--color-surface);border-bottom:1px solid var(--color-green-border)">
+    <div class="md:hidden" style="position:sticky;top:0;z-index:20">
+    <div style="height:5px;background:var(--gradient-stripe)"></div>
+    <div class="pl-2 pr-5 pt-0 pb-0 flex justify-between items-center" style="background:var(--color-surface);border-bottom:1px solid var(--color-green-border)">
       <div style="display:flex;align-items:flex-start;gap:10px;height:88px;overflow:hidden">
         <img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:100px;width:auto;display:block;flex-shrink:0">
       </div>
@@ -2152,7 +2153,7 @@ function vParent() {
         <button onclick="go('home')" style="color:#15803d;font-size:21px;background:none;border:none;cursor:pointer;font-family:var(--font-family);display:flex;align-items:center;gap:6px">← ${uiIcon('home', 24)}</button>
       </div>
     </div>
-    <div class="md:hidden sp-mob-tabbar border-b flex sticky top-0 z-10" style="background:#dcfce7;border-color:var(--color-green-border)">
+    <div class="sp-mob-tabbar border-b flex" style="background:#dcfce7;border-color:var(--color-green-border)">
       <div class="sp-mob-thumb" style="width:calc(100% / ${navItems.length});transform:translateX(${PARENT_TAB_ORDER.indexOf(S.tab) * 100}%)"></div>
       ${navItems.slice(0, -1).map((_, i) => {
           const activeIdx = PARENT_TAB_ORDER.indexOf(S.tab);
@@ -2167,6 +2168,7 @@ function vParent() {
           <span class="sp-mob-tab-label">${t.label}</span>
           ${t.badge ? `<span class="badge absolute top-1.5 right-1">${t.badge}</span>` : ''}
         </button>`).join('')}
+    </div>
     </div>`;
 
     return `
