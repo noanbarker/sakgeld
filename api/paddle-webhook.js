@@ -45,6 +45,66 @@ async function sendLoopsEmail(transactionalId, email, dataVariables) {
   }
 }
 
+// Keeps the Loops contact's properties current so the marketing Workflows'
+// branch/exit filters (trialing vs active, cancelScheduled, etc.) see live data.
+async function syncLoopsContact(email, properties) {
+  if (!process.env.LOOPS_API_KEY || !email) return;
+  try {
+    const response = await fetch('https://app.loops.so/api/v1/contacts/update', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.LOOPS_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, ...properties }),
+    });
+    if (!response.ok) {
+      console.error('Loops contact sync failed:', response.status, await response.text());
+    }
+  } catch (err) {
+    console.error('Loops contact sync error:', err.message);
+  }
+}
+
+// Fires a Loops event (used as Workflow triggers), separate from the direct
+// transactional sends above.
+async function sendLoopsEvent(email, eventName, properties) {
+  if (!process.env.LOOPS_API_KEY || !email) return;
+  try {
+    const response = await fetch('https://app.loops.so/api/v1/events/send', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.LOOPS_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, eventName, eventProperties: properties || {}, contactProperties: properties || {} }),
+    });
+    if (!response.ok) {
+      console.error('Loops event send failed:', response.status, await response.text());
+    }
+  } catch (err) {
+    console.error('Loops event send error:', err.message);
+  }
+}
+
+// Paddle amounts are integer minor units (e.g. cents). This assumes a
+// 2-decimal currency, true for ZAR/USD/GBP/EUR — Sprout's realistic set.
+function extractChargeAmount(sub) {
+  if (!Array.isArray(sub.items) || !sub.currency_code) return '';
+  const totalMinor = sub.items.reduce((sum, item) => {
+    const unit = item && item.price && item.price.unit_price && item.price.unit_price.amount;
+    const qty = (item && item.quantity) || 1;
+    return sum + (unit ? parseInt(unit, 10) * qty : 0);
+  }, 0);
+  if (!totalMinor) return '';
+  const major = totalMinor / 100;
+  try {
+    return new Intl.NumberFormat('en-GB', { style: 'currency', currency: sub.currency_code }).format(major);
+  } catch (e) {
+    return `${major.toFixed(2)} ${sub.currency_code}`;
+  }
+}
+
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
     let data = '';
@@ -138,21 +198,53 @@ module.exports = async (req, res) => {
         return;
       }
 
-      // Only fire on an actual status transition, so a duplicate Paddle
-      // delivery (they don't guarantee exactly-once) doesn't resend the email.
       const previousStatus = existing.user.user_metadata.subscription_status || null;
       const newStatus = sub.status || null;
-      if (newStatus && newStatus !== previousStatus) {
-        const email = existing.user.email;
-        const firstName = ((existing.user.user_metadata.name || '').split(' ')[0]) || 'there';
-        const accessEndsAt = formatDate(sub.current_billing_period ? sub.current_billing_period.ends_at : null);
+      const email = existing.user.email;
+      const firstName = ((existing.user.user_metadata.name || '').split(' ')[0]) || 'there';
+      // A scheduled (end-of-period) cancellation carries the real access-end
+      // date in scheduled_change; an immediate one falls back to the current
+      // billing period's end (which Paddle can null out on immediate cancels).
+      const accessEndsAt = formatDate(
+        (sub.scheduled_change && sub.scheduled_change.action === 'cancel' && sub.scheduled_change.effective_at)
+        || (sub.current_billing_period ? sub.current_billing_period.ends_at : null)
+      );
+      const billingInterval = billingIntervalLabel(sub.billing_cycle && sub.billing_cycle.interval);
+      const nextBillingDate = formatDate(sub.next_billed_at);
+      const nextChargeAmount = extractChargeAmount(sub);
 
-        if (previousStatus === 'trialing' && newStatus === 'canceled') {
+      // Keep the Loops contact's properties current on every subscription
+      // event, not just the ones that trigger an email — the marketing
+      // Workflows' branch/exit filters read these live.
+      await syncLoopsContact(email, {
+        firstName,
+        lifecycleStage: newStatus === 'trialing' ? 'trial' : newStatus === 'active' ? 'paid' : newStatus === 'canceled' ? 'cancelled' : undefined,
+        subscriptionStatus: newStatus || undefined,
+        trialStartedAt: (previousStatus === null && newStatus === 'trialing') ? formatDate(event.occurred_at || new Date().toISOString()) : undefined,
+        trialEndsAt: newStatus === 'trialing' ? accessEndsAt : undefined,
+        billingInterval: billingInterval || undefined,
+        nextChargeAmount: nextChargeAmount || undefined,
+        currency: sub.currency_code || undefined,
+        nextBillingDate: nextBillingDate || undefined,
+        // True as soon as Paddle records a scheduled (end-of-period) cancellation,
+        // not only once the subscription has actually finished canceling —
+        // this is what the conversion-reminder Workflow's exit filter checks.
+        cancelScheduled: newStatus === 'canceled' || Boolean(sub.scheduled_change && sub.scheduled_change.action === 'cancel'),
+        accessEndsAt: newStatus === 'canceled' ? accessEndsAt : undefined,
+        appUrl: 'https://www.sproutearnsave.com/app/',
+      });
+
+      // Only fire on an actual status transition, so a duplicate Paddle
+      // delivery (they don't guarantee exactly-once) doesn't resend the email.
+      if (newStatus && newStatus !== previousStatus) {
+        if (previousStatus === null && newStatus === 'trialing') {
+          await sendLoopsEvent(email, 'trial_started', { firstName, trialEndsAt: accessEndsAt, billingInterval, nextChargeAmount });
+        } else if (previousStatus === 'trialing' && newStatus === 'canceled') {
           await sendLoopsEmail(LOOPS_TEMPLATE.trialCancelled, email, { firstName, accessEndsAt });
+          await sendLoopsEvent(email, 'trial_cancelled', { firstName });
         } else if (previousStatus === 'trialing' && newStatus === 'active') {
-          const billingInterval = billingIntervalLabel(sub.billing_cycle && sub.billing_cycle.interval);
-          const nextBillingDate = formatDate(sub.next_billed_at);
           await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionActivated, email, { firstName, billingInterval, nextBillingDate });
+          await sendLoopsEvent(email, 'subscription_activated', { firstName, billingInterval, nextBillingDate });
         } else if (previousStatus && previousStatus !== 'trialing' && newStatus === 'canceled') {
           await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionCancelled, email, { firstName, accessEndsAt });
         }

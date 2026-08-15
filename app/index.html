@@ -3819,6 +3819,7 @@ async function addKid() {
     const { error: pinError } = await sb.rpc('set_kid_pin', { p_kid_id: id, p_new_pin: pin });
     if (pinError) return toast('❌ Kid saved, but PIN could not be set.');
     cache.kids.push({ id, name, emoji, color_key, date_of_birth, balance: 0, ...cycleFields });
+    trackLoops('child_added', { childrenCount: cache.kids.length });
     closeModal(); toast(`${name} added! 🎉`);
 }
 // Reads the cycle-amount modal fields when in per-cycle mode; {} otherwise so
@@ -3884,6 +3885,7 @@ async function addChore() {
     const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: desc, value: val, weight, assigned_to: assignedTo, emoji, schedule, days, created_at: now, schedule_updated_at: now });
     if (error) return toast('❌ Could not save. Check your connection.');
     cache.chores.push({ id, name, description: desc, value: val, weight, assignedTo, emoji, schedule, days, created_at: now, schedule_updated_at: now });
+    trackLoops(cache.chores.length === 1 ? 'first_chore_created' : null, { choreCount: cache.chores.length });
     closeModal(); toast('Chore added!');
 }
 function editChore(id) {
@@ -3969,6 +3971,7 @@ async function addQuickTask() {
     const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: '', value: val, assigned_to: assignedTo, emoji: '37', schedule: 'daily', days: [], one_off: true, expires_on: expiresOn });
     if (error) return toast('❌ Could not save. Check your connection.');
     cache.chores.push({ id, name, description: '', value: val, assignedTo, emoji: '37', schedule: 'daily', days: [], oneOff: true, expiresOn });
+    trackLoops(cache.chores.length === 1 ? 'first_chore_created' : null, { choreCount: cache.chores.length });
     closeModal(); toast('Quick task assigned! 🎯');
 }
 async function doDeleteChore(id) {
@@ -4010,6 +4013,7 @@ async function saveBonusMilestone(editId) {
         const { error } = await sb.from('bonus_milestones').insert({ id, user_id: currentUser.id, name, threshold, bonus_amount: bonusAmt, assigned_to: assignedTo, claimed_by: [], created_at: createdAt });
         if (error) return toast('❌ ' + (error.message || 'Could not save.'));
         cache.bonusMilestones.push({ id, name, threshold, bonusAmount: bonusAmt, assignedTo, claimedBy: [], createdAt });
+        trackLoops(cache.bonusMilestones.length === 1 ? 'savings_goal_created' : null, { hasSavingsGoal: true });
         closeModal(); toast('Milestone added!', milestoneStarSVG(16));
         // Award immediately to any kid who already has enough saved, rather than
         // leaving it dangling until their next unrelated transaction happens to
@@ -4125,6 +4129,8 @@ async function approveChore(cid) {
         cache.transactions.push({ id: txId, kidId: kid.id, amount: chore.value, type: 'chore', description: chore.name, createdAt: txCreatedAt });
         await checkBonusMilestones(kid.id, newBalance);
     }
+    const approvedCount = cache.completions.filter(c => c.approved).length;
+    trackLoops(approvedCount === 1 ? 'first_chore_approved' : null, { hasApprovedChore: true });
     toast(paysOut ? `✓ Approved! ${R(chore?.value)} added to ${kid?.name}.` : `✓ Approved! Counts toward ${kid?.name}'s cycle progress.`);
     render();
 }
@@ -4160,6 +4166,8 @@ async function approveAllForKid(kidId) {
         await sb.from('transactions').insert(txInserts);
         txInserts.forEach(t => cache.transactions.push({ id: t.id, kidId, amount: t.amount, type: t.type, description: t.description, createdAt: t.created_at }));
     }
+    const approvedCountAll = cache.completions.filter(c => c.approved).length;
+    trackLoops(approvedCountAll === wonComps.length ? 'first_chore_approved' : null, { hasApprovedChore: true });
     toast(isCycleMode() ? `✓ All approved! Counts toward ${kid.name}'s cycle progress${totalAdded > 0 ? ` (plus ${R(totalAdded)} from quick chores)` : ''}.` : `✓ All approved! ${R(totalAdded)} added to ${kid.name}.`);
     render();
 }
@@ -4206,6 +4214,7 @@ async function markDone(choreId, evt) {
         render();
         return toast('❌ Could not save. Check your connection.');
     }
+    trackLoops(cache.completions.length === 1 ? 'first_chore_completed' : null, null);
     toast('Marked as done! Waiting for parent to approve. ⏳');
 }
 async function markRewardDone(rewardId, evt) {
@@ -4264,6 +4273,21 @@ function clearMissedChores() {
     sb.auth.updateUser({ data: { missed_cleared_at: latest } }).then(({ data }) => {
         if (data?.user) currentUser = data.user;
     });
+}
+
+// Fire-and-forget Loops event/property sync for lifecycle email workflows.
+// Never surfaces errors to the parent — this is invisible marketing plumbing,
+// not something a failed request should ever interrupt real app use for.
+function trackLoops(event, properties) {
+    sb.auth.getSession().then(({ data }) => {
+        const session = data && data.session;
+        if (!session) return;
+        fetch('/api/loops-track', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ event: event || undefined, properties: properties || {} }),
+        }).catch(() => {});
+    }).catch(() => {});
 }
 
 async function openManageSubscription() {
