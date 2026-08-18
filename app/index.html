@@ -918,7 +918,16 @@ const TOUR_STEPS = [
     { id: 'kids', tab: 'kids', title: 'Kids',
       body: "Add a profile for each child - Name, avatar and their own PIN.<br><br>They will use this to log in on their side of the app, where they will find their assigned chores, savings balances, rewards, and more." },
     { id: 'chores', tab: 'chores', title: 'Chores',
-      body: "Create chores, assign them to one child or everyone, and set what each one pays. Completed chores land here for you to approve before the money moves." },
+      body: `This is where you create chores.
+      <ul style="list-style:disc;margin:10px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px">
+        <li>Assign them to one or multiple children at a time.</li>
+        <li>Scheduled for a specific day or multiple days per week.</li>
+      </ul>
+      <div style="margin-top:14px">Depending on the allowance system you chose, chores get assigned values as follows:</div>
+      <ul style="list-style:disc;margin:10px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px">
+        <li><strong>Amount per Chore System:</strong> You set the amount per chore.</li>
+        <li><strong>Amount per Cycle System:</strong> The value gets determined by the amount of chores in a cycle and the weighting you assign to each chore (some could be more valuable than others).</li>
+      </ul>` },
     { id: 'bonuses', tab: 'bonuses', title: 'Bonuses',
       body: "Give one-off or recurring bonus payments - for good behaviour, a milestone, or anything outside the usual chore list." },
     { id: 'rewards', tab: 'rewards', title: 'Rewards',
@@ -987,7 +996,7 @@ function renderTour() {
     return `
     <div id="tourDim" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:70;${isWelcome ? '' : 'display:none'}"></div>
     <div id="tourSpotlight" style="position:fixed;z-index:71;border-radius:14px;pointer-events:none;box-shadow:0 0 0 4px rgba(255,255,255,.95),0 0 0 6px var(--color-green-600),0 0 0 9999px rgba(15,23,42,.6);transition:top .35s cubic-bezier(.4,0,.2,1),left .35s cubic-bezier(.4,0,.2,1),width .35s cubic-bezier(.4,0,.2,1),height .35s cubic-bezier(.4,0,.2,1);${isWelcome ? 'display:none' : ''}"></div>
-    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:380px;max-width:calc(100% - 48px);background:#fff;border-radius:18px;box-shadow:var(--shadow-card);padding:24px 24px 20px;z-index:72">
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:380px;max-width:calc(100% - 48px);max-height:calc(100vh - 48px);overflow-y:auto;background:#fff;border-radius:18px;box-shadow:var(--shadow-card);padding:24px 24px 20px;z-index:72">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
         ${headerInner}
         <button onclick="endTour()" aria-label="Skip tour" style="background:none;border:none;color:var(--color-text-secondary);font-size:13px;width:26px;height:26px;border-radius:8px;cursor:pointer">✕</button>
