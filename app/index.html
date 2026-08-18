@@ -439,6 +439,12 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
 
 let currentUser = null;
+// Set by openTrialCheckout, read by the Paddle eventCallback below — they're
+// separate closures, so this is how the trial-start event gets the same user
+// id both functions can independently turn into the same Meta event_id
+// (trial_started_<userId>), which is what lets Meta de-duplicate the Pixel
+// and Conversions API copies of the same conversion instead of double-counting it.
+let pendingTrialUserId = null;
 let cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [] };
 const DB = { load: () => cache };
 
@@ -477,7 +483,10 @@ Paddle.Initialize({
                 refreshUserAfterCheckout();
             } else {
                 if (window.posthog) posthog.capture('trial_started', { billing_cycle: S.billingCycle || 'monthly', ...getStoredUTM() });
-                if (typeof fbq === 'function') fbq('track', 'StartTrial');
+                // Same event_id the server sends via Conversions API for this same
+                // trial start (see api/paddle-webhook.js) — Meta uses matching
+                // event_id + event_name to merge the two into one counted conversion.
+                if (typeof fbq === 'function') fbq('track', 'StartTrial', {}, { eventID: 'trial_started_' + pendingTrialUserId });
                 if (typeof gtag === 'function') gtag('event', 'trial_started');
                 S.authMode = 'signin';
                 toast('🎉 Trial started! Check your email to confirm your account, then sign in.');
@@ -517,6 +526,7 @@ function openTrialCheckout({ email, geo, userId, billingCycle }) {
         : (isYearly ? PADDLE_YEARLY_PRICE_ID : PADDLE_MONTHLY_PRICE_ID);
     if (window.posthog) posthog.capture('checkout_started', { billing_cycle: billingCycle, geo, ...getStoredUTM() });
     if (typeof fbq === 'function') fbq('track', 'InitiateCheckout');
+    pendingTrialUserId = userId;
     // No customer.address here on purpose — leaving it out lets Paddle work
     // out the customer's real billing country and tax itself.
     Paddle.Checkout.open({

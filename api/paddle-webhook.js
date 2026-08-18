@@ -105,6 +105,61 @@ function extractChargeAmount(sub) {
   }
 }
 
+// Same total as extractChargeAmount, but as a plain number for the Meta
+// Conversions API's `value` field, which won't accept a formatted currency string.
+function extractChargeValue(sub) {
+  if (!Array.isArray(sub.items)) return null;
+  const totalMinor = sub.items.reduce((sum, item) => {
+    const unit = item && item.price && item.price.unit_price && item.price.unit_price.amount;
+    const qty = (item && item.quantity) || 1;
+    return sum + (unit ? parseInt(unit, 10) * qty : 0);
+  }, 0);
+  return totalMinor ? totalMinor / 100 : null;
+}
+
+// Meta calls this a "Dataset ID" as of their 2026 Graph API — it's the same
+// numeric id as the client-side Pixel in js/meta-pixel.js. Recreated
+// 2026-08-18 under the Sprout Kids App business portfolio after the original
+// pixel turned out to be owned by an inaccessible account.
+const META_PIXEL_ID = '1621574729405259';
+const META_CAPI_VERSION = 'v25.0'; // Meta deprecates Graph API versions ~2 years after release — revisit periodically.
+
+function sha256Hex(value) {
+  return crypto.createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+// Fire-and-forget, same reasoning as the Loops helpers above: Meta being down
+// should never fail the webhook or trigger a Paddle retry. Requires
+// META_CAPI_ACCESS_TOKEN to be set in Vercel — silently does nothing without it,
+// so this is safe to call even before that's configured.
+async function sendMetaCAPIEvent({ eventName, eventId, email, userId, value, currency, eventSourceUrl }) {
+  if (!process.env.META_CAPI_ACCESS_TOKEN) return;
+  const userData = {};
+  if (email) userData.em = [sha256Hex(email.trim().toLowerCase())];
+  if (userId) userData.external_id = [sha256Hex(userId)];
+  const event = {
+    event_name: eventName,
+    event_time: Math.floor(Date.now() / 1000),
+    event_id: eventId,
+    action_source: 'website',
+    event_source_url: eventSourceUrl || 'https://www.sproutearnsave.com/app/',
+    user_data: userData,
+  };
+  if (value != null) event.custom_data = { value, currency: currency || 'ZAR' };
+  try {
+    const response = await fetch(`https://graph.facebook.com/${META_CAPI_VERSION}/${META_PIXEL_ID}/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: [event], access_token: process.env.META_CAPI_ACCESS_TOKEN }),
+    });
+    if (!response.ok) {
+      console.error('Meta Conversions API event failed:', response.status, await response.text());
+    }
+  } catch (err) {
+    console.error('Meta Conversions API event error:', err.message);
+  }
+}
+
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
     let data = '';
@@ -239,12 +294,19 @@ module.exports = async (req, res) => {
       if (newStatus && newStatus !== previousStatus) {
         if (previousStatus === null && newStatus === 'trialing') {
           await sendLoopsEvent(email, 'trial_started', { firstName, trialEndsAt: accessEndsAt, billingInterval, nextChargeAmount });
+          // Same event_id as the client-side Pixel StartTrial call in app/index.html —
+          // Meta merges the two into one conversion instead of double-counting it.
+          await sendMetaCAPIEvent({ eventName: 'StartTrial', eventId: `trial_started_${userId}`, email, userId });
         } else if (previousStatus === 'trialing' && newStatus === 'canceled') {
           await sendLoopsEmail(LOOPS_TEMPLATE.trialCancelled, email, { firstName, accessEndsAt });
           await sendLoopsEvent(email, 'trial_cancelled', { firstName });
         } else if (previousStatus === 'trialing' && newStatus === 'active') {
           await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionActivated, email, { firstName, billingInterval, nextBillingDate });
           await sendLoopsEvent(email, 'subscription_activated', { firstName, billingInterval, nextBillingDate });
+          // No client-side pairing here — the trial converting to paid happens
+          // automatically days later, with nobody necessarily on the site, so
+          // this fires from the server only (no dedup event_id needed).
+          await sendMetaCAPIEvent({ eventName: 'Subscribe', eventId: `subscription_paid_${userId}`, email, userId, value: extractChargeValue(sub), currency: sub.currency_code });
         } else if (previousStatus && previousStatus !== 'trialing' && newStatus === 'canceled') {
           await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionCancelled, email, { firstName, accessEndsAt });
         }
