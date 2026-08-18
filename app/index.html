@@ -643,7 +643,8 @@ const S = {
     onboardStep: 0,
     authMode: new URLSearchParams(window.location.search).get('mode') === 'signin' ? 'signin' : 'signup',
     billingCycle: 'monthly',
-    tourStep: -1
+    tourStep: -1,
+    faqOpen: null
 };
 
 // ─── KID EMOJIS ──────────────────────────────────────────────────
@@ -716,6 +717,7 @@ const UI_ICON_PATHS = {
   trophy: '<path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a2 2 0 0 0 0 4h1M17 5h3a2 2 0 0 1 0 4h-1"/>',
   user:   '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"/>',
   banknote: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
+  help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 4"/><path d="M12 17h.01"/>',
   bag: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
 };
 function uiIcon(name, size = 16, stroke = 2) {
@@ -938,8 +940,10 @@ const TOUR_STEPS = [
         <li><strong>Distributions:</strong> See what you still owe them from the last payout.</li>
         <li><strong>Expenditure:</strong> Record cash kids actually spent.</li>
         <li><strong>Reconciliation Tool:</strong> Helps you compare their app balance to that of their actual bank account or piggy bank.</li>
-      </ul>` }
+      </ul>` },
+    { id: 'done' }
 ];
+function goToFaqFromTour() { S.tourStep = -1; setTab('faq'); }
 function startTour() { S.tourStep = 0; render(); }
 function tourGoTo(i) {
     S.tourStep = i;
@@ -976,15 +980,24 @@ window.addEventListener('resize', () => { if (S.view === 'parent' && S.tourStep 
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.view === 'parent' && S.tourStep >= 0) endTour(); });
 function renderTour() {
     const step = TOUR_STEPS[S.tourStep];
-    const lastIndex = TOUR_STEPS.length - 1;
-    const total = TOUR_STEPS.length - 1; // real steps only, excluding the welcome screen
-    const isWelcome = !step.tab;
-    const title = isWelcome ? 'Welcome to your dashboard' : step.title;
-    const body = isWelcome
-        ? "Let's take a two-minute look around. We'll walk through Settings, Kids, Chores, Bonuses, Rewards and Money - six places worth knowing before you dive in."
-        : step.body;
+    const contentSteps = TOUR_STEPS.filter(s => s.tab);
+    const total = contentSteps.length;
+    const finishIndex = TOUR_STEPS.indexOf(contentSteps[contentSteps.length - 1]);
+    const isDone = step.id === 'done';
+    const isChrome = !step.tab; // "hero" steps with no sidebar target: welcome and done
+    let title, body;
+    if (step.id === 'welcome') {
+        title = 'Welcome to your dashboard';
+        body = "Let's take a two-minute look around. We'll walk through Settings, Kids, Chores, Bonuses, Rewards and Money - six places worth knowing before you dive in.";
+    } else if (isDone) {
+        title = "You're all set!";
+        body = `Got any other questions? <a href="#" onclick="event.preventDefault();goToFaqFromTour()" style="color:var(--color-green-700);font-weight:800">Check the FAQs</a>.`;
+    } else {
+        title = step.title;
+        body = step.body;
+    }
     const iconHTML = `<img src="../images/sprout-thinking_800.webp" alt="" style="height:120px;width:auto;display:block;flex-shrink:0">`;
-    const headerInner = isWelcome
+    const headerInner = isChrome
         ? `<div style="display:flex;align-items:center;justify-content:center;flex:1">${iconHTML}</div>`
         : `<div style="display:flex;align-items:center;flex:1">
           ${iconHTML}
@@ -993,27 +1006,28 @@ function renderTour() {
                character instead of next to the image's empty edge. -->
           <span style="margin-left:-38px;font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-secondary)">Step ${S.tourStep} of ${total}</span>
         </div>`;
-    const dots = isWelcome ? '' : TOUR_STEPS.slice(1).map((s, i) => {
+    const dots = isChrome ? '' : contentSteps.map((s, i) => {
         const n = i + 1;
         return `<span style="width:${n === S.tourStep ? '16px' : '6px'};height:6px;border-radius:${n === S.tourStep ? '4px' : '50%'};background:${n === S.tourStep ? 'var(--color-green-600)' : (n < S.tourStep ? 'var(--color-green-300)' : 'var(--color-border)')};transition:width .2s"></span>`;
     }).join('');
     const backStyle = `background:none;border:1.5px solid var(--color-border);color:var(--color-text-primary);border-radius:12px;font-weight:800;font-size:13px;padding:9px 16px;cursor:pointer;font-family:var(--font-family);${S.tourStep === 0 ? 'visibility:hidden' : ''}`;
+    const nextLabel = S.tourStep === 0 ? 'Start Tour' : (isDone ? 'Got it' : (S.tourStep === finishIndex ? 'Finish' : 'Next'));
     return `
-    <div id="tourDim" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:70;${isWelcome ? '' : 'display:none'}"></div>
-    <div id="tourSpotlight" style="position:fixed;z-index:71;border-radius:14px;pointer-events:none;box-shadow:0 0 0 4px rgba(255,255,255,.95),0 0 0 6px var(--color-green-600),0 0 0 9999px rgba(15,23,42,.6);transition:top .35s cubic-bezier(.4,0,.2,1),left .35s cubic-bezier(.4,0,.2,1),width .35s cubic-bezier(.4,0,.2,1),height .35s cubic-bezier(.4,0,.2,1);${isWelcome ? 'display:none' : ''}"></div>
+    <div id="tourDim" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:70;${isChrome ? '' : 'display:none'}"></div>
+    <div id="tourSpotlight" style="position:fixed;z-index:71;border-radius:14px;pointer-events:none;box-shadow:0 0 0 4px rgba(255,255,255,.95),0 0 0 6px var(--color-green-600),0 0 0 9999px rgba(15,23,42,.6);transition:top .35s cubic-bezier(.4,0,.2,1),left .35s cubic-bezier(.4,0,.2,1),width .35s cubic-bezier(.4,0,.2,1),height .35s cubic-bezier(.4,0,.2,1);${isChrome ? 'display:none' : ''}"></div>
     <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:380px;max-width:calc(100% - 48px);max-height:calc(100vh - 48px);overflow-y:auto;background:#fff;border-radius:18px;box-shadow:var(--shadow-card);padding:24px 24px 20px;z-index:72">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:-20px">
         ${headerInner}
-        <button onclick="endTour()" aria-label="Skip tour" style="background:none;border:none;color:var(--color-text-secondary);font-size:13px;width:26px;height:26px;border-radius:8px;cursor:pointer">✕</button>
+        <button onclick="endTour()" aria-label="Close" style="background:none;border:none;color:var(--color-text-secondary);font-size:13px;width:26px;height:26px;border-radius:8px;cursor:pointer">✕</button>
       </div>
       <h3 style="font-family:var(--font-family);font-size:19px;font-weight:900;margin:0 0 8px;color:var(--color-text-primary)">${title}</h3>
       <div style="font-family:var(--font-family);font-size:14px;line-height:1.55;color:var(--color-text-secondary);margin:0 0 18px">${body}</div>
-      ${isWelcome ? '' : `<div style="display:flex;gap:5px;margin-bottom:18px">${dots}</div>`}
+      ${isChrome ? '' : `<div style="display:flex;gap:5px;margin-bottom:18px">${dots}</div>`}
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
         <button onclick="tourBack()" style="${backStyle}">Back</button>
         <div style="display:flex;gap:8px">
-          <button onclick="endTour()" style="background:none;border:none;color:var(--color-text-secondary);font-size:12.5px;font-weight:700;padding:8px 2px;cursor:pointer;font-family:var(--font-family)">Skip tour</button>
-          <button onclick="tourNext()" style="background:var(--gradient-primary);color:#fff;border:none;border-radius:12px;font-weight:800;font-size:13px;padding:9px 18px;box-shadow:var(--shadow-button);cursor:pointer;font-family:var(--font-family)">${S.tourStep === 0 ? 'Start Tour' : (S.tourStep === lastIndex ? 'Finish' : 'Next')}</button>
+          ${isDone ? '' : `<button onclick="endTour()" style="background:none;border:none;color:var(--color-text-secondary);font-size:12.5px;font-weight:700;padding:8px 2px;cursor:pointer;font-family:var(--font-family)">Skip tour</button>`}
+          <button onclick="tourNext()" style="background:var(--gradient-primary);color:#fff;border:none;border-radius:12px;font-weight:800;font-size:13px;padding:9px 18px;box-shadow:var(--shadow-button);cursor:pointer;font-family:var(--font-family)">${nextLabel}</button>
         </div>
       </div>
     </div>`;
@@ -2261,6 +2275,7 @@ function vParent() {
         }).join('')}
         <div style="padding:12px 4px 0;margin-top:8px;border-top:1px solid #16a34a">
           <button class="manage-sub-btn" onclick="openManageSubscription()" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('card', 16)} Manage Subscription</button>
+          <button id="nav-faq" onclick="setTab('faq')" style="color:${S.tab === 'faq' ? 'var(--color-green-700)' : 'var(--color-text-secondary)'};font-size:13px;font-weight:${S.tab === 'faq' ? '800' : '400'};font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('help', 16)} FAQ</button>
           <button onclick="signOut()" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer">${uiIcon('logout', 16)} Sign out</button>
         </div>
       </nav>
@@ -2307,6 +2322,7 @@ function vParent() {
             S.tab === 'money'     ? pMoney(db) :
             S.tab === 'bonuses'   ? pBonuses(db) :
             S.tab === 'rewards'   ? pRewards(db) :
+            S.tab === 'faq'       ? pFAQ() :
                                     pSettings()}
         </div>
       </div>
@@ -2970,6 +2986,58 @@ function pRewards(db) {
     </div>` : ''}`;
 }
 
+const FAQ_ITEMS = [
+    { q: "How do I approve or reject a chore my child has marked as done?",
+      a: `When a child marks a chore as done, it shows up under "Pending Chore Approvals" on your dashboard. Tap the checkmark to approve it or the cross to reject it - you can also use "Approve all" to clear every pending chore for one child at once.` },
+    { q: "Does approving a chore send real money to my child?",
+      a: `No. Sprout is a ledger, not a payment system - approving a chore adds to your child's balance inside the app only. When you're ready to hand over real money, use "Distribution Made" in Money Management to record that you've paid them and reset the amount owed.` },
+    { q: "What's the difference between Amount per Chore and Amount per Cycle, and can I switch between them?",
+      a: "With Amount per Chore, each chore has its own value and pays out the moment it's approved. With Amount per Cycle, you set one total amount for the week, fortnight or month, and each child's share is worked out from the percentage of chores they complete by the end of that cycle. You can switch between the two anytime in Settings." },
+    { q: "Can I add more than one child, and can each one have different chores and amounts?",
+      a: "Yes. Add as many children as you like from the Kids tab, each with their own PIN, avatar and colour. Chores can be assigned to one child, several, or all of them, and each child can have a different value per chore, or a different Amount per Cycle target." },
+    { q: "What happens if my child misses a chore?",
+      a: `If a chore's due date passes without it being marked done, it's automatically logged as missed at the end of that day. Missed chores don't pay out, and they show up under "Missed Chores" on your dashboard so you can see the full history. If however you know they did the chore and forgot to mark it as done, you can still approve it in the "Missed Chores" section.` },
+    { q: "What are Distributions and Expenditure in Money Management?",
+      a: `Distributions show how much you still owe each child since you last paid them out - tap "Distribution Made" once you've handed over the cash or made a bank transfer, and the amount owed resets to zero. Expenditure is a separate record of money your kids have actually spent from their bank account or piggy bank, which you can capture manually to keep the app's balance matching reality - recorded expenses don't count against what you still owe.` },
+    { q: "What are Quick Chores, and how are they different from regular chores?",
+      a: "Quick Chores are one-off tasks you can assign on the spot - say, helping wash the car - with their own reward and an expiry date you choose. If you're on the Amount per Cycle system, a Quick Chore's reward is added to your child's balance as soon as it's approved, unlike regular chores, which are only added to their balance at the end of the cycle." },
+    { q: "What are bonuses and milestones, and how do my kids earn them?",
+      a: "You can set a savings milestone with its own bonus amount. As soon as a child's balance reaches that threshold, the bonus is added automatically - no approval needed. It's a way to reward long-term saving on top of regular chores." },
+    { q: "What are Rewards, and how are they different from chore earnings and bonuses?",
+      a: "Rewards are for bigger, one-off goals - an exam mark, a sports achievement, anything worth celebrating - that you set up separately from regular chores. Like chores, a child marks a reward as done and you approve it before the amount is added to their balance. Bonuses, by contrast, are savings milestones that pay out automatically once a child's balance reaches a set amount, with no approval needed." },
+    { q: "Can I edit or delete a chore after I've created it?",
+      a: "Yes. Open the Chores tab, tap the pencil icon on any chore to change its name, value, schedule or who it's assigned to, or the trash icon to delete it. Editing a chore doesn't affect chores your child has already completed." },
+    { q: "What does a chore's weighting (0.5x-2x) mean under Amount per Cycle?",
+      a: "Weighting decides how much a chore counts toward a child's overall progress for the cycle, not how much it's worth in money. A chore weighted 2x counts double toward their percentage complete; one weighted 0.5x counts half. It's useful for making bigger or smaller chores count accordingly without assigning them an amount directly." },
+    { q: "What happens if I switch from Amount per Cycle to Amount per Chore partway through a cycle?",
+      a: "Switching mid-cycle closes it out early. You'll see exactly what each child has earned so far - worked out the same way as normal, just for a shorter period - before you confirm. That amount is added to their balance straight away, and every chore then needs its own value set before it pays out again." },
+    { q: "What is Reconciliation, and when should I use it?",
+      a: "Reconciliation lets you compare what the app says a child should have against what they actually have in real life, like their bank account or piggy bank. It's a quick way to check the two match up, especially after handing over cash or making a manual adjustment." },
+    { q: "What if my child forgets their PIN, or I forget my parent PIN?",
+      a: `You can reset a child's PIN anytime from their profile in the Kids tab. If you forget your own parent PIN, use "Forgot PIN?" on the PIN screen to reset it via your account email.` },
+    { q: "Can I change our home currency after we've already set everything up?",
+      a: "Yes, anytime in Settings. It changes how amounts are displayed going forward - existing chores, balances and history aren't converted, they just show under the new currency symbol." }
+];
+function toggleFaq(i) { S.faqOpen = S.faqOpen === i ? null : i; render(); }
+function pFAQ() {
+    return `
+    <div style="max-width:680px">
+      <p class="pr-section-label mb-3">FAQ &amp; Help</p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${FAQ_ITEMS.map((item, i) => {
+          const open = S.faqOpen === i;
+          return `
+          <div style="background:var(--color-background);border:1px solid var(--color-border);border-radius:14px;overflow:hidden">
+            <button onclick="toggleFaq(${i})" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:var(--font-family);padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
+              <span style="font-size:14.5px;font-weight:800;color:var(--color-green-700)">${item.q}</span>
+              <span style="font-size:19px;font-weight:800;color:var(--color-green-600);flex:none;line-height:1">${open ? '−' : '+'}</span>
+            </button>
+            ${open ? `<div style="padding:0 18px 18px;font-size:14px;line-height:1.6;color:var(--color-text-secondary)">${item.a}</div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
 function pSettings() {
     const currCode = getCurrencyCode();
     const t = loadTreeThresholds();
