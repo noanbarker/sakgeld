@@ -907,17 +907,17 @@ function setTab(t) {
 // ─── PARENT DASHBOARD TUTORIAL ──────────────────────────────────
 const TOUR_STEPS = [
     { id: 'welcome' },
-    { id: 'settings', tab: 'settings', icon: 'gear', title: 'Settings',
+    { id: 'settings', tab: 'settings', title: 'Settings',
       body: "This is where you set the basics for your family — currency, your allowance cycle, and your Parent PIN. Start here before anything else." },
-    { id: 'kids', tab: 'kids', icon: 'users', title: 'Kids',
+    { id: 'kids', tab: 'kids', title: 'Kids',
       body: "Add a profile for each child — name, avatar and their own PIN — so they can log in on their side of the app and see their own balance." },
-    { id: 'chores', tab: 'chores', icon: 'list', title: 'Chores',
+    { id: 'chores', tab: 'chores', title: 'Chores',
       body: "Create chores, assign them to one child or everyone, and set what each one pays. Completed chores land here for you to approve before the money moves." },
-    { id: 'bonuses', tab: 'bonuses', icon: 'star', title: 'Bonuses',
+    { id: 'bonuses', tab: 'bonuses', title: 'Bonuses',
       body: "Give one-off or recurring bonus payments — for good behaviour, a milestone, or anything outside the usual chore list." },
-    { id: 'rewards', tab: 'rewards', icon: 'trophy', title: 'Rewards',
+    { id: 'rewards', tab: 'rewards', title: 'Rewards',
       body: "Build a list of things your kids can spend their earned money on, and approve their reward requests as they come in." },
-    { id: 'money', tab: 'money', icon: 'banknote', title: 'Money',
+    { id: 'money', tab: 'money', title: 'Money',
       body: "See every child's balance at a glance, review their transaction history, and record deposits, withdrawals or adjustments by hand." }
 ];
 function startTour() { S.tourStep = 0; render(); }
@@ -960,9 +960,9 @@ function renderTour() {
     const isWelcome = !step.tab;
     const title = isWelcome ? 'Welcome to your dashboard' : step.title;
     const body = isWelcome
-        ? "Let's take a two-minute look around. We'll walk through Settings, Kids, Chores, Bonuses, Rewards and Money — six places worth knowing before you dive in."
+        ? "Let's take a two-minute look around. We'll walk through Settings, Kids, Chores, Bonuses, Rewards and Money - six places worth knowing before you dive in."
         : step.body;
-    const icon = isWelcome ? '🌱' : uiIcon(step.icon, 17);
+    const iconHTML = `<img src="../images/sprout-thinking_800.webp" alt="" style="height:120px;width:auto;display:block;flex-shrink:0">`;
     const dots = TOUR_STEPS.map((s, i) => `<span style="width:${i === S.tourStep ? '16px' : '6px'};height:6px;border-radius:${i === S.tourStep ? '4px' : '50%'};background:${i === S.tourStep ? 'var(--color-green-600)' : (i < S.tourStep ? 'var(--color-green-300)' : 'var(--color-border)')};transition:width .2s"></span>`).join('');
     const backStyle = `background:none;border:1.5px solid var(--color-border);color:var(--color-text-primary);border-radius:12px;font-weight:800;font-size:13px;padding:9px 16px;cursor:pointer;font-family:var(--font-family);${S.tourStep === 0 ? 'visibility:hidden' : ''}`;
     return `
@@ -970,8 +970,13 @@ function renderTour() {
     <div id="tourSpotlight" style="position:fixed;z-index:71;border-radius:14px;pointer-events:none;box-shadow:0 0 0 4px rgba(255,255,255,.95),0 0 0 6px var(--color-green-600),0 0 0 9999px rgba(15,23,42,.6);transition:top .35s cubic-bezier(.4,0,.2,1),left .35s cubic-bezier(.4,0,.2,1),width .35s cubic-bezier(.4,0,.2,1),height .35s cubic-bezier(.4,0,.2,1);${isWelcome ? 'display:none' : ''}"></div>
     <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:380px;max-width:calc(100% - 48px);background:#fff;border-radius:18px;box-shadow:var(--shadow-card);padding:24px 24px 20px;z-index:72">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-        <span style="width:34px;height:34px;border-radius:10px;background:var(--color-green-50);color:var(--color-green-700);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px">${icon}</span>
-        <span style="flex:1;font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-secondary)">Step ${S.tourStep + 1} of ${total}</span>
+        <div style="display:flex;align-items:center;flex:1">
+          ${iconHTML}
+          <!-- sprout-thinking_800.webp has ~38% transparent padding on each side of the
+               figure, so a negative margin is needed to sit the label next to the actual
+               character instead of next to the image's empty edge. -->
+          <span style="margin-left:-38px;font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-secondary)">Step ${S.tourStep + 1} of ${total}</span>
+        </div>
         <button onclick="endTour()" aria-label="Skip tour" style="background:none;border:none;color:var(--color-text-secondary);font-size:13px;width:26px;height:26px;border-radius:8px;cursor:pointer">✕</button>
       </div>
       <h3 style="font-family:var(--font-family);font-size:19px;font-weight:900;margin:0 0 8px;color:var(--color-text-primary)">${title}</h3>
