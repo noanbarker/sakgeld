@@ -347,9 +347,17 @@
         background:#f59e0b; color:white; font-size:11px; font-weight:800;
         min-width:18px; height:18px; border-radius:9999px; padding:0 5px;
       }
+      .tour-nudge { display:flex; flex-direction:row; align-items:center; gap:16px; }
+      .tour-nudge-row { display:flex; align-items:center; gap:16px; flex:1; min-width:0; }
+      .tour-mascot { height:120px; width:auto; display:block; flex-shrink:0; }
+      .tour-step-label { margin-left:-38px; }
 
       /* ── Mobile overrides ────────────────────────────── */
       @media (max-width: 640px) {
+        .tour-nudge { flex-direction:column; align-items:stretch; }
+        .tour-nudge-btn { width:100%; justify-content:center; }
+        .tour-mascot { height:88px; }
+        .tour-step-label { margin-left:-26px; }
 
         /* Parent dashboard content area */
         .sp-tab-content { padding: 14px 16px !important; }
@@ -962,19 +970,55 @@ function endTour() {
     S.tourStep = -1;
     setTab('overview');
 }
+function resetTourPopupPosition() {
+    const popup = document.getElementById('tourPopup');
+    if (!popup) return;
+    // Setting these to '' would unset them entirely rather than restoring the
+    // centered defaults from the popup's own inline style, so they're restated here.
+    popup.style.top = '50%';
+    popup.style.transform = 'translate(-50%,-50%)';
+    popup.style.maxHeight = 'calc(100vh - 48px)';
+}
 function positionTourSpotlight() {
     const spotlight = document.getElementById('tourSpotlight');
     if (!spotlight) return;
     const step = TOUR_STEPS[S.tourStep];
-    const target = step.tab && document.getElementById('nav-' + step.tab);
-    if (!target) { spotlight.style.display = 'none'; return; }
-    const rect = target.getBoundingClientRect();
-    const pad = 6;
+    if (!step.tab) { spotlight.style.display = 'none'; resetTourPopupPosition(); return; }
+    // The desktop sidebar and mobile top bar are both always in the DOM, but only
+    // one is visible at a time (toggled by the "hidden md:flex" breakpoint), so
+    // pick whichever nav item actually has size rather than hardcoding a breakpoint.
+    let target = document.getElementById('nav-' + step.tab);
+    let rect = target && target.getBoundingClientRect();
+    let onMobile = false;
+    if (!rect || (rect.width === 0 && rect.height === 0)) {
+        target = document.getElementById('mnav-' + step.tab);
+        rect = target && target.getBoundingClientRect();
+        onMobile = true;
+    }
+    if (!rect || (rect.width === 0 && rect.height === 0)) { spotlight.style.display = 'none'; resetTourPopupPosition(); return; }
+    const pad = 4;
     spotlight.style.display = 'block';
     spotlight.style.top = (rect.top - pad) + 'px';
     spotlight.style.left = (rect.left - pad) + 'px';
     spotlight.style.width = (rect.width + pad * 2) + 'px';
     spotlight.style.height = (rect.height + pad * 2) + 'px';
+
+    // On mobile the nav bar sits fixed at the top of the screen, so a vertically
+    // centered popup can grow tall enough to cover the very icon it's pointing at.
+    // Anchor it just below the nav bar instead, and let it scroll internally.
+    const popup = document.getElementById('tourPopup');
+    if (popup) {
+        if (onMobile) {
+            const bar = document.querySelector('.sp-mob-tabbar');
+            const barBottom = bar ? bar.getBoundingClientRect().bottom : 0;
+            const top = barBottom + 12;
+            popup.style.top = top + 'px';
+            popup.style.transform = 'translateX(-50%)';
+            popup.style.maxHeight = `calc(100vh - ${top + 24}px)`;
+        } else {
+            resetTourPopupPosition();
+        }
+    }
 }
 window.addEventListener('resize', () => { if (S.view === 'parent' && S.tourStep >= 0) positionTourSpotlight(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.view === 'parent' && S.tourStep >= 0) endTour(); });
@@ -996,15 +1040,16 @@ function renderTour() {
         title = step.title;
         body = step.body;
     }
-    const iconHTML = `<img src="../images/sprout-thinking_800.webp" alt="" style="height:120px;width:auto;display:block;flex-shrink:0">`;
+    const iconHTML = `<img src="../images/sprout-thinking_800.webp" alt="" class="tour-mascot">`;
     const headerInner = isChrome
         ? `<div style="display:flex;align-items:center;justify-content:center;flex:1">${iconHTML}</div>`
         : `<div style="display:flex;align-items:center;flex:1">
           ${iconHTML}
           <!-- sprout-thinking_800.webp has ~38% transparent padding on each side of the
                figure, so a negative margin is needed to sit the label next to the actual
-               character instead of next to the image's empty edge. -->
-          <span style="margin-left:-38px;font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-secondary)">Step ${S.tourStep} of ${total}</span>
+               character instead of next to the image's empty edge. The .tour-step-label
+               class scales that margin down to match the smaller mobile mascot. -->
+          <span class="tour-step-label" style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-secondary)">Step ${S.tourStep} of ${total}</span>
         </div>`;
     const dots = isChrome ? '' : contentSteps.map((s, i) => {
         const n = i + 1;
@@ -1015,7 +1060,7 @@ function renderTour() {
     return `
     <div id="tourDim" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:70;${isChrome ? '' : 'display:none'}"></div>
     <div id="tourSpotlight" style="position:fixed;z-index:71;border-radius:14px;pointer-events:none;box-shadow:0 0 0 4px rgba(255,255,255,.95),0 0 0 6px var(--color-green-600),0 0 0 9999px rgba(15,23,42,.6);transition:top .35s cubic-bezier(.4,0,.2,1),left .35s cubic-bezier(.4,0,.2,1),width .35s cubic-bezier(.4,0,.2,1),height .35s cubic-bezier(.4,0,.2,1);${isChrome ? 'display:none' : ''}"></div>
-    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:380px;max-width:calc(100% - 48px);max-height:calc(100vh - 48px);overflow-y:auto;background:#fff;border-radius:18px;box-shadow:var(--shadow-card);padding:24px 24px 20px;z-index:72">
+    <div id="tourPopup" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:380px;max-width:calc(100% - 48px);max-height:calc(100vh - 48px);overflow-y:auto;background:#fff;border-radius:18px;box-shadow:var(--shadow-card);padding:24px 24px 20px;z-index:72">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:-20px">
         ${headerInner}
         <button onclick="endTour()" aria-label="Close" style="background:none;border:none;color:var(--color-text-secondary);font-size:13px;width:26px;height:26px;border-radius:8px;cursor:pointer">✕</button>
@@ -2300,7 +2345,7 @@ function vParent() {
           return `<div class="sp-mob-divider" style="left:calc(${i + 1} * (100% / ${navItems.length}));opacity:${hidden ? 0 : 1}"></div>`;
       }).join('')}
       ${navItems.map(t => `
-        <button onclick="setTab('${t.id}')"
+        <button id="mnav-${t.id}" onclick="setTab('${t.id}')"
           class="sp-mob-tab flex-1 py-3 relative ${S.tab === t.id ? 'tab-active' : 'tab-inactive'}"
           style="font-family:var(--font-family);font-size:10px;font-weight:700;letter-spacing:0.04em">
           <span class="sp-mob-tab-svg">${t.svg}</span>
@@ -2552,13 +2597,15 @@ function pOverview(db) {
         <div class="flex flex-col gap-2">${pendingRewardRows}</div>`}
       </div>
     </div>
-    <div class="hidden md:flex" style="margin-top:30px;align-items:center;gap:16px;background:var(--color-green-bg);border:1px solid var(--color-green-border);border-radius:var(--radius-lg);padding:18px 20px">
-      <span style="width:40px;height:40px;border-radius:12px;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:19px;box-shadow:var(--shadow-sm)">🧭</span>
-      <div style="flex:1">
-        <div style="font-family:var(--font-family);font-weight:800;font-size:14px;color:var(--color-text-primary);margin-bottom:2px">New here?</div>
-        <div style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);line-height:1.4">Take a two-minute tour of your dashboard — Settings, Kids, Chores, Bonuses, Rewards and Money.</div>
+    <div class="tour-nudge" style="margin-top:30px;background:var(--color-green-bg);border:1px solid var(--color-green-border);border-radius:var(--radius-lg);padding:18px 20px">
+      <div class="tour-nudge-row">
+        <span style="width:40px;height:40px;border-radius:12px;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:19px;box-shadow:var(--shadow-sm)">🧭</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--font-family);font-weight:800;font-size:14px;color:var(--color-text-primary);margin-bottom:2px">New here?</div>
+          <div style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);line-height:1.4">Take a two-minute tour of your dashboard — Settings, Kids, Chores, Bonuses, Rewards and Money.</div>
+        </div>
       </div>
-      <button onclick="startTour()" style="background:#fff;color:var(--color-green-700);border:1.5px solid var(--color-green-600);border-radius:var(--radius-lg);font-weight:800;font-size:13.5px;padding:10px 20px;flex-shrink:0;display:flex;align-items:center;gap:7px;cursor:pointer;font-family:var(--font-family)">🧭 Tutorial</button>
+      <button onclick="startTour()" class="tour-nudge-btn" style="background:#fff;color:var(--color-green-700);border:1.5px solid var(--color-green-600);border-radius:var(--radius-lg);font-weight:800;font-size:13.5px;padding:10px 20px;flex-shrink:0;display:flex;align-items:center;gap:7px;cursor:pointer;font-family:var(--font-family)">🧭 Tutorial</button>
     </div>`;
 }
 
