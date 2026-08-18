@@ -932,8 +932,13 @@ const TOUR_STEPS = [
       body: "This is where you can set your children's savings milestones. This would allow them to earn a one time bonus for each milestone they achieve." },
     { id: 'rewards', tab: 'rewards', title: 'Rewards',
       body: "This is where you can add rewards for those special achievements worth celebrating. This could be an exam mark, a sports achievement, anything worth celebrating." },
-    { id: 'money', tab: 'money', title: 'Money',
-      body: "See every child's balance at a glance, review their transaction history, and record deposits, withdrawals or adjustments by hand." }
+    { id: 'money', tab: 'money', title: 'Money Management',
+      body: `This section helps you with the following:
+      <ul style="list-style:disc;margin:10px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px">
+        <li><strong>Distributions:</strong> See what you still owe them from the last payout.</li>
+        <li><strong>Expenditure:</strong> Record cash kids actually spent.</li>
+        <li><strong>Reconciliation Tool:</strong> Helps you compare their app balance to that of their actual bank account or piggy bank.</li>
+      </ul>` }
 ];
 function startTour() { S.tourStep = 0; render(); }
 function tourGoTo(i) {
