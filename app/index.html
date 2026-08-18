@@ -1741,7 +1741,7 @@ function onboardBack() { S.onboardStep = Math.max(S.onboardStep - 1, 0); render(
 async function finishOnboarding() {
     const { data } = await sb.auth.updateUser({ data: { onboarding_complete: true } });
     if (data?.user) currentUser = data.user;
-    go('parent', { tab: 'overview' });
+    go('home');
 }
 
 function vOnboarding() {
