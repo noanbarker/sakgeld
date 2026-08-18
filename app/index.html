@@ -1950,12 +1950,12 @@ function vOnboarding() {
         <div style="display:flex;flex-direction:column;gap:10px" class="mb-4">
           <button onclick="chooseAllowanceMode('per_chore')" type="button"
             style="text-align:left;padding:14px 16px;border-radius:14px;border:2px solid ${mode==='per_chore'?'var(--color-green-600)':'var(--color-border)'};background:${mode==='per_chore'?'var(--color-green-100)':'white'};cursor:pointer">
-            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Amount per chore</p>
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Amount per Chore</p>
             <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">Each chore has its own amount. A kid earns it the moment that chore is approved.</p>
           </button>
           <button onclick="chooseAllowanceMode('per_cycle')" type="button"
             style="text-align:left;padding:14px 16px;border-radius:14px;border:2px solid ${mode==='per_cycle'?'var(--color-green-600)':'var(--color-border)'};background:${mode==='per_cycle'?'var(--color-green-100)':'white'};cursor:pointer">
-            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Amount per cycle</p>
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Amount per Cycle</p>
             <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">Set a total amount for the week, fortnight, or month. A kid's share is worked out from the percentage of their chores they complete by the end of the cycle, nothing is added to their balance until then.</p>
           </button>
         </div>
@@ -3100,7 +3100,7 @@ function pSettings() {
         { stage: 4, name: 'Forest',     range: `${R(t.t4)} and above` },
     ];
     const sections = [
-        { id: 'allowance', title: 'Allowance System',         subtitle: isCycleMode() ? `Amount per cycle — ${CYCLE_PERIOD_LABELS[getCyclePeriod()]}` : 'Amount per chore' },
+        { id: 'allowance', title: 'Allowance System',         subtitle: isCycleMode() ? `Amount per Cycle — ${CYCLE_PERIOD_LABELS[getCyclePeriod()]}` : 'Amount per Chore' },
         { id: 'currency', title: 'Currency / Value Display', subtitle: 'Choose how values are displayed' },
         { id: 'tree',     title: 'Tree Growth Stages',       subtitle: 'Set the balance thresholds for each tree stage' },
         { id: 'pin',      title: 'Parent PIN',               subtitle: hasParentPin ? 'A PIN is currently set' : 'No PIN set' },
@@ -3154,12 +3154,12 @@ function pSettings() {
             <div style="display:flex;flex-direction:column;gap:10px">
               <button onclick="chooseAllowanceMode('per_chore')" type="button"
                 style="text-align:left;padding:14px 16px;border-radius:14px;border:2px solid ${mode==='per_chore'?'var(--color-green-600)':'var(--color-border)'};background:${mode==='per_chore'?'var(--color-green-100)':'white'};cursor:pointer">
-                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Amount per chore</p>
+                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Amount per Chore</p>
                 <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">Each chore has its own amount. A kid earns it the moment that chore is approved.</p>
               </button>
               <button onclick="chooseAllowanceMode('per_cycle')" type="button"
                 style="text-align:left;padding:14px 16px;border-radius:14px;border:2px solid ${mode==='per_cycle'?'var(--color-green-600)':'var(--color-border)'};background:${mode==='per_cycle'?'var(--color-green-100)':'white'};cursor:pointer">
-                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Amount per cycle</p>
+                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">Amount per Cycle</p>
                 <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">Set a total amount for the week, fortnight, or month. A kid's share is worked out from the percentage of their chores they complete by the end of the cycle, nothing is added to their balance until then.</p>
               </button>
             </div>
