@@ -739,7 +739,8 @@ function choreIconSVG(key, size = 44) {
     const idx = (num >= 1 && num <= 41) ? num : 37;
     const file = CHORE_ICON_FILES[idx];
     const name = CHORE_ICON_NAMES[idx];
-    return `<img src="../images/chores/${file}" alt="${name}" style="width:${size}px;height:${size}px;object-fit:contain;display:block">`;
+    const pngFile = file.replace(/\.webp$/i, '.png');
+    return `<picture><source srcset="../images/chores/${file}" type="image/webp"><img src="../images/chores/${pngFile}" alt="${name}" style="width:${size}px;height:${size}px;object-fit:contain;display:block"></picture>`;
 }
 
 // ─── TREE GROWTH STAGES ──────────────────────────────────────────
@@ -786,7 +787,8 @@ function treeStageSVG(stageIndex, size = 80) {
     const scale = [0.62, 0.76, 0.88, 1, 1.18];
     const idx = Math.min(stageIndex, 4);
     const h = Math.round(size * scale[idx]);
-    return `<img src="../images/${files[idx]}" alt="${TREE_STAGES[idx].label}" style="height:${h}px;width:auto;display:block">`;
+    const pngFile = files[idx].replace(/\.webp$/i, '.png');
+    return `<picture><source srcset="../images/${files[idx]}" type="image/webp"><img src="../images/${pngFile}" alt="${TREE_STAGES[idx].label}" style="height:${h}px;width:auto;display:block"></picture>`;
 }
 
 // ─── CHORE EMOJIS (legacy — kept for fallback) ────────────────────
@@ -1036,7 +1038,7 @@ function renderTour() {
         title = step.title;
         body = step.body;
     }
-    const iconHTML = `<img src="../images/sprout-thinking_800.webp" alt="" class="tour-mascot">`;
+    const iconHTML = `<picture><source srcset="../images/sprout-thinking_800.webp" type="image/webp"><img src="../images/sprout-thinking_800.png" alt="" class="tour-mascot"></picture>`;
     const headerInner = isChrome
         ? `<div style="display:flex;align-items:center;justify-content:center;flex:1">${iconHTML}</div>`
         : `<div style="display:flex;align-items:center;flex:1">
@@ -1531,7 +1533,7 @@ function vLogin() {
           <div class="pr-blob-bottom"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;justify-content:center;margin-bottom:28px">
-              <img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:130px;width:auto;display:block;transform:translateX(-10.75%)">
+              <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:130px;width:auto;display:block;transform:translateX(-10.75%)"></picture>
             </div>
             ${isForgot ? `
             <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:18px;text-align:center">Enter your email and we'll send you a link to reset your password.</p>
@@ -1588,7 +1590,7 @@ function vSignupPage() {
           <div class="pr-stripe"></div>
           <div style="position:relative;z-index:1;padding:clamp(24px,4vw,40px)">
             <div style="display:flex;justify-content:center;margin-bottom:28px">
-              <img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:130px;width:auto;display:block;transform:translateX(-10.75%)">
+              <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:130px;width:auto;display:block;transform:translateX(-10.75%)"></picture>
             </div>
 
             <div class="su-grid">
@@ -1708,7 +1710,7 @@ function vResetPassword() {
           <div class="pr-blob-bottom"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;justify-content:center;margin-bottom:28px">
-              <img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:100px;width:auto;display:block">
+              <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture>
             </div>
             <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:18px;text-align:center">Choose a new password for your account.</p>
             <input type="password" id="rp-pass" placeholder="New password" class="mb-3"
@@ -1741,7 +1743,7 @@ function vResetParentPin() {
           <div class="pr-blob-bottom"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;justify-content:center;margin-bottom:28px">
-              <img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:100px;width:auto;display:block">
+              <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture>
             </div>
             <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:18px;text-align:center">Choose a new 4-digit parent PIN.</p>
             <input id="rpp-pin" placeholder="New 4-digit PIN" maxlength="4" inputmode="numeric" class="mb-3"
@@ -1792,7 +1794,7 @@ function vSubscriptionGate() {
         <div class="pr-card" style="padding:52px 40px 44px;text-align:center">
           <div class="pr-stripe"></div>
           <div style="position:relative;z-index:1">
-            <div style="display:flex;justify-content:center;margin-bottom:20px"><img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:100px;width:auto;display:block"></div>
+            <div style="display:flex;justify-content:center;margin-bottom:20px"><picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture></div>
             <h2 style="font-family:var(--font-family);font-size:22px;font-weight:900;color:#14532d;margin-bottom:10px">${needsAttention ? 'Your subscription needs attention' : "You're almost there!"}</h2>
             <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:28px">${needsAttention
                 ? 'There’s an issue with your payment method or subscription. Please update your details to keep using Sprout.'
@@ -1864,7 +1866,7 @@ function vHome() {
           <div style="position:relative;z-index:1">
             <!-- Logo block -->
             <div style="display:flex;justify-content:center;margin-bottom:20px">
-              <img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:130px;width:auto;display:block;transform:translateX(-10.75%)">
+              <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:130px;width:auto;display:block;transform:translateX(-10.75%)"></picture>
             </div>
             <!-- Family Portal label -->
             <p style="margin:0 auto;text-align:center;font-family:var(--font-family);font-weight:800;color:var(--color-green);font-size:30px;white-space:nowrap">Family Portal</p>
@@ -2297,7 +2299,7 @@ function vParent() {
     <aside style="width:220px;min-height:100vh;background:#f6faf7;flex-direction:column;flex-shrink:0;border-right:1px solid var(--color-border)" class="hidden md:flex">
       <div style="height:5px;background:var(--gradient-stripe);flex-shrink:0"></div>
       <div style="padding:28px 20px 16px;display:flex;flex-direction:column;align-items:flex-start;gap:2px">
-        <img src="../images/Sprout_Logo_400.webp" alt="Sprout" style="height:100px;width:auto;display:block">
+        <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture>
         <p style="color:var(--color-green);font-size:18px;font-weight:700;font-family:var(--font-family);margin-left:9px">Parent Dashboard</p>
       </div>
       <div style="padding:16px 20px;border-top:1px solid #16a34a;border-bottom:1px solid #16a34a">
@@ -2327,7 +2329,7 @@ function vParent() {
     <div style="height:5px;background:var(--gradient-stripe)"></div>
     <div class="pl-2 pr-5 pt-0 pb-0 flex justify-between items-center" style="background:var(--color-surface);border-bottom:1px solid var(--color-green-border)">
       <div style="display:flex;align-items:flex-start;gap:10px;height:88px;overflow:hidden">
-        <img src="../images/Sprout_Logo_400.webp" alt="Sprout" class="sp-mobile-logo" style="height:100px;width:auto;display:block;flex-shrink:0">
+        <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" class="sp-mobile-logo" style="height:100px;width:auto;display:block;flex-shrink:0"></picture>
       </div>
       <div class="flex items-center gap-4">
         <button onclick="go('home')" style="color:#15803d;font-size:21px;background:none;border:none;cursor:pointer;font-family:var(--font-family);display:flex;align-items:center;gap:6px">← ${uiIcon('home', 24)}</button>
@@ -3511,7 +3513,7 @@ function vKid() {
           <span style="font-family:var(--font-family);font-size:11px;font-weight:600;color:var(--color-text-secondary);letter-spacing:normal;text-transform:none;margin-left:6px">&mdash; ${new Date().toLocaleDateString('en-ZA',{weekday:'long', day:'numeric', month:'short'})}</span>
         </p>
         ${ready.length === 0
-            ? `<div class="card text-center py-2 mb-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px;font-weight:700"><img src="../images/sprout-celebrating_800_cropped.webp" alt="" style="height:75px;width:auto;display:block;margin:0 auto">All done for today!</div>`
+            ? `<div class="card text-center py-2 mb-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px;font-weight:700"><picture><source srcset="../images/sprout-celebrating_800_cropped.webp" type="image/webp"><img src="../images/sprout-celebrating_800_cropped.png" alt="" style="height:75px;width:auto;display:block;margin:0 auto"></picture>All done for today!</div>`
             : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
               ${ready.map(c => `
                 <div class="card flex items-center gap-4">
