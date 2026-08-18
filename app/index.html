@@ -997,7 +997,7 @@ function renderTour() {
     <div id="tourDim" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:70;${isWelcome ? '' : 'display:none'}"></div>
     <div id="tourSpotlight" style="position:fixed;z-index:71;border-radius:14px;pointer-events:none;box-shadow:0 0 0 4px rgba(255,255,255,.95),0 0 0 6px var(--color-green-600),0 0 0 9999px rgba(15,23,42,.6);transition:top .35s cubic-bezier(.4,0,.2,1),left .35s cubic-bezier(.4,0,.2,1),width .35s cubic-bezier(.4,0,.2,1),height .35s cubic-bezier(.4,0,.2,1);${isWelcome ? 'display:none' : ''}"></div>
     <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:380px;max-width:calc(100% - 48px);max-height:calc(100vh - 48px);overflow-y:auto;background:#fff;border-radius:18px;box-shadow:var(--shadow-card);padding:24px 24px 20px;z-index:72">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:-20px">
         ${headerInner}
         <button onclick="endTour()" aria-label="Skip tour" style="background:none;border:none;color:var(--color-text-secondary);font-size:13px;width:26px;height:26px;border-radius:8px;cursor:pointer">✕</button>
       </div>
