@@ -442,6 +442,18 @@ let currentUser = null;
 let cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [] };
 const DB = { load: () => cache };
 
+// Reads the utm_source/medium/campaign/content/term captured by
+// js/utm-capture.js on whichever page the visitor first landed on, so paid
+// and organic acquisition events can be attributed back to the right ad/post.
+function getStoredUTM() {
+    try {
+        const raw = localStorage.getItem('sprout_utm');
+        if (!raw) return {};
+        const { captured_at, ...utm } = JSON.parse(raw);
+        return utm;
+    } catch (e) { return {}; }
+}
+
 // ─── PADDLE ──────────────────────────────────────────────────────
 const PADDLE_MONTHLY_PRICE_ID = 'pri_01kz8phde0ep7qr2syx293dg83'; // $4.50/month
 const PADDLE_YEARLY_PRICE_ID  = 'pri_01kz8phq5syca08vqrp6nqvwsr'; // $45.00/year
@@ -464,6 +476,9 @@ Paddle.Initialize({
                 toast('🎉 Almost there! Confirming your subscription…');
                 refreshUserAfterCheckout();
             } else {
+                if (window.posthog) posthog.capture('trial_started', { billing_cycle: S.billingCycle || 'monthly', ...getStoredUTM() });
+                if (typeof fbq === 'function') fbq('track', 'StartTrial');
+                if (typeof gtag === 'function') gtag('event', 'trial_started');
                 S.authMode = 'signin';
                 toast('🎉 Trial started! Check your email to confirm your account, then sign in.');
                 render();
@@ -500,6 +515,8 @@ function openTrialCheckout({ email, geo, userId, billingCycle }) {
     const priceId = isZA
         ? (isYearly ? PADDLE_YEARLY_PRICE_ID_ZA : PADDLE_MONTHLY_PRICE_ID_ZA)
         : (isYearly ? PADDLE_YEARLY_PRICE_ID : PADDLE_MONTHLY_PRICE_ID);
+    if (window.posthog) posthog.capture('checkout_started', { billing_cycle: billingCycle, geo, ...getStoredUTM() });
+    if (typeof fbq === 'function') fbq('track', 'InitiateCheckout');
     // No customer.address here on purpose — leaving it out lets Paddle work
     // out the customer's real billing country and tax itself.
     Paddle.Checkout.open({
@@ -587,6 +604,12 @@ async function initApp() {
     // any later means the recovery link silently becomes a normal signed-in session.
     sb.auth.onAuthStateChange(async (event, session) => {
         currentUser = session?.user || null;
+        // Links this browser's pre-signup activity (landing page, checkout_started)
+        // to the real person as soon as they're known, so acquisition source isn't
+        // lost. Safe to call repeatedly — PostHog no-ops if already identified as this id.
+        if (currentUser && window.posthog) {
+            posthog.identify(currentUser.id, { email: currentUser.email });
+        }
         if (event === 'PASSWORD_RECOVERY') {
             const intent = localStorage.getItem('sprout_recovery_intent');
             localStorage.removeItem('sprout_recovery_intent');
@@ -1845,7 +1868,8 @@ async function doSignUp() {
     const { data, error } = await sb.auth.signUp({
         email, password: pass,
         // `country` is only ever kept for analytics — it never decides pricing or tax.
-        options: { data: { name, country, billing_cycle: billingCycle, signup_geo: geo } }
+        // utm fields (from getStoredUTM) record which ad/post brought this signup in.
+        options: { data: { name, country, billing_cycle: billingCycle, signup_geo: geo, ...getStoredUTM() } }
     });
     if (error) { if (errEl) errEl.textContent = error.message; return; }
     // Supabase never errors for an already-registered email — it silently returns
@@ -4091,6 +4115,7 @@ async function addKid() {
     if (pinError) return toast('❌ Kid saved, but PIN could not be set.');
     cache.kids.push({ id, name, emoji, color_key, date_of_birth, balance: 0, ...cycleFields });
     trackLoops('child_added', { childrenCount: cache.kids.length });
+    if (window.posthog) posthog.capture('child_added', { childrenCount: cache.kids.length });
     closeModal(); toast(`${name} added! 🎉`);
 }
 // Reads the cycle-amount modal fields when in per-cycle mode; {} otherwise so
@@ -4157,6 +4182,7 @@ async function addChore() {
     if (error) return toast('❌ Could not save. Check your connection.');
     cache.chores.push({ id, name, description: desc, value: val, weight, assignedTo, emoji, schedule, days, created_at: now, schedule_updated_at: now });
     trackLoops(cache.chores.length === 1 ? 'first_chore_created' : null, { choreCount: cache.chores.length });
+    if (window.posthog) posthog.capture('chore_created', { choreCount: cache.chores.length });
     closeModal(); toast('Chore added!');
 }
 function editChore(id) {
@@ -4243,6 +4269,7 @@ async function addQuickTask() {
     if (error) return toast('❌ Could not save. Check your connection.');
     cache.chores.push({ id, name, description: '', value: val, assignedTo, emoji: '37', schedule: 'daily', days: [], oneOff: true, expiresOn });
     trackLoops(cache.chores.length === 1 ? 'first_chore_created' : null, { choreCount: cache.chores.length });
+    if (window.posthog) posthog.capture('chore_created', { choreCount: cache.chores.length });
     closeModal(); toast('Quick task assigned! 🎯');
 }
 async function doDeleteChore(id) {
@@ -4402,6 +4429,7 @@ async function approveChore(cid) {
     }
     const approvedCount = cache.completions.filter(c => c.approved).length;
     trackLoops(approvedCount === 1 ? 'first_chore_approved' : null, { hasApprovedChore: true });
+    if (window.posthog) posthog.capture('chore_approved');
     toast(paysOut ? `✓ Approved! ${R(chore?.value)} added to ${kid?.name}.` : `✓ Approved! Counts toward ${kid?.name}'s cycle progress.`);
     render();
 }
@@ -4439,6 +4467,7 @@ async function approveAllForKid(kidId) {
     }
     const approvedCountAll = cache.completions.filter(c => c.approved).length;
     trackLoops(approvedCountAll === wonComps.length ? 'first_chore_approved' : null, { hasApprovedChore: true });
+    if (window.posthog) wonComps.forEach(() => posthog.capture('chore_approved'));
     toast(isCycleMode() ? `✓ All approved! Counts toward ${kid.name}'s cycle progress${totalAdded > 0 ? ` (plus ${R(totalAdded)} from quick chores)` : ''}.` : `✓ All approved! ${R(totalAdded)} added to ${kid.name}.`);
     render();
 }
@@ -4486,6 +4515,7 @@ async function markDone(choreId, evt) {
         return toast('❌ Could not save. Check your connection.');
     }
     trackLoops(cache.completions.length === 1 ? 'first_chore_completed' : null, null);
+    if (window.posthog) posthog.capture('chore_completed');
     toast('Marked as done! Waiting for parent to approve. ⏳');
 }
 async function markRewardDone(rewardId, evt) {
@@ -4713,6 +4743,7 @@ function render() {
 
 initApp();
 </script>
+<script src="/js/utm-capture.js?v=1"></script>
 <script defer src="/js/cookie-consent.js?v=2"></script>
 <script defer src="/js/analytics.js?v=1"></script>
 <script defer src="/js/meta-pixel.js?v=1"></script>
