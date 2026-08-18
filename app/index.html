@@ -642,7 +642,8 @@ const S = {
     moneySection: null,
     onboardStep: 0,
     authMode: new URLSearchParams(window.location.search).get('mode') === 'signin' ? 'signin' : 'signup',
-    billingCycle: 'monthly'
+    billingCycle: 'monthly',
+    tourStep: -1
 };
 
 // ─── KID EMOJIS ──────────────────────────────────────────────────
@@ -901,6 +902,89 @@ function setTab(t) {
             thumb.style.transform = `translateX(${newIdx * tabWidth}px)`;
         }
     }
+}
+
+// ─── PARENT DASHBOARD TUTORIAL ──────────────────────────────────
+const TOUR_STEPS = [
+    { id: 'welcome' },
+    { id: 'settings', tab: 'settings', icon: 'gear', title: 'Settings',
+      body: "This is where you set the basics for your family — currency, your allowance cycle, and your Parent PIN. Start here before anything else." },
+    { id: 'kids', tab: 'kids', icon: 'users', title: 'Kids',
+      body: "Add a profile for each child — name, avatar and their own PIN — so they can log in on their side of the app and see their own balance." },
+    { id: 'chores', tab: 'chores', icon: 'list', title: 'Chores',
+      body: "Create chores, assign them to one child or everyone, and set what each one pays. Completed chores land here for you to approve before the money moves." },
+    { id: 'bonuses', tab: 'bonuses', icon: 'star', title: 'Bonuses',
+      body: "Give one-off or recurring bonus payments — for good behaviour, a milestone, or anything outside the usual chore list." },
+    { id: 'rewards', tab: 'rewards', icon: 'trophy', title: 'Rewards',
+      body: "Build a list of things your kids can spend their earned money on, and approve their reward requests as they come in." },
+    { id: 'money', tab: 'money', icon: 'banknote', title: 'Money',
+      body: "See every child's balance at a glance, review their transaction history, and record deposits, withdrawals or adjustments by hand." }
+];
+function startTour() { S.tourStep = 0; render(); }
+function tourGoTo(i) {
+    S.tourStep = i;
+    const step = TOUR_STEPS[i];
+    if (step.tab) setTab(step.tab); else render();
+}
+function tourNext() {
+    if (S.tourStep >= TOUR_STEPS.length - 1) { endTour(); return; }
+    tourGoTo(S.tourStep + 1);
+}
+function tourBack() {
+    if (S.tourStep <= 0) return;
+    tourGoTo(S.tourStep - 1);
+}
+function endTour() {
+    S.tourStep = -1;
+    setTab('overview');
+}
+function positionTourSpotlight() {
+    const spotlight = document.getElementById('tourSpotlight');
+    if (!spotlight) return;
+    const step = TOUR_STEPS[S.tourStep];
+    const target = step.tab && document.getElementById('nav-' + step.tab);
+    if (!target) { spotlight.style.display = 'none'; return; }
+    const rect = target.getBoundingClientRect();
+    const pad = 6;
+    spotlight.style.display = 'block';
+    spotlight.style.top = (rect.top - pad) + 'px';
+    spotlight.style.left = (rect.left - pad) + 'px';
+    spotlight.style.width = (rect.width + pad * 2) + 'px';
+    spotlight.style.height = (rect.height + pad * 2) + 'px';
+}
+window.addEventListener('resize', () => { if (S.view === 'parent' && S.tourStep >= 0) positionTourSpotlight(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.view === 'parent' && S.tourStep >= 0) endTour(); });
+function renderTour() {
+    const step = TOUR_STEPS[S.tourStep];
+    const total = TOUR_STEPS.length;
+    const isWelcome = !step.tab;
+    const title = isWelcome ? 'Welcome to your dashboard' : step.title;
+    const body = isWelcome
+        ? "Let's take a two-minute look around. We'll walk through Settings, Kids, Chores, Bonuses, Rewards and Money — six places worth knowing before you dive in."
+        : step.body;
+    const icon = isWelcome ? '🌱' : uiIcon(step.icon, 17);
+    const dots = TOUR_STEPS.map((s, i) => `<span style="width:${i === S.tourStep ? '16px' : '6px'};height:6px;border-radius:${i === S.tourStep ? '4px' : '50%'};background:${i === S.tourStep ? 'var(--color-green-600)' : (i < S.tourStep ? 'var(--color-green-300)' : 'var(--color-border)')};transition:width .2s"></span>`).join('');
+    const backStyle = `background:none;border:1.5px solid var(--color-border);color:var(--color-text-primary);border-radius:12px;font-weight:800;font-size:13px;padding:9px 16px;cursor:pointer;font-family:var(--font-family);${S.tourStep === 0 ? 'visibility:hidden' : ''}`;
+    return `
+    <div id="tourDim" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:70;${isWelcome ? '' : 'display:none'}"></div>
+    <div id="tourSpotlight" style="position:fixed;z-index:71;border-radius:14px;pointer-events:none;box-shadow:0 0 0 4px rgba(255,255,255,.95),0 0 0 6px var(--color-green-600),0 0 0 9999px rgba(15,23,42,.6);transition:top .35s cubic-bezier(.4,0,.2,1),left .35s cubic-bezier(.4,0,.2,1),width .35s cubic-bezier(.4,0,.2,1),height .35s cubic-bezier(.4,0,.2,1);${isWelcome ? 'display:none' : ''}"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:380px;max-width:calc(100% - 48px);background:#fff;border-radius:18px;box-shadow:var(--shadow-card);padding:24px 24px 20px;z-index:72">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <span style="width:34px;height:34px;border-radius:10px;background:var(--color-green-50);color:var(--color-green-700);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px">${icon}</span>
+        <span style="flex:1;font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-secondary)">Step ${S.tourStep + 1} of ${total}</span>
+        <button onclick="endTour()" aria-label="Skip tour" style="background:none;border:none;color:var(--color-text-secondary);font-size:13px;width:26px;height:26px;border-radius:8px;cursor:pointer">✕</button>
+      </div>
+      <h3 style="font-family:var(--font-family);font-size:19px;font-weight:900;margin:0 0 8px;color:var(--color-text-primary)">${title}</h3>
+      <p style="font-family:var(--font-family);font-size:14px;line-height:1.55;color:var(--color-text-secondary);margin:0 0 18px">${body}</p>
+      <div style="display:flex;gap:5px;margin-bottom:18px">${dots}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <button onclick="tourBack()" style="${backStyle}">Back</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="endTour()" style="background:none;border:none;color:var(--color-text-secondary);font-size:12.5px;font-weight:700;padding:8px 2px;cursor:pointer;font-family:var(--font-family)">Skip tour</button>
+          <button onclick="tourNext()" style="background:var(--gradient-primary);color:#fff;border:none;border-radius:12px;font-weight:800;font-size:13px;padding:9px 18px;box-shadow:var(--shadow-button);cursor:pointer;font-family:var(--font-family)">${S.tourStep === 0 ? 'Start Tour' : (S.tourStep === total - 1 ? 'Finish' : 'Next')}</button>
+        </div>
+      </div>
+    </div>`;
 }
 function toast(msg, icon = null) {
     if (S.toastTimer) clearTimeout(S.toastTimer);
@@ -2137,7 +2221,7 @@ function vParent() {
           const isActive = S.tab === t.id;
           const activeStyle = isActive ? 'background:rgba(22,163,74,.12);color:#14532d;' : '';
           return `
-          <button onclick="setTab('${t.id}')" class="sidebar-item ${isActive ? 'active' : ''}" style="margin-bottom:4px;${activeStyle}">
+          <button id="nav-${t.id}" onclick="setTab('${t.id}')" class="sidebar-item ${isActive ? 'active' : ''}" style="margin-bottom:4px;${activeStyle}">
             <span class="sp-sidebar-icon">${t.svg}</span>
             <span style="flex:1">${t.label}</span>
             ${t.badge ? `<span class="badge">${t.badge}</span>` : ''}
@@ -2194,7 +2278,8 @@ function vParent() {
                                     pSettings()}
         </div>
       </div>
-    </div>`;
+    </div>
+    ${S.tourStep >= 0 ? renderTour() : ''}`;
 }
 
 function missedChoreRow(c, db) {
@@ -2418,6 +2503,14 @@ function pOverview(db) {
         <p class="pr-section-label mb-3 mt-6">Pending Reward Approvals <span class="badge ml-1">${pendingRewards.length}</span></p>
         <div class="flex flex-col gap-2">${pendingRewardRows}</div>`}
       </div>
+    </div>
+    <div class="hidden md:flex" style="margin-top:30px;align-items:center;gap:16px;background:var(--color-green-bg);border:1px solid var(--color-green-border);border-radius:var(--radius-lg);padding:18px 20px">
+      <span style="width:40px;height:40px;border-radius:12px;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:19px;box-shadow:var(--shadow-sm)">🧭</span>
+      <div style="flex:1">
+        <div style="font-family:var(--font-family);font-weight:800;font-size:14px;color:var(--color-text-primary);margin-bottom:2px">New here?</div>
+        <div style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);line-height:1.4">Take a two-minute tour of your dashboard — Settings, Kids, Chores, Bonuses, Rewards and Money.</div>
+      </div>
+      <button onclick="startTour()" style="background:#fff;color:var(--color-green-700);border:1.5px solid var(--color-green-600);border-radius:var(--radius-lg);font-weight:800;font-size:13.5px;padding:10px 20px;flex-shrink:0;display:flex;align-items:center;gap:7px;cursor:pointer;font-family:var(--font-family)">🧭 Tutorial</button>
     </div>`;
 }
 
@@ -4436,6 +4529,7 @@ function render() {
         const newLogo = app.querySelector('.sp-mobile-logo');
         if (newLogo && newLogo.src === prevLogo.src) newLogo.replaceWith(prevLogo);
     }
+    if (S.view === 'parent' && S.tourStep >= 0) positionTourSpotlight();
     S.tabAnim = null;
 }
 
