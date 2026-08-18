@@ -968,6 +968,21 @@ function endTour() {
     S.tourStep = -1;
     setTab('overview');
 }
+function tutorialNudgeDismissed() {
+    try { return localStorage.getItem('sprout_tutorial_nudge_dismissed') === 'true'; }
+    catch { return false; }
+}
+function dismissTutorialNudge() {
+    try { localStorage.setItem('sprout_tutorial_nudge_dismissed', 'true'); } catch {}
+    render();
+}
+function renderTutorialNudge() {
+    return `
+    <div class="md:hidden" style="position:fixed;left:16px;right:16px;bottom:16px;z-index:60;background:#1e293b;color:#fff;font-family:var(--font-family);border-radius:var(--radius-full);box-shadow:0 8px 24px rgba(0,0,0,.25);padding:6px 6px 6px 16px;display:flex;align-items:center;gap:8px">
+      <button onclick="startTour()" style="flex:1;display:flex;align-items:center;gap:8px;background:none;border:none;color:#fff;cursor:pointer;text-align:left;padding:8px 0;font-size:14px;font-weight:800;font-family:var(--font-family)">Tutorial</button>
+      <button onclick="dismissTutorialNudge()" style="background:rgba(255,255,255,.14);border:none;color:rgba(255,255,255,.85);cursor:pointer;font-size:11.5px;font-weight:700;padding:8px 12px;border-radius:var(--radius-full);white-space:nowrap;font-family:var(--font-family)">Don't show again</button>
+    </div>`;
+}
 function resetTourPopupPosition() {
     const popup = document.getElementById('tourPopup');
     if (!popup) return;
@@ -4686,7 +4701,8 @@ function render() {
     // time and produces a visible flash as the browser reflows/repaints it. Reuse
     // the already-painted node instead of letting the fresh one take its place.
     const prevLogo = app.querySelector('.sp-mobile-logo');
-    app.innerHTML = html + renderModal() + toastHtml;
+    const showTutorialNudge = S.view === 'parent' && S.tourStep < 0 && !S.modal && !tutorialNudgeDismissed();
+    app.innerHTML = html + renderModal() + (showTutorialNudge ? renderTutorialNudge() : '') + toastHtml;
     if (prevLogo) {
         const newLogo = app.querySelector('.sp-mobile-logo');
         if (newLogo && newLogo.src === prevLogo.src) newLogo.replaceWith(prevLogo);
