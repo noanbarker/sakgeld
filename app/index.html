@@ -908,13 +908,19 @@ function setTab(t) {
 const TOUR_STEPS = [
     { id: 'welcome' },
     { id: 'settings', tab: 'settings', title: 'Settings',
-      body: "This is where you set the basics for your family — currency, your allowance cycle, and your Parent PIN. Start here before anything else." },
+      body: `This is where you set the basics for your family:
+      <ul style="list-style:disc;margin:10px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px">
+        <li><strong>Allowance system:</strong> Choose between Amount per Chore or Amount per Cycle.</li>
+        <li><strong>Currency:</strong> Choose the currency you want to operate in.</li>
+        <li><strong>Tree Growth Stages:</strong> Set the balance thresholds for each stage.</li>
+        <li>Parent PIN.</li>
+      </ul>` },
     { id: 'kids', tab: 'kids', title: 'Kids',
-      body: "Add a profile for each child — name, avatar and their own PIN — so they can log in on their side of the app and see their own balance." },
+      body: "Add a profile for each child - name, avatar and their own PIN - so they can log in on their side of the app and see their own balance." },
     { id: 'chores', tab: 'chores', title: 'Chores',
       body: "Create chores, assign them to one child or everyone, and set what each one pays. Completed chores land here for you to approve before the money moves." },
     { id: 'bonuses', tab: 'bonuses', title: 'Bonuses',
-      body: "Give one-off or recurring bonus payments — for good behaviour, a milestone, or anything outside the usual chore list." },
+      body: "Give one-off or recurring bonus payments - for good behaviour, a milestone, or anything outside the usual chore list." },
     { id: 'rewards', tab: 'rewards', title: 'Rewards',
       body: "Build a list of things your kids can spend their earned money on, and approve their reward requests as they come in." },
     { id: 'money', tab: 'money', title: 'Money',
@@ -956,37 +962,44 @@ window.addEventListener('resize', () => { if (S.view === 'parent' && S.tourStep 
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.view === 'parent' && S.tourStep >= 0) endTour(); });
 function renderTour() {
     const step = TOUR_STEPS[S.tourStep];
-    const total = TOUR_STEPS.length;
+    const lastIndex = TOUR_STEPS.length - 1;
+    const total = TOUR_STEPS.length - 1; // real steps only, excluding the welcome screen
     const isWelcome = !step.tab;
     const title = isWelcome ? 'Welcome to your dashboard' : step.title;
     const body = isWelcome
         ? "Let's take a two-minute look around. We'll walk through Settings, Kids, Chores, Bonuses, Rewards and Money - six places worth knowing before you dive in."
         : step.body;
     const iconHTML = `<img src="../images/sprout-thinking_800.webp" alt="" style="height:120px;width:auto;display:block;flex-shrink:0">`;
-    const dots = TOUR_STEPS.map((s, i) => `<span style="width:${i === S.tourStep ? '16px' : '6px'};height:6px;border-radius:${i === S.tourStep ? '4px' : '50%'};background:${i === S.tourStep ? 'var(--color-green-600)' : (i < S.tourStep ? 'var(--color-green-300)' : 'var(--color-border)')};transition:width .2s"></span>`).join('');
+    const headerInner = isWelcome
+        ? `<div style="display:flex;align-items:center;justify-content:center;flex:1">${iconHTML}</div>`
+        : `<div style="display:flex;align-items:center;flex:1">
+          ${iconHTML}
+          <!-- sprout-thinking_800.webp has ~38% transparent padding on each side of the
+               figure, so a negative margin is needed to sit the label next to the actual
+               character instead of next to the image's empty edge. -->
+          <span style="margin-left:-38px;font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-secondary)">Step ${S.tourStep} of ${total}</span>
+        </div>`;
+    const dots = isWelcome ? '' : TOUR_STEPS.slice(1).map((s, i) => {
+        const n = i + 1;
+        return `<span style="width:${n === S.tourStep ? '16px' : '6px'};height:6px;border-radius:${n === S.tourStep ? '4px' : '50%'};background:${n === S.tourStep ? 'var(--color-green-600)' : (n < S.tourStep ? 'var(--color-green-300)' : 'var(--color-border)')};transition:width .2s"></span>`;
+    }).join('');
     const backStyle = `background:none;border:1.5px solid var(--color-border);color:var(--color-text-primary);border-radius:12px;font-weight:800;font-size:13px;padding:9px 16px;cursor:pointer;font-family:var(--font-family);${S.tourStep === 0 ? 'visibility:hidden' : ''}`;
     return `
     <div id="tourDim" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:70;${isWelcome ? '' : 'display:none'}"></div>
     <div id="tourSpotlight" style="position:fixed;z-index:71;border-radius:14px;pointer-events:none;box-shadow:0 0 0 4px rgba(255,255,255,.95),0 0 0 6px var(--color-green-600),0 0 0 9999px rgba(15,23,42,.6);transition:top .35s cubic-bezier(.4,0,.2,1),left .35s cubic-bezier(.4,0,.2,1),width .35s cubic-bezier(.4,0,.2,1),height .35s cubic-bezier(.4,0,.2,1);${isWelcome ? 'display:none' : ''}"></div>
     <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:380px;max-width:calc(100% - 48px);background:#fff;border-radius:18px;box-shadow:var(--shadow-card);padding:24px 24px 20px;z-index:72">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-        <div style="display:flex;align-items:center;flex:1">
-          ${iconHTML}
-          <!-- sprout-thinking_800.webp has ~38% transparent padding on each side of the
-               figure, so a negative margin is needed to sit the label next to the actual
-               character instead of next to the image's empty edge. -->
-          <span style="margin-left:-38px;font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-secondary)">Step ${S.tourStep + 1} of ${total}</span>
-        </div>
+        ${headerInner}
         <button onclick="endTour()" aria-label="Skip tour" style="background:none;border:none;color:var(--color-text-secondary);font-size:13px;width:26px;height:26px;border-radius:8px;cursor:pointer">✕</button>
       </div>
       <h3 style="font-family:var(--font-family);font-size:19px;font-weight:900;margin:0 0 8px;color:var(--color-text-primary)">${title}</h3>
-      <p style="font-family:var(--font-family);font-size:14px;line-height:1.55;color:var(--color-text-secondary);margin:0 0 18px">${body}</p>
-      <div style="display:flex;gap:5px;margin-bottom:18px">${dots}</div>
+      <div style="font-family:var(--font-family);font-size:14px;line-height:1.55;color:var(--color-text-secondary);margin:0 0 18px">${body}</div>
+      ${isWelcome ? '' : `<div style="display:flex;gap:5px;margin-bottom:18px">${dots}</div>`}
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
         <button onclick="tourBack()" style="${backStyle}">Back</button>
         <div style="display:flex;gap:8px">
           <button onclick="endTour()" style="background:none;border:none;color:var(--color-text-secondary);font-size:12.5px;font-weight:700;padding:8px 2px;cursor:pointer;font-family:var(--font-family)">Skip tour</button>
-          <button onclick="tourNext()" style="background:var(--gradient-primary);color:#fff;border:none;border-radius:12px;font-weight:800;font-size:13px;padding:9px 18px;box-shadow:var(--shadow-button);cursor:pointer;font-family:var(--font-family)">${S.tourStep === 0 ? 'Start Tour' : (S.tourStep === total - 1 ? 'Finish' : 'Next')}</button>
+          <button onclick="tourNext()" style="background:var(--gradient-primary);color:#fff;border:none;border-radius:12px;font-weight:800;font-size:13px;padding:9px 18px;box-shadow:var(--shadow-button);cursor:pointer;font-family:var(--font-family)">${S.tourStep === 0 ? 'Start Tour' : (S.tourStep === lastIndex ? 'Finish' : 'Next')}</button>
         </div>
       </div>
     </div>`;
