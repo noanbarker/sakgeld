@@ -612,7 +612,7 @@ async function loadCache() {
         kids: kRes.data || [],
         chores: (cRes.data || []).map(c => ({ ...c, assignedTo: c.assigned_to, oneOff: c.one_off || false, expiresOn: c.expires_on || null })),
         completions: (compRes.data || []).map(c => ({ ...c, choreId: c.chore_id, kidId: c.kid_id, completedAt: c.completed_at, dueDate: c.due_date || null, missed: c.missed || false })),
-        transactions: (txRes.data || []).map(t => ({ ...t, kidId: t.kid_id, createdAt: t.created_at })),
+        transactions: (txRes.data || []).map(t => ({ ...t, kidId: t.kid_id, createdAt: t.created_at, choreDate: t.chore_date || null })),
         bonusMilestones: (bmRes.data || []).map(m => ({ ...m, assignedTo: m.assigned_to, bonusAmount: m.bonus_amount, claimedBy: m.claimed_by || [] })),
         rewards: (rwRes.data || []).map(r => ({ ...r, assignedTo: r.assigned_to })),
         rewardCompletions: (rcRes.data || []).map(c => ({ ...c, rewardId: c.reward_id, kidId: c.kid_id, claimedAt: c.claimed_at, approvedAt: c.approved_at })),
@@ -904,6 +904,12 @@ function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 function dateStr(iso) { return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }); }
+// The date an entry belongs to, which for a chore is the day it was assigned —
+// not the moment the parent got round to approving it. Approving a day or two
+// late must not shift a chore to a date the child never worked on. Noon keeps
+// the date from sliding either way across a timezone boundary. Everything else
+// (manual, bonus, reward, expense, allowance) happens when it happens.
+function txDate(t) { return t.choreDate ? t.choreDate + 'T12:00:00' : t.createdAt; }
 function kidIcon(kidOrName) {
     if (kidOrName && typeof kidOrName === 'object') {
         if (kidOrName.emoji) return kidOrName.emoji;
@@ -1217,7 +1223,10 @@ function weekStart() {
 function weeklyEarned(db, kidId) {
     const mon = weekStart();
     return db.transactions
-        .filter(t => t.kidId === kidId && t.type === 'chore' && new Date(t.createdAt) >= mon)
+        // Counted against weeklyPossible, which is built from the chore schedule —
+        // so this side has to be keyed on the assigned date too, or a Sunday chore
+        // approved on Monday lands in the wrong week's total.
+        .filter(t => t.kidId === kidId && t.type === 'chore' && new Date(txDate(t)) >= mon)
         .reduce((s, t) => s + t.amount, 0);
 }
 function weeklyPossible(db, kidId) {
@@ -2500,7 +2509,7 @@ function pOverview(db) {
             <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;background:var(--color-background)">
               <div class="flex-1 min-w-0">
                 <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:13px">${esc(chore?.name) || 'Deleted chore'}</p>
-                <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary);margin-top:1px">${detail} · ${dateStr(c.completedAt)}</p>
+                <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary);margin-top:1px">${detail} · ${dateStr(c.dueDate ? c.dueDate + 'T12:00:00' : c.completedAt)}</p>
               </div>
               <button onclick="approveChore('${c.id}')" title="Approve" style="background:var(--color-green-100);color:var(--color-green-700);padding:6px 11px;border-radius:8px;border:none;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center">${uiIcon('check', 13, 3)}</button>
               <button onclick="rejectChore('${c.id}')" title="Reject" style="background:var(--color-coral-bg);color:var(--color-coral-text);padding:6px 11px;border-radius:8px;border:none;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center">${uiIcon('cross', 13, 3)}</button>
@@ -3448,7 +3457,7 @@ function vKid() {
     const pending   = doneToday.filter(c => !c.approved);
     const ready     = allChores.filter(c => !doneTodayIds.includes(c.id));
     const txns      = db.transactions.filter(t => t.kidId === kid.id)
-                        .sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt));
+                        .sort((a,b) => new Date(txDate(b))-new Date(txDate(a)));
     const typeIcon  = { payout:'💸', weekly:'📅', chore:'✅', manual:'💰', bonus: milestoneStarSVG(16), reward:'🏆', expense:'🛍️' };
     const treeStageIdx = getTreeStage(kid.balance);
     const treeThresh   = loadTreeThresholds();
@@ -3732,7 +3741,7 @@ function vKid() {
                 </div>
                 <div class="flex-1 min-w-0">
                   <p style="font-family:var(--font-family);font-weight:600;color:var(--color-text-primary);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.description)}</p>
-                  <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary)">${dateStr(t.createdAt)}</p>
+                  <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary)">${dateStr(txDate(t))}</p>
                 </div>
                 <p style="font-family:var(--font-family);font-weight:800;font-size:13px;flex-shrink:0;color:${t.amount>0?ac.header:'var(--color-coral)'}">
                   ${t.amount>0?'+':''}${R(t.amount)}
@@ -4450,9 +4459,9 @@ async function approveChore(cid) {
         // transactions strictly after last_distribution_at.
         const txCreatedAt = new Date().toISOString();
         await sb.from('kids').update({ balance: newBalance }).eq('id', kid.id).eq('user_id', currentUser.id);
-        await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, kid_id: kid.id, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt });
+        await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, kid_id: kid.id, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt, chore_date: comp.dueDate || null });
         kid.balance = newBalance;
-        cache.transactions.push({ id: txId, kidId: kid.id, amount: chore.value, type: 'chore', description: chore.name, createdAt: txCreatedAt });
+        cache.transactions.push({ id: txId, kidId: kid.id, amount: chore.value, type: 'chore', description: chore.name, createdAt: txCreatedAt, choreDate: comp.dueDate || null });
         await checkBonusMilestones(kid.id, newBalance);
     }
     const approvedCount = cache.completions.filter(c => c.approved).length;
@@ -4480,7 +4489,7 @@ async function approveAllForKid(kidId) {
         if (chore && (!isCycleMode() || chore.oneOff)) {
             totalAdded += chore.value;
             const txCreatedAt = new Date().toISOString();
-            txInserts.push({ id: uid(), user_id: currentUser.id, kid_id: kidId, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt });
+            txInserts.push({ id: uid(), user_id: currentUser.id, kid_id: kidId, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt, chore_date: comp.dueDate || null });
         }
     });
     if (totalAdded > 0) {
@@ -4491,7 +4500,7 @@ async function approveAllForKid(kidId) {
     }
     if (txInserts.length) {
         await sb.from('transactions').insert(txInserts);
-        txInserts.forEach(t => cache.transactions.push({ id: t.id, kidId, amount: t.amount, type: t.type, description: t.description, createdAt: t.created_at }));
+        txInserts.forEach(t => cache.transactions.push({ id: t.id, kidId, amount: t.amount, type: t.type, description: t.description, createdAt: t.created_at, choreDate: t.chore_date }));
     }
     const approvedCountAll = cache.completions.filter(c => c.approved).length;
     trackLoops(approvedCountAll === wonComps.length ? 'first_chore_approved' : null, { hasApprovedChore: true });
