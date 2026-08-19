@@ -432,6 +432,12 @@
       /* Let the tab content scroll clear of the pill so nothing sits under it. */
       .sp-tab-content.sp-has-nudge { padding-bottom:104px !important; }
       @media (max-width:640px) { .sp-tab-content.sp-has-nudge { padding-bottom:88px !important; } }
+      /* Cards in these lists stay stacked one per line, but only take half the
+         width on desktop - stretched across the full dashboard they read as
+         banners. Narrower than this and half a row is not enough for the text,
+         which wraps and makes a card taller than the full-width one it
+         replaced, so below 1024px they keep the full width. */
+      @media (min-width:1024px) { .sp-narrow-list > .card { max-width:max(320px,50%); } }
     </style>
 </head>
 <body class="min-h-screen">
@@ -3006,7 +3012,10 @@ function pExpenditure(db) {
 }
 
 function pBonuses(db) {
-    const milestones = db.bonusMilestones || [];
+    // Ordered by the threshold itself, low to high, so the ladder reads in the
+    // order kids climb it. Card names and creation order are both editable and
+    // say nothing about how far a milestone is.
+    const milestones = [...(db.bonusMilestones || [])].sort((a, b) => (a.threshold || 0) - (b.threshold || 0));
     const bonusHistory = db.transactions
         .filter(t => t.type === 'bonus')
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -3080,11 +3089,11 @@ function pBonuses(db) {
     <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:20px">When a kid's balance reaches a threshold, they automatically receive the bonus — once per milestone.</p>
     ${milestones.length === 0
         ? `<div class="card text-center py-12" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px"><div style="display:flex;justify-content:center;margin-bottom:12px">${milestoneStarSVG(40)}</div>No milestones yet.<br>Add one to reward your kids for saving!</div>`
-        : `<div class="gap-3 mb-6" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));align-items:start">${milestoneCards}</div>`}
+        : `<div class="sp-narrow-list flex flex-col gap-3 mb-6">${milestoneCards}</div>`}
     ${bonusHistory.length > 0 ? `
     <div class="mt-2">
       <p class="pr-section-label mb-3">Bonus History</p>
-      <div class="flex flex-col gap-2">${historyRows}</div>
+      <div class="sp-narrow-list flex flex-col gap-2">${historyRows}</div>
     </div>` : ''}`;
 }
 
@@ -3170,7 +3179,7 @@ function pRewards(db) {
     ${rewardHistory.length > 0 ? `
     <div class="mt-2">
       <p class="pr-section-label mb-3">Reward History</p>
-      <div class="flex flex-col gap-2">${historyRows}</div>
+      <div class="sp-narrow-list flex flex-col gap-2">${historyRows}</div>
     </div>` : ''}`;
 }
 
