@@ -269,6 +269,14 @@
   .pr-grid-hero{grid-template-columns:1fr!important;gap:32px!important}
   .pr-grid-row{grid-template-columns:1fr!important;justify-items:center;text-align:center}
 }
+@media (min-width:641px) and (max-width:1090px){
+  /* Six nav items no longer fit beside the logo and buttons, so collapse the
+     links into the hamburger menu and keep the sign-in / trial buttons. */
+  .pr-desktop-nav{display:none!important}
+  .pr-desktop-auth{margin-left:auto!important;margin-right:16px!important}
+  #pr-hamburger{display:inline-flex!important}
+  #pr-menu-toggle:checked ~ #pr-mobmenu{display:flex!important}
+}
 </style>
 </head>
 <body>
@@ -277,7 +285,7 @@
   <input type="checkbox" id="pr-menu-toggle" style="display:none">
 <div class="pr-header-row" style="font-family:'Nunito',system-ui,sans-serif;display:flex;align-items:center;justify-content:space-between;height:76px;padding:0 clamp(20px,5vw,44px);position:sticky;top:0;background:rgba(246,250,247,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid #e5ece7;z-index:50">
   <div style="display:flex;align-items:center"><a href="index.html" style="display:flex;align-items:center;text-decoration:none"><picture><source srcset="images/Sprout_Logo_400.webp" type="image/webp"><img src="images/Sprout_Logo_400.png" alt="Sprout" style="height:75px;width:auto;display:block"></picture></a><div class="pr-tagline" style="display:flex;align-items:center;gap:10px;margin-left:10px"><span style="width:1px;height:16px;background:#bbf7d0"></span><span style="font-family:'Nunito',sans-serif;font-size:13px;font-weight:700"><span style="color:#2563eb">Earn.</span> <span style="color:#f43f5e">Save.</span> <span style="color:#16a34a">Grow.</span></span></div><div class="pr-tagline-mobile" style="display:none;flex-direction:column;margin-left:8px;line-height:1.15"><span style="font-family:'Nunito',sans-serif;font-size:9px;font-weight:800;color:#2563eb">Earn.</span><span style="font-family:'Nunito',sans-serif;font-size:9px;font-weight:800;color:#f43f5e">Save.</span><span style="font-family:'Nunito',sans-serif;font-size:9px;font-weight:800;color:#16a34a">Grow.</span></div></div>
-  <div class="pr-desktop-nav" style="display:flex;gap:30px"><a href="features.html" style="color:#475569;font-weight:700;font-size:15px;text-decoration:none">Features</a><a href="how-it-works.html" style="color:#475569;font-weight:700;font-size:15px;text-decoration:none">How it works</a><a href="pricing.html" style="color:#475569;font-weight:700;font-size:15px;text-decoration:none">Pricing</a><a href="faq.html" style="color:#475569;font-weight:700;font-size:15px;text-decoration:none">FAQ</a><a href="about.html" style="color:#15803d;font-weight:800;font-size:15px;text-decoration:none">About</a></div>
+  <div class="pr-desktop-nav" style="display:flex;gap:30px"><a href="features.html" style="color:#475569;font-weight:700;font-size:15px;text-decoration:none">Features</a><a href="how-it-works.html" style="color:#475569;font-weight:700;font-size:15px;text-decoration:none">How it works</a><a href="research.html" style="color:#475569;font-weight:700;font-size:15px;text-decoration:none">Research</a><a href="pricing.html" style="color:#475569;font-weight:700;font-size:15px;text-decoration:none">Pricing</a><a href="faq.html" style="color:#475569;font-weight:700;font-size:15px;text-decoration:none">FAQ</a><a href="about.html" style="color:#15803d;font-weight:800;font-size:15px;text-decoration:none">About</a></div>
   <div class="pr-desktop-auth" style="display:flex;gap:12px;align-items:center">
     <a href="app/index.html?mode=signin" style="font-size:15px;font-weight:800;color:#15803d;text-decoration:none">Sign in</a>
     <a href="app/index.html" style="text-decoration:none;background:linear-gradient(132deg,#16a34a,#15803d);color:#fff;font-weight:800;font-size:15px;padding:11px 22px;border-radius:14px;box-shadow:0 8px 20px rgba(22,163,74,.32)">Start Free Trial</a>
@@ -287,6 +295,7 @@
 <div id="pr-mobmenu" style="display:none;flex-direction:column;gap:2px;position:fixed;top:76px;left:0;right:0;background:#fff;border-bottom:1px solid #e5ece7;box-shadow:0 12px 28px rgba(0,0,0,.1);padding:10px 24px 20px;z-index:49">
   <a href="features.html" style="color:#334155;font-weight:700;font-size:16px;text-decoration:none;padding:12px 0">Features</a>
   <a href="how-it-works.html" style="color:#334155;font-weight:700;font-size:16px;text-decoration:none;padding:12px 0">How it works</a>
+  <a href="research.html" style="color:#334155;font-weight:700;font-size:16px;text-decoration:none;padding:12px 0">Research</a>
   <a href="pricing.html" style="color:#334155;font-weight:700;font-size:16px;text-decoration:none;padding:12px 0">Pricing</a>
   <a href="about.html" style="color:#334155;font-weight:700;font-size:16px;text-decoration:none;padding:12px 0">About</a>
   <div style="height:1px;background:#e5ece7;margin:6px 0"></div>
@@ -374,6 +383,7 @@
       <div style="display:flex;flex-direction:column;gap:10px;font-size:14px">
         <a href="features.html" style="color:#a7d9b6;text-decoration:none">Features</a>
         <a href="how-it-works.html" style="color:#a7d9b6;text-decoration:none">How it works</a>
+        <a href="research.html" style="color:#a7d9b6;text-decoration:none">Research</a>
         <a href="pricing.html" style="color:#a7d9b6;text-decoration:none">Pricing</a>
       </div>
     </div>
