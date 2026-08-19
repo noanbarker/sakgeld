@@ -2716,7 +2716,7 @@ function pOverview(db) {
             </div>
           </div>
           ${missed.length === 0
-            ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No missed chores right now 🎉</div>`
+            ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No missed chores right now.</div>`
             : `<div class="flex flex-col gap-2">${missedRows}</div>`}
         </div>`}
       </div>
@@ -2724,7 +2724,7 @@ function pOverview(db) {
         <p class="pr-section-label mb-3">Pending Chore Approvals ${pending.length ? `<span class="badge ml-1">${pending.length}</span>` : ''}</p>
         <div class="flex flex-col gap-2">
           ${pending.length === 0
-            ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">Nothing waiting for approval 🎉</div>`
+            ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">Nothing waiting for approval.</div>`
             : pendingRows}
         </div>
         ${pendingRewards.length === 0 ? '' : `
@@ -3998,7 +3998,7 @@ function renderModal() {
         </div>
         <div class="flex flex-col gap-2" style="max-height:60vh;overflow-y:auto;padding-right:2px">
           ${allMissed.length === 0
-            ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No missed chores on record. 🎉</div>`
+            ? `<div class="card text-center py-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">No missed chores on record.</div>`
             : rows}
         </div>`;
     }
