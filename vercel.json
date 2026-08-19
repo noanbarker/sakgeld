@@ -4,12 +4,5 @@
       "path": "/api/purge-canceled-accounts",
       "schedule": "0 3 * * *"
     }
-  ],
-  "redirects": [
-    {
-      "source": "/join/:code",
-      "destination": "/?ref=:code",
-      "permanent": false
-    }
   ]
 }

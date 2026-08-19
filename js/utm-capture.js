@@ -26,13 +26,18 @@
 })();
 
 /*
- * Partner referral codes reach us as `?ref=GREENFIELD25`, either because someone
- * shared such a link directly or because they followed the printed short link
- * `/join/GREENFIELD25`, which vercel.json redirects here.
+ * Partner referral codes reach us two ways:
  *
- * The code is banked and then wiped straight back out of the address bar, so
- * what the visitor is left looking at is a clean `sproutearnsave.com` — the
- * whole point of handing schools a tidy link in the first place.
+ *   /join/GREYCOLLEGE  — the printed short link. middleware.js banks the code in
+ *                        a `sprout_ref` cookie and redirects to a bare homepage
+ *                        URL, so by the time this runs the code is already in
+ *                        the cookie and was never in the address bar.
+ *   ?ref=GREYCOLLEGE   — the fallback for a link shared or forwarded by hand.
+ *
+ * Both end up in the same localStorage key so the signup form has one place to
+ * look. The cookie is deliberately left in place too: a server-set cookie
+ * outlives Safari's seven-day cap on script-written storage and localStorage
+ * doesn't, so whichever survives longer, signup still finds the code.
  */
 (function () {
   function normalise(raw) {
@@ -41,18 +46,26 @@
     return value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 40);
   }
 
+  function fromCookie() {
+    var match = / ?sprout_ref=([^;]*)/.exec('; ' + document.cookie);
+    return match ? match[1] : '';
+  }
+
+  // A ?ref= on the current URL is a deliberate act and wins over anything
+  // already banked, so a parent following a second school's link isn't stuck
+  // with the first one.
   var params = new URLSearchParams(window.location.search);
-  if (!params.has('ref')) return;
-  var code = normalise(params.get('ref'));
+  var code = normalise(params.get('ref')) || normalise(fromCookie());
   if (code) {
     try { localStorage.setItem('sprout_ref', code); } catch (e) {}
   }
 
-  // replaceState rather than a redirect: no second round trip, no extra entry in
-  // the back button's history, and the query is gone before the visitor has read
-  // the page. Only `ref` is dropped — utm_* params are left for the block above
-  // and for any analytics reading them later in the page.
-  if (!window.history || !window.history.replaceState) return;
+  // Tidy a hand-shared ?ref= out of the address bar once it's banked, so those
+  // links end up looking like the printed ones. replaceState rather than a
+  // redirect: no second round trip and no extra back-button entry. Only `ref` is
+  // dropped — utm_* params are left for the block above and for any analytics
+  // reading them later in the page.
+  if (!params.has('ref') || !window.history || !window.history.replaceState) return;
   params.delete('ref');
   var query = params.toString();
   try {

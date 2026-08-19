@@ -482,14 +482,18 @@ function getStoredUTM() {
 function normaliseRefCode(raw) {
     return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 40);
 }
-// The current URL is checked as well as storage, not instead of it:
-// js/utm-capture.js is loaded at the foot of the page and so runs *after* this
-// app has rendered its first screen, which would leave the code invisible to
-// anyone landing straight on /app/ with one still in the URL.
+// Checked in three places rather than trusting one: js/utm-capture.js is loaded
+// at the foot of the page and so runs *after* this app has rendered its first
+// screen, which would leave the code invisible to anyone landing straight on
+// /app/ with one. Reading the URL and the middleware's cookie here as well
+// removes that ordering dependency entirely.
 function getStoredRef() {
     try {
         const fromUrl = normaliseRefCode(new URLSearchParams(window.location.search).get('ref'));
         if (fromUrl) return fromUrl;
+        const cookie = / ?sprout_ref=([^;]*)/.exec('; ' + document.cookie);
+        const fromCookie = normaliseRefCode(cookie ? cookie[1] : '');
+        if (fromCookie) return fromCookie;
         return normaliseRefCode(localStorage.getItem('sprout_ref'));
     } catch (e) { return ''; }
 }
