@@ -87,6 +87,71 @@ async function sendLoopsEvent(email, eventName, properties) {
   }
 }
 
+// Records a signup against the school or partner whose code brought it in, and
+// keeps its subscription status current so a partner is only ever credited for
+// families that actually converted.
+//
+// The code arrives from the browser (user_metadata / Paddle custom_data), so it
+// is untrusted text: normalising to letters and digits here is what stops a
+// crafted value reaching the query below. An unrecognised code is still stored
+// rather than dropped — a near-miss typo is recoverable by hand, a discarded
+// one isn't.
+//
+// Fire-and-forget, same as the Loops and Meta helpers: this is bookkeeping, and
+// failing the webhook over it would make Paddle retry and resend live emails.
+async function recordReferralSignup(supabaseAdmin, { userId, email, rawCode, status, occurredAt }) {
+  const code = String(rawCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 40);
+  if (!code) return;
+  const stamp = occurredAt || new Date().toISOString();
+  try {
+    // ilike with no wildcards is a case-insensitive exact match, which is how
+    // referral_codes' unique index treats codes too.
+    const { data: match, error: lookupError } = await supabaseAdmin
+      .from('referral_codes')
+      .select('id')
+      .eq('active', true)
+      .ilike('code', code)
+      .maybeSingle();
+    if (lookupError) {
+      console.error('Referral code lookup failed:', lookupError.message);
+      return;
+    }
+
+    // signed_up_at is deliberately absent: it defaults on insert and must keep
+    // the original date when a later subscription event updates this row.
+    const { error: upsertError } = await supabaseAdmin
+      .from('referral_signups')
+      .upsert({
+        user_id: userId,
+        code_id: match ? match.id : null,
+        code_entered: code,
+        email: email || null,
+        subscription_status: status || null,
+        // Cleared on reactivation, mirroring how canceled_at is handled on the
+        // user's metadata above.
+        canceled_at: status === 'canceled' ? stamp : null,
+        updated_at: stamp,
+      }, { onConflict: 'user_id' });
+    if (upsertError) {
+      console.error('Referral signup upsert failed:', upsertError.message);
+      return;
+    }
+
+    // Written separately, and only where it's still empty, so the date a family
+    // first started paying survives a later cancellation and re-subscription.
+    if (status === 'active') {
+      const { error: paidError } = await supabaseAdmin
+        .from('referral_signups')
+        .update({ first_paid_at: stamp })
+        .eq('user_id', userId)
+        .is('first_paid_at', null);
+      if (paidError) console.error('Referral first_paid_at update failed:', paidError.message);
+    }
+  } catch (err) {
+    console.error('Referral signup error:', err.message);
+  }
+}
+
 // Paddle amounts are integer minor units (e.g. cents). This assumes a
 // 2-decimal currency, true for ZAR/USD/GBP/EUR — Sprout's realistic set.
 function extractChargeAmount(sub) {
@@ -267,6 +332,16 @@ module.exports = async (req, res) => {
       const billingInterval = billingIntervalLabel(sub.billing_cycle && sub.billing_cycle.interval);
       const nextBillingDate = formatDate(sub.next_billed_at);
       const nextChargeAmount = extractChargeAmount(sub);
+
+      // Prefer the code stored at sign-up: it's set whether or not checkout was
+      // ever completed, where Paddle's custom_data only exists once it was.
+      await recordReferralSignup(supabaseAdmin, {
+        userId,
+        email,
+        rawCode: existing.user.user_metadata.referral_code || (sub.custom_data && sub.custom_data.referral_code),
+        status: newStatus,
+        occurredAt: event.occurred_at,
+      });
 
       // Keep the Loops contact's properties current on every subscription
       // event, not just the ones that trigger an email — the marketing

@@ -475,6 +475,29 @@ function getStoredUTM() {
     } catch (e) { return {}; }
 }
 
+// Partner referral codes — a school's code, arriving from a poster, a QR, or
+// the /join/ short link. Codes are letters and digits only, so normalising here
+// means one typed by hand into the signup form matches one that arrived by link
+// regardless of casing, spaces or stray punctuation.
+function normaliseRefCode(raw) {
+    return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 40);
+}
+// Checked in three places rather than trusting one: js/utm-capture.js is loaded
+// at the foot of the page and so runs *after* this app has already rendered its
+// first screen, which would leave the code invisible to anyone landing straight
+// on /app/ with one. Reading the URL and the middleware's cookie here as well
+// removes that ordering dependency entirely.
+function getStoredRef() {
+    try {
+        const fromUrl = normaliseRefCode(new URLSearchParams(window.location.search).get('ref'));
+        if (fromUrl) return fromUrl;
+        const cookie = / ?sprout_ref=([^;]*)/.exec('; ' + document.cookie);
+        const fromCookie = normaliseRefCode(cookie ? cookie[1] : '');
+        if (fromCookie) return fromCookie;
+        return normaliseRefCode(localStorage.getItem('sprout_ref'));
+    } catch (e) { return ''; }
+}
+
 // ─── PADDLE ──────────────────────────────────────────────────────
 const PADDLE_MONTHLY_PRICE_ID = 'pri_01kz8phde0ep7qr2syx293dg83'; // $4.50/month
 const PADDLE_YEARLY_PRICE_ID  = 'pri_01kz8phq5syca08vqrp6nqvwsr'; // $45.00/year
@@ -527,13 +550,14 @@ function resumeCheckout() {
         email: currentUser.email,
         geo: meta.signup_geo || getGeoPref(),
         userId: currentUser.id,
-        billingCycle: meta.billing_cycle || 'monthly'
+        billingCycle: meta.billing_cycle || 'monthly',
+        referralCode: meta.referral_code || ''
     });
 }
 // `geo` here is the visitor's detected location (see getGeoPref), which is what
 // decided the price shown on the sign-up page — never the country dropdown,
 // which is kept purely for our own Supabase analytics (see doSignUp).
-function openTrialCheckout({ email, geo, userId, billingCycle }) {
+function openTrialCheckout({ email, geo, userId, billingCycle, referralCode }) {
     const isYearly = billingCycle === 'yearly';
     const isZA = geo === 'ZA';
     const priceId = isZA
@@ -547,7 +571,11 @@ function openTrialCheckout({ email, geo, userId, billingCycle }) {
     Paddle.Checkout.open({
         items: [{ priceId, quantity: 1 }],
         customer: { email },
-        customData: { supabase_user_id: userId }
+        // referral_code rides along so it's on the subscription itself, not only
+        // in the user's metadata — the webhook reads whichever it finds.
+        customData: referralCode
+            ? { supabase_user_id: userId, referral_code: referralCode }
+            : { supabase_user_id: userId }
     });
 }
 
@@ -695,6 +723,7 @@ const S = {
     onboardStep: 0,
     authMode: new URLSearchParams(window.location.search).get('mode') === 'signin' ? 'signin' : 'signup',
     billingCycle: 'monthly',
+    showRefField: false,
     tourStep: -1,
     faqOpen: null
 };
@@ -1657,6 +1686,14 @@ function vSignupPage() {
     const amt = pr.sym + (billing === 'monthly' ? pr.monthly : pr.yearly);
     const cyc = billing === 'monthly' ? '/month' : '/year';
     const countryOptions = COUNTRIES.map(([code, name]) => `<option value="${code}" ${code === country ? 'selected' : ''}>${name}</option>`).join('');
+    // A code that arrived via a school's link or QR pre-fills the box and shows
+    // it open, so the parent can see the referral landed. With no code stored
+    // the box stays folded away behind a one-line prompt — the overwhelming
+    // majority of signups have no code and shouldn't be asked for one. It still
+    // has to be reachable by hand: a QR scanned on a child's phone leaves
+    // nothing behind on the parent's laptop.
+    const refCode = draft.referral !== undefined ? draft.referral : getStoredRef();
+    const showRef = S.showRefField || !!refCode;
     return `
     <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
       <div style="width:100%;max-width:1000px">
@@ -1712,6 +1749,13 @@ function vSignupPage() {
                   <option value="">Select your country</option>
                   ${countryOptions}
                 </select>
+                ${showRef ? `
+                <input type="text" id="l-ref" placeholder="School or referral code" value="${esc(refCode)}" class="mb-3" style="text-transform:uppercase" autocapitalize="characters" autocomplete="off" spellcheck="false">
+                ` : `
+                <div style="margin-bottom:12px">
+                  <button type="button" onclick="showReferralField()" style="background:none;border:none;padding:0;cursor:pointer;font-family:var(--font-family);font-size:13px;font-weight:700;color:#15803d">Have a school or referral code?</button>
+                </div>
+                `}
                 <div style="display:flex;gap:8px;margin-bottom:12px">
                   <div onclick="setBillingCycle('monthly')" class="su-bill-opt ${billing !== 'yearly' ? 'active' : ''}">
                     <div style="font-family:var(--font-family);font-size:13px;font-weight:800;color:var(--color-text-primary)">Monthly</div>
@@ -1846,8 +1890,16 @@ function captureSignupDraft() {
         name: document.getElementById('l-name')?.value,
         email: document.getElementById('l-email')?.value,
         pass: document.getElementById('l-pass')?.value,
-        country: document.getElementById('l-country')?.value
+        country: document.getElementById('l-country')?.value,
+        // Left undefined when the field isn't on screen, so vSignupPage falls
+        // back to the stored code rather than treating "not shown" as "cleared".
+        referral: document.getElementById('l-ref')?.value
     };
+}
+function showReferralField() {
+    S.signupDraft = captureSignupDraft();
+    S.showRefField = true;
+    render();
 }
 function setBillingCycle(cycle) {
     S.signupDraft = captureSignupDraft();
@@ -1897,6 +1949,10 @@ async function doSignUp() {
     const email   = document.getElementById('l-email')?.value?.trim();
     const pass    = document.getElementById('l-pass')?.value;
     const country = document.getElementById('l-country')?.value;
+    // Falls back to the stored code when the field was never unfolded — someone
+    // who arrived on a school link always has the box shown, but this keeps the
+    // referral if a future change ever hides it.
+    const referralCode = normaliseRefCode(document.getElementById('l-ref')?.value ?? getStoredRef());
     const billingCycle = S.billingCycle || 'monthly';
     const errEl = document.getElementById('l-err');
     if (!name || !email || !pass || !country) { if (errEl) errEl.textContent = 'Please fill in all fields.'; return; }
@@ -1906,7 +1962,10 @@ async function doSignUp() {
         email, password: pass,
         // `country` is only ever kept for analytics — it never decides pricing or tax.
         // utm fields (from getStoredUTM) record which ad/post brought this signup in.
-        options: { data: { name, country, billing_cycle: billingCycle, signup_geo: geo, ...getStoredUTM() } }
+        // referral_code records which school or partner sent this family in; the
+        // Paddle webhook resolves it against referral_codes once there's a
+        // subscription to attach it to.
+        options: { data: { name, country, billing_cycle: billingCycle, signup_geo: geo, ...(referralCode ? { referral_code: referralCode } : {}), ...getStoredUTM() } }
     });
     if (error) { if (errEl) errEl.textContent = error.message; return; }
     // Supabase never errors for an already-registered email — it silently returns
@@ -1924,7 +1983,7 @@ async function doSignUp() {
     const userId = data?.user?.id;
     if (!userId) { if (errEl) errEl.textContent = 'Something went wrong creating your account.'; return; }
     if (errEl) errEl.textContent = '';
-    openTrialCheckout({ email, geo, userId, billingCycle });
+    openTrialCheckout({ email, geo, userId, billingCycle, referralCode });
 }
 
 // ─── VIEWS ───────────────────────────────────────────────────────
