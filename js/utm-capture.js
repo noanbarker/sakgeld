@@ -55,9 +55,18 @@
   // already banked, so a parent following a second school's link isn't stuck
   // with the first one.
   var params = new URLSearchParams(window.location.search);
-  var code = normalise(params.get('ref')) || normalise(fromCookie());
+  var fromUrl = normalise(params.get('ref'));
+  var code = fromUrl || normalise(fromCookie());
   if (code) {
     try { localStorage.setItem('sprout_ref', code); } catch (e) {}
+  }
+  // The cookie has to be overwritten too, not just localStorage. Signup reads
+  // the cookie ahead of localStorage (it's the longer-lived of the two), so
+  // leaving a stale cookie behind would credit the first school a visitor
+  // happened to click rather than the last one.
+  if (fromUrl) {
+    document.cookie = 'sprout_ref=' + fromUrl + '; Path=/; Max-Age=7776000; SameSite=Lax'
+      + (window.location.protocol === 'https:' ? '; Secure' : '');
   }
 
   // Tidy a hand-shared ?ref= out of the address bar once it's banked, so those
