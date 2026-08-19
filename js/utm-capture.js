@@ -26,18 +26,13 @@
 })();
 
 /*
- * Partner referral codes reach us two ways:
+ * Partner referral codes reach us as `?ref=GREENFIELD25`, either because someone
+ * shared such a link directly or because they followed the printed short link
+ * `/join/GREENFIELD25`, which vercel.json redirects here.
  *
- *   /join/GREENFIELD25  — the printed short link. middleware.mjs banks the code
- *                         in a `sprout_ref` cookie and redirects to a clean
- *                         homepage URL, so by the time this runs the code is
- *                         already in the cookie and never in the address bar.
- *   ?ref=GREENFIELD25   — the fallback for a link shared or forwarded by hand.
- *
- * Both end up in the same localStorage key so the signup form only has one
- * place to look. The cookie is left in place as well, since a server-set cookie
- * survives Safari's seven-day cap on script-written storage and localStorage
- * doesn't — whichever outlives the other, signup still finds the code.
+ * The code is banked and then wiped straight back out of the address bar, so
+ * what the visitor is left looking at is a clean `sproutearnsave.com` — the
+ * whole point of handing schools a tidy link in the first place.
  */
 (function () {
   function normalise(raw) {
@@ -46,15 +41,25 @@
     return value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 40);
   }
 
-  function fromCookie() {
-    var match = / ?sprout_ref=([^;]*)/.exec('; ' + document.cookie);
-    return match ? match[1] : '';
+  var params = new URLSearchParams(window.location.search);
+  if (!params.has('ref')) return;
+  var code = normalise(params.get('ref'));
+  if (code) {
+    try { localStorage.setItem('sprout_ref', code); } catch (e) {}
   }
 
-  // A ?ref= on the current URL is a deliberate act and wins over anything
-  // already banked, so a parent following a second school's link isn't stuck
-  // with the first one.
-  var code = normalise(new URLSearchParams(window.location.search).get('ref')) || normalise(fromCookie());
-  if (!code) return;
-  try { localStorage.setItem('sprout_ref', code); } catch (e) {}
+  // replaceState rather than a redirect: no second round trip, no extra entry in
+  // the back button's history, and the query is gone before the visitor has read
+  // the page. Only `ref` is dropped — utm_* params are left for the block above
+  // and for any analytics reading them later in the page.
+  if (!window.history || !window.history.replaceState) return;
+  params.delete('ref');
+  var query = params.toString();
+  try {
+    window.history.replaceState(
+      window.history.state,
+      '',
+      window.location.pathname + (query ? '?' + query : '') + window.location.hash
+    );
+  } catch (e) {}
 })();
