@@ -417,6 +417,21 @@
       .su-badge { display:flex; align-items:center; gap:10px; color:var(--color-green-700); min-width:0; }
       .su-bill-opt { flex:1; cursor:pointer; border-radius:var(--radius-md); border:1.5px solid var(--color-border); background:var(--color-surface); padding:10px 12px; transition:border-color .12s,background .12s; }
       .su-bill-opt.active { border-color:var(--color-green-600); background:var(--color-green-50); }
+
+      /* ── Parent dashboard: floating tutorial nudge ───────────── */
+      .sp-tutorial-nudge {
+        position:fixed; left:16px; right:16px; bottom:16px; z-index:60;
+        background:#1e293b; color:#fff; font-family:var(--font-family);
+        border-radius:var(--radius-full); box-shadow:0 8px 24px rgba(0,0,0,.25);
+        padding:6px 6px 6px 16px; display:flex; align-items:center; gap:8px;
+      }
+      @media (min-width:768px) {
+        /* Half-width pill, centred on the viewport instead of a full-width bar. */
+        .sp-tutorial-nudge { left:50%; right:auto; transform:translateX(-50%); width:min(50%,420px); }
+      }
+      /* Let the tab content scroll clear of the pill so nothing sits under it. */
+      .sp-tab-content.sp-has-nudge { padding-bottom:104px !important; }
+      @media (max-width:640px) { .sp-tab-content.sp-has-nudge { padding-bottom:88px !important; } }
     </style>
 </head>
 <body class="min-h-screen">
@@ -909,7 +924,7 @@ function setTab(t) {
         if (live) {
             const rect = live.getBoundingClientRect();
             const outgoing = live.cloneNode(true);
-            outgoing.className = 'sp-tab-content ' + (dir === 'fwd' ? 'sp-tab-exit-fwd' : 'sp-tab-exit-back');
+            outgoing.className = 'sp-tab-content ' + (live.classList.contains('sp-has-nudge') ? 'sp-has-nudge ' : '') + (dir === 'fwd' ? 'sp-tab-exit-fwd' : 'sp-tab-exit-back');
             outgoing.style.position = 'fixed';
             outgoing.style.top = rect.top + 'px';
             outgoing.style.left = rect.left + 'px';
@@ -1009,9 +1024,12 @@ function dismissTutorialNudge() {
     try { localStorage.setItem('sprout_tutorial_nudge_dismissed', 'true'); } catch {}
     render();
 }
+function tutorialNudgeVisible() {
+    return S.view === 'parent' && S.tourStep < 0 && !tutorialNudgeDismissed();
+}
 function renderTutorialNudge() {
     return `
-    <div class="md:hidden" style="position:fixed;left:16px;right:16px;bottom:16px;z-index:60;background:#1e293b;color:#fff;font-family:var(--font-family);border-radius:var(--radius-full);box-shadow:0 8px 24px rgba(0,0,0,.25);padding:6px 6px 6px 16px;display:flex;align-items:center;gap:8px">
+    <div class="sp-tutorial-nudge">
       <button onclick="startTour()" style="flex:1;display:flex;align-items:center;gap:8px;background:none;border:none;color:#fff;cursor:pointer;text-align:left;padding:8px 0;font-size:14px;font-weight:800;font-family:var(--font-family)">Tutorial</button>
       <button onclick="dismissTutorialNudge()" style="background:rgba(255,255,255,.14);border:none;color:rgba(255,255,255,.85);cursor:pointer;font-size:11.5px;font-weight:700;padding:8px 12px;border-radius:var(--radius-full);white-space:nowrap;font-family:var(--font-family)">Don't show again</button>
     </div>`;
@@ -2407,7 +2425,7 @@ function vParent() {
       ${sidebar}
       <div style="flex:1;display:flex;flex-direction:column;min-width:0">
         ${mobileHeader}
-        <div class="sp-tab-content ${S.tabAnim === 'fwd' ? 'sp-tab-anim-fwd' : S.tabAnim === 'back' ? 'sp-tab-anim-back' : ''}" style="flex:1;overflow:auto;padding:24px 28px;background-color:#f4faf6;background-image:var(--gradient-dashboard);background-attachment:local">
+        <div class="sp-tab-content ${tutorialNudgeVisible() ? 'sp-has-nudge ' : ''}${S.tabAnim === 'fwd' ? 'sp-tab-anim-fwd' : S.tabAnim === 'back' ? 'sp-tab-anim-back' : ''}" style="flex:1;overflow:auto;padding:24px 28px;background-color:#f4faf6;background-image:var(--gradient-dashboard);background-attachment:local">
           ${S.tab === 'overview'  ? pOverview(db) :
             S.tab === 'chores'    ? pChores(db) :
             S.tab === 'kids'      ? pKids(db) :
@@ -4741,7 +4759,7 @@ function render() {
     // time and produces a visible flash as the browser reflows/repaints it. Reuse
     // the already-painted node instead of letting the fresh one take its place.
     const prevLogo = app.querySelector('.sp-mobile-logo');
-    const showTutorialNudge = S.view === 'parent' && S.tourStep < 0 && !S.modal && !tutorialNudgeDismissed();
+    const showTutorialNudge = tutorialNudgeVisible() && !S.modal;
     app.innerHTML = html + renderModal() + (showTutorialNudge ? renderTutorialNudge() : '') + toastHtml;
     if (prevLogo) {
         const newLogo = app.querySelector('.sp-mobile-logo');
