@@ -2466,7 +2466,7 @@ function vParent() {
     <div style="height:5px;background:var(--gradient-stripe)"></div>
     <div class="pl-2 pr-5 pt-0 pb-0 flex justify-between items-center" style="background:var(--color-surface);border-bottom:1px solid var(--color-green-border)">
       <div style="display:flex;align-items:flex-start;gap:10px;height:88px;overflow:hidden">
-        <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" class="sp-mobile-logo" style="height:100px;width:auto;display:block;flex-shrink:0"></picture>
+        <picture class="sp-mobile-logo"><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block;flex-shrink:0"></picture>
       </div>
       <div class="flex items-center gap-4">
         <button onclick="go('home')" style="color:#15803d;font-size:21px;background:none;border:none;cursor:pointer;font-family:var(--font-family);display:flex;align-items:center;gap:6px">← ${uiIcon('home', 24)}</button>
@@ -4825,15 +4825,20 @@ function render() {
     const html  = (views[S.view] || vHome)();
     const app = document.getElementById('app');
     // Re-render replaces the whole subtree on every state change (tab switches
-    // included), which recreates the mobile header's logo <img> from scratch each
-    // time and produces a visible flash as the browser reflows/repaints it. Reuse
-    // the already-painted node instead of letting the fresh one take its place.
+    // included), which recreates the mobile header's logo from scratch each time
+    // and produces a visible flash as the browser reflows/repaints it. Reuse the
+    // already-painted node instead of letting the fresh one take its place. Swap
+    // the whole <picture>, never the <img> inside it: moving an <img> into a
+    // freshly built <picture> makes the browser re-run source selection and fire
+    // a second load, which is exactly the flash this is meant to avoid.
     const prevLogo = app.querySelector('.sp-mobile-logo');
     const showTutorialNudge = tutorialNudgeVisible() && !S.modal;
     app.innerHTML = html + renderModal() + (showTutorialNudge ? renderTutorialNudge() : '') + toastHtml;
     if (prevLogo) {
         const newLogo = app.querySelector('.sp-mobile-logo');
-        if (newLogo && newLogo.src === prevLogo.src) newLogo.replaceWith(prevLogo);
+        const prevSrc = prevLogo.querySelector('img')?.src;
+        const newSrc  = newLogo?.querySelector('img')?.src;
+        if (newLogo && prevSrc && newSrc === prevSrc) newLogo.replaceWith(prevLogo);
     }
     if (S.view === 'parent' && S.tourStep >= 0) positionTourSpotlight();
     S.tabAnim = null;
