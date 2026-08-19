@@ -897,10 +897,12 @@ function kidAccent(kid) {
 
 // ─── UTILS ───────────────────────────────────────────────────────
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
-// Set by middleware.mjs on every page in this site, including this one — South
-// Africa gets 'ZA', everyone else gets 'ROW'. Used only to pick a sensible
-// default in the country dropdown below; the dropdown itself still decides
-// what's actually charged, exactly as it always has.
+// Set by middleware.js on every page in this site, including this one — South
+// Africa gets 'ZA', everyone else gets 'ROW'. This is what picks both the price
+// shown on the sign-up page and the Paddle price id checkout opens with; the
+// country dropdown is kept for our own analytics and never decides either.
+// Falls back to 'ZA' when the cookie is missing, so a failure here bills at Rand
+// prices rather than at nothing.
 function getGeoPref() {
     const m = document.cookie.match(/(?:^|; )sprout_geo=([^;]+)/);
     return m ? decodeURIComponent(m[1]) : 'ZA';
