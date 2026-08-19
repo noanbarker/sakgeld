@@ -3038,18 +3038,18 @@ function pBonuses(db) {
             </div>
             <div class="flex-1 min-w-0">
               <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">${esc(m.name) || 'Balance Milestone'}</p>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap">
-                <span style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">Reach</span>
-                <span style="font-family:var(--font-family);font-size:15px;font-weight:800;color:var(--color-text-primary)">${R(m.threshold)}</span>
-                <span style="color:var(--color-text-muted);font-size:14px">→</span>
-                <span style="font-family:var(--font-family);font-size:15px;font-weight:800;color:var(--color-green-600)">+${R(m.bonusAmount)}</span>
-                <span style="font-family:var(--font-family);font-size:11px;font-weight:700;color:#f97316;background:#fff7ed;padding:2px 8px;border-radius:99px">bonus</span>
-              </div>
             </div>
             <div style="display:flex;gap:2px;flex-shrink:0">
               <button onclick="openModal('edit-bonus',{milestoneId:'${m.id}'})" title="Edit" class="icon-btn">${uiIcon('pencil', 15)}</button>
               <button onclick="deleteBonusMilestone('${m.id}')" title="Delete" class="icon-btn danger">${uiIcon('trash', 15)}</button>
             </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <span style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">Reach</span>
+            <span style="font-family:var(--font-family);font-size:15px;font-weight:800;color:var(--color-text-primary)">${R(m.threshold)}</span>
+            <span style="color:var(--color-text-muted);font-size:14px">→</span>
+            <span style="font-family:var(--font-family);font-size:15px;font-weight:800;color:var(--color-green-600)">+${R(m.bonusAmount)}</span>
+            <span style="font-family:var(--font-family);font-size:11px;font-weight:700;color:#f97316;background:#fff7ed;padding:2px 8px;border-radius:99px">bonus</span>
           </div>
           ${affectedKids.length > 0 ? `
           <div style="border-top:1px solid var(--color-border);margin-top:12px;padding-top:8px">
@@ -3080,7 +3080,7 @@ function pBonuses(db) {
     <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:20px">When a kid's balance reaches a threshold, they automatically receive the bonus — once per milestone.</p>
     ${milestones.length === 0
         ? `<div class="card text-center py-12" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px"><div style="display:flex;justify-content:center;margin-bottom:12px">${milestoneStarSVG(40)}</div>No milestones yet.<br>Add one to reward your kids for saving!</div>`
-        : `<div class="flex flex-col gap-3 mb-6">${milestoneCards}</div>`}
+        : `<div class="gap-3 mb-6" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));align-items:start">${milestoneCards}</div>`}
     ${bonusHistory.length > 0 ? `
     <div class="mt-2">
       <p class="pr-section-label mb-3">Bonus History</p>
@@ -3166,7 +3166,7 @@ function pRewards(db) {
     <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:20px">Set a reward for a longer-term goal — an exam mark, a sports achievement, anything worth celebrating. Kids mark it done, you verify it before the reward pays out.</p>
     ${rewards.length === 0
         ? `<div class="card text-center py-12" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px">🏆<br><br>No rewards yet.<br>Add one to celebrate a big goal!</div>`
-        : `<div class="flex flex-col gap-3 mb-6">${rewardCards}</div>`}
+        : `<div class="gap-3 mb-6" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));align-items:start">${rewardCards}</div>`}
     ${rewardHistory.length > 0 ? `
     <div class="mt-2">
       <p class="pr-section-label mb-3">Reward History</p>
