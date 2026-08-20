@@ -19,6 +19,7 @@ export const config = {
     '/contact.html',
     '/faq.html',
     '/how-it-works.html',
+    '/research.html',
     '/privacy.html',
     '/terms.html',
     '/refund-policy.html',
