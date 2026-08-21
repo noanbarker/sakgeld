@@ -286,6 +286,30 @@ module.exports = async (req, res) => {
     if (userId) {
       const supabaseAdmin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
+      // Idempotency guard: Paddle doesn't guarantee exactly-once delivery, and
+      // the transition check further down (comparing old vs new status) isn't
+      // enough on its own — two concurrent deliveries of the same event can
+      // both read the same "before" status before either one's update below
+      // commits, so both conclude "this is a fresh transition" and both send
+      // the email. Claiming the event_id via a unique constraint means only
+      // one concurrent request wins; the other exits here instead of
+      // repeating any side effect below.
+      if (event.event_id) {
+        const { error: dedupeError } = await supabaseAdmin
+          .from('paddle_processed_events')
+          .insert({ event_id: event.event_id, event_type: event.event_type });
+        if (dedupeError) {
+          if (dedupeError.code === '23505') {
+            // Already processed this exact event — nothing left to do.
+            res.status(200).json({ received: true, duplicate: true });
+            return;
+          }
+          // A dedupe-table hiccup shouldn't drop a real webhook — a false
+          // "not yet processed" is far safer than silently losing the event.
+          console.error('Paddle event dedupe insert failed:', dedupeError.message);
+        }
+      }
+
       // updateUserById replaces user_metadata wholesale rather than merging it,
       // so we fetch what's already there first — otherwise every webhook wipes
       // out the name/country/billing_cycle/signup_geo set at sign-up.
