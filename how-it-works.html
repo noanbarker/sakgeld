@@ -250,6 +250,12 @@
 }
 </style>
 <style>
+  /* Walkthrough clips: one device shell shared by all three steps, so the phone
+     stays identical from step to step and stays crisp (the video is the screen
+     only, never the bezel). */
+  .pr-clip-shell{position:relative;flex-shrink:0;background:linear-gradient(160deg,#3b4453 0%,#11161e 26%,#0b0f15 74%,#2b3341 100%);border-radius:34px;padding:9px;box-shadow:0 14px 28px rgba(11,18,26,.20)}
+  .pr-clip-shell::after{content:"";position:absolute;top:9px;left:50%;transform:translateX(-50%);width:74px;height:14px;background:#0b0f15;border-radius:0 0 10px 10px;z-index:2}
+  .pr-clip-shell video{display:block;width:100%;height:auto;border-radius:26px;background:#fff}
   body{margin:0}
   @keyframes sway{0%,100%{transform:rotate(-1.6deg)}50%{transform:rotate(1.6deg)}}
   @keyframes blobMorph{0%,100%{border-radius:60% 40% 30% 70%/60% 30% 70% 40%}50%{border-radius:30% 60% 70% 40%/50% 60% 30% 60%}}
@@ -274,8 +280,6 @@
   .pr-grid-row{grid-template-columns:1fr!important;justify-items:center;text-align:center}
   .pr-grid-row ul{text-align:left}
   .pr-hiw-steps-row{grid-template-columns:1fr!important}
-  .pr-hiw-phone-wrap{order:-1}
-  .pr-hiw-gif{height:auto!important;max-width:72%!important}
 }
 @media (min-width:641px){
   .pr-cta-plant-img{height:104px!important}
@@ -327,37 +331,34 @@
 
   <!-- steps as vertical timeline -->
   <div style="max-width:1160px;margin:0 auto;padding:20px clamp(20px,5vw,44px)">
-    <div class="pr-hiw-steps-row" style="display:grid;grid-template-columns:1fr auto;gap:40px;align-items:center">
+    <div class="pr-hiw-steps-row" style="display:block">
       <div style="display:flex;flex-direction:column;gap:24px">
-        <div class="pr-grid-row" style="background:#fff;border:1px solid #e5ece7;border-radius:28px;padding:40px;box-shadow:0 1px 3px rgba(15,40,25,.07);display:grid;grid-template-columns:auto 1fr auto;gap:32px;align-items:center">
+        <div class="pr-grid-row" style="background:#fff;border:1px solid #e5ece7;border-radius:28px;padding:36px 40px;box-shadow:0 1px 3px rgba(15,40,25,.07);display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:34px;align-items:center;max-width:920px;margin:0 auto">
           <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(132deg,#16a34a,#15803d);color:#fbbf24;font-weight:900;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(22,163,74,.35)">1</div>
           <div>
             <h2 style="font-size:clamp(22px,5.5vw,24px);font-weight:900;letter-spacing:-.02em;color:#15803d;margin:0 0 8px">Setup: Add Kids &amp; Chores</h2>
             <ul style="margin:0;padding-left:20px;font-size:15.5px;line-height:1.65;color:#475569"><li>Choose your preferred system: <strong>Amount Per Chore</strong>, or <strong>Fixed Amount Per Cycle</strong></li><li>Select your home currency</li><li>Create a profile for each child, with their own colour, avatar and PIN</li><li>Add chores from the library</li></ul>
           </div>
-          <div><picture><source srcset="images/Website%20Icons/Add%20Child.webp" type="image/webp"><img loading="lazy" src="images/Website%20Icons/Add%20Child.png" alt="Add child" width="54" height="54" style="display:block"></picture></div>
+          <div class="pr-clip-shell" style="width:180px;max-width:100%"><video class="pr-clip" muted loop playsinline preload="none" width="464" height="1004" poster="images/marketing/walkthrough/step1-poster.webp?v=1" aria-label="Sprout parent dashboard: adding Zoe as a new child profile, then adding the Make Bed chore"><source src="images/marketing/walkthrough/step1.mp4?v=1" type="video/mp4"></video></div>
         </div>
-        <div class="pr-grid-row" style="background:#fff;border:1px solid #e5ece7;border-radius:28px;padding:40px;box-shadow:0 1px 3px rgba(15,40,25,.07);display:grid;grid-template-columns:auto 1fr auto;gap:32px;align-items:center">
+        <div class="pr-grid-row" style="background:#fff;border:1px solid #e5ece7;border-radius:28px;padding:36px 40px;box-shadow:0 1px 3px rgba(15,40,25,.07);display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:34px;align-items:center;max-width:920px;margin:0 auto">
           <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(132deg,#16a34a,#15803d);color:#fbbf24;font-weight:900;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(22,163,74,.35)">2</div>
           <div>
             <h2 style="font-size:clamp(22px,5.5vw,24px);font-weight:900;letter-spacing:-.02em;color:#15803d;margin:0 0 8px">Kids tick off their day</h2>
             <p style="font-size:15.5px;line-height:1.65;color:#475569;margin:0">Each child logs in with their PIN, sees today's chores with friendly pictures, and taps "Done!" as they finish. Simple enough for the youngest, satisfying for everyone.</p>
           </div>
-          <div><picture><source srcset="images/Website%20Icons/Check%20Sign.webp" type="image/webp"><img loading="lazy" src="images/Website%20Icons/Check%20Sign.png" alt="Check" width="54" height="54" style="display:block"></picture></div>
+          <div class="pr-clip-shell" style="width:180px;max-width:100%"><video class="pr-clip" muted loop playsinline preload="none" width="464" height="1004" poster="images/marketing/walkthrough/step2-poster.webp?v=1" aria-label="A child's Sprout screen: today's chores, then Make Bed moving to waiting for approval after tapping Done"><source src="images/marketing/walkthrough/step2.mp4?v=1" type="video/mp4"></video></div>
         </div>
-        <div class="pr-grid-row" style="background:#fff;border:1px solid #e5ece7;border-radius:28px;padding:40px;box-shadow:0 1px 3px rgba(15,40,25,.07);display:grid;grid-template-columns:auto 1fr auto;gap:32px;align-items:center">
+        <div class="pr-grid-row" style="background:#fff;border:1px solid #e5ece7;border-radius:28px;padding:36px 40px;box-shadow:0 1px 3px rgba(15,40,25,.07);display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:34px;align-items:center;max-width:920px;margin:0 auto">
           <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(132deg,#16a34a,#15803d);color:#fbbf24;font-weight:900;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(22,163,74,.35)">3</div>
           <div>
             <h2 style="font-size:clamp(22px,5.5vw,24px);font-weight:900;letter-spacing:-.02em;color:#15803d;margin:0 0 8px">You approve, they grow</h2>
             <p style="font-size:15.5px;line-height:1.65;color:#475569;margin:0">Approve completed chores from your dashboard, one at a time or a whole day at once. Balances update, milestones unlock, and the money tree grows.</p>
           </div>
-          <div><picture><source srcset="images/4_Big_Tree_v2.webp" type="image/webp"><img loading="lazy" src="images/4_Big_Tree_v2.png" alt="Big tree" style="height:65px;width:auto;display:block"></picture></div>
+          <div class="pr-clip-shell" style="width:180px;max-width:100%"><video class="pr-clip" muted loop playsinline preload="none" width="464" height="1004" poster="images/marketing/walkthrough/step3-poster.webp?v=1" aria-label="Sprout parent dashboard: three chores waiting for approval, then the queue cleared and both balances updated"><source src="images/marketing/walkthrough/step3.mp4?v=1" type="video/mp4"></video></div>
         </div>
       </div>
-      <div class="pr-hiw-phone-wrap" style="display:flex;flex-direction:column;align-items:center;justify-content:center">
-        <picture style="display:flex;justify-content:center;width:100%"><source id="hiwDemoSource" srcset="images/marketing/demo-animation.webp?v=2" type="image/webp"><img loading="lazy" class="pr-hiw-gif" id="hiwDemoGif" src="images/marketing/demo-animation.gif?v=2" alt="Sprout walkthrough: a parent adding a kid and a chore, the kid completing it, and the parent approving it" style="max-width:100%;width:auto;height:520px;border-radius:22px;box-shadow:0 1px 3px rgba(15,40,25,.07)"></picture><script>if(document.documentElement.getAttribute('data-geo')==='ROW'){document.getElementById('hiwDemoSource').srcset='images/marketing/demo-animation-usd.webp?v=2';document.getElementById('hiwDemoGif').src='images/marketing/demo-animation-usd.gif?v=2';}</script>
-        <p style="font-size:12px;color:#94a3b8;margin:10px 0 0;text-align:center">Example of an Amount Per Chore set up</p>
-      </div>
+      
     </div>
   </div>
 
@@ -450,6 +451,7 @@
 })();
 </script>
 
+<script defer src="/js/walkthrough-clips.js?v=1"></script>
 <script src="/js/utm-capture.js?v=1"></script>
 <script defer src="/js/cookie-consent.js?v=2"></script>
 <script defer src="/js/analytics.js?v=1"></script>

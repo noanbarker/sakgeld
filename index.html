@@ -255,6 +255,12 @@
   @keyframes sway{0%,100%{transform:rotate(-1.6deg)}50%{transform:rotate(1.6deg)}}
   @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
   @keyframes blobMorph{0%,100%{border-radius:60% 40% 30% 70%/60% 30% 70% 40%}50%{border-radius:30% 60% 70% 40%/50% 60% 30% 60%}}
+  /* Walkthrough clips: one device shell shared by all three steps, so the phone
+     stays identical from step to step and stays crisp (the video is the screen
+     only, never the bezel). */
+  .pr-clip-shell{position:relative;flex-shrink:0;background:linear-gradient(160deg,#3b4453 0%,#11161e 26%,#0b0f15 74%,#2b3341 100%);border-radius:34px;padding:9px;box-shadow:0 14px 28px rgba(11,18,26,.20)}
+  .pr-clip-shell::after{content:"";position:absolute;top:9px;left:50%;transform:translateX(-50%);width:74px;height:14px;background:#0b0f15;border-radius:0 0 10px 10px;z-index:2}
+  .pr-clip-shell video{display:block;width:100%;height:auto;border-radius:26px;background:#fff}
   .pr-treegrow-slot{opacity:0;transform:scaleY(.05);transform-origin:bottom center}
   .pr-treegrow-slot.visible{opacity:1;transform:scaleY(1);transition:opacity .5s ease-out,transform .6s cubic-bezier(.22,1,.36,1)}
 </style>
@@ -272,9 +278,7 @@
   #pr-menu-toggle:checked ~ .pr-sticky-cta{display:none!important}
   .pr-grid-footer{grid-template-columns:repeat(2,1fr)!important;gap:28px!important}
   .pr-grid-2col{grid-template-columns:1fr!important;gap:28px!important}
-  .pr-hiw-grid3{grid-template-columns:1fr!important;grid-template-rows:none!important;row-gap:28px!important;column-gap:0!important}
-  .pr-hiw-card-1,.pr-hiw-card-2,.pr-hiw-card-3,.pr-hiw-phone-wrap{grid-column:1!important;grid-row:auto!important}
-  .pr-hiw-gif{height:auto!important;max-width:80%!important}
+  .pr-hiw-grid3{grid-template-columns:1fr!important;row-gap:44px!important;column-gap:0!important}
   .pr-hero-desc{font-weight:700!important}
   .pr-hero-heading{font-size:33.6px!important}
   .pr-grid-3col{grid-template-columns:1fr!important}
@@ -515,15 +519,58 @@
   <div class="pr-hiw-section" style="max-width:1160px;margin:0 auto;padding:56px clamp(20px,5vw,44px) 80px">
     <div style="font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#2563eb">How it works</div>
     <h2 style="font-size:clamp(22px,5.5vw,38px);font-weight:900;letter-spacing:-.02em;margin:10px 0 44px;color:#15803d">Up and running in five minutes.</h2>
-    <div class="pr-hiw-grid3" style="display:grid;grid-template-columns:1fr 1.3fr 1fr;grid-template-rows:auto auto auto;column-gap:40px;row-gap:20px;align-items:center">
-      <div class="pr-hiw-card-1" style="grid-column:1;grid-row:1;background:#fff;border:1px solid #e5ece7;border-radius:22px;padding:26px 24px;position:relative;box-shadow:0 1px 3px rgba(15,40,25,.07)"><div style="position:absolute;top:-16px;left:24px;width:36px;height:36px;border-radius:50%;background:linear-gradient(132deg,#16a34a,#15803d);color:#fff;font-weight:900;font-size:15px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 14px rgba(22,163,74,.35)">1</div><h3 style="font-size:17px;font-weight:800;margin:12px 0 6px">Setup: Add Kids &amp; Chores</h3><ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.6;color:#64748b"><li>Choose your preferred system: <strong>Amount Per Chore</strong>, or <strong>Fixed Amount Per Cycle</strong></li><li>Set your home currency</li><li>Create a profile for each child, with their own PIN and avatar</li><li>Add chores from the library</li></ul></div>
-      <div class="pr-hiw-card-2" style="grid-column:3;grid-row:2;background:#fff;border:1px solid #e5ece7;border-radius:22px;padding:26px 24px;position:relative;box-shadow:0 1px 3px rgba(15,40,25,.07)"><div style="position:absolute;top:-16px;left:24px;width:36px;height:36px;border-radius:50%;background:linear-gradient(132deg,#16a34a,#15803d);color:#fff;font-weight:900;font-size:15px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 14px rgba(22,163,74,.35)">2</div><h3 style="font-size:17px;font-weight:800;margin:12px 0 6px">Kids tick off their day</h3><p style="font-size:14px;line-height:1.6;color:#64748b;margin:0">Each child logs in with their PIN, sees today's chores with friendly pictures, and taps &quot;Done!&quot;</p></div>
-      <div class="pr-hiw-card-3" style="grid-column:1;grid-row:3;background:#fff;border:1px solid #e5ece7;border-radius:22px;padding:26px 24px;position:relative;box-shadow:0 1px 3px rgba(15,40,25,.07)"><div style="position:absolute;top:-16px;left:24px;width:36px;height:36px;border-radius:50%;background:linear-gradient(132deg,#16a34a,#15803d);color:#fff;font-weight:900;font-size:15px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 14px rgba(22,163,74,.35)">3</div><h3 style="font-size:17px;font-weight:800;margin:12px 0 6px">You approve, they grow</h3><p style="font-size:14px;line-height:1.6;color:#64748b;margin:0">Approve completed chores from your dashboard. Balances update, milestones unlock, the tree grows.</p></div>
-      <div class="pr-hiw-phone-wrap" style="grid-column:2;grid-row:1 / span 3;display:flex;flex-direction:column;align-items:center;justify-content:center">
-        <picture style="display:flex;justify-content:center;width:100%"><source id="hiwDemoSource" srcset="images/marketing/demo-animation.webp?v=2" type="image/webp"><img loading="lazy" class="pr-hiw-gif" id="hiwDemoGif" src="images/marketing/demo-animation.gif?v=2" alt="Sprout walkthrough: a parent adding a kid and a chore, the kid completing it, and the parent approving it" style="max-width:100%;width:auto;height:546px;border-radius:22px;box-shadow:0 1px 3px rgba(15,40,25,.07)"></picture><script>if(document.documentElement.getAttribute('data-geo')==='ROW'){document.getElementById('hiwDemoSource').srcset='images/marketing/demo-animation-usd.webp?v=2';document.getElementById('hiwDemoGif').src='images/marketing/demo-animation-usd.gif?v=2';}</script>
-        <p style="font-size:12px;color:#94a3b8;margin:10px 0 0;text-align:center">Example of an Amount Per Chore set up</p>
+    <div class="pr-hiw-grid3" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:32px;align-items:stretch">
+
+      <div class="pr-hiw-step" style="display:flex;flex-direction:column;align-items:center;gap:22px">
+        <div class="pr-clip-shell" style="width:236px;max-width:100%">
+          <video class="pr-clip" muted loop playsinline preload="none" width="464" height="1004"
+                 poster="images/marketing/walkthrough/step1-poster.webp?v=1"
+                 aria-label="Sprout parent dashboard: adding Zoe as a new child profile, then adding the Make Bed chore">
+            <source src="images/marketing/walkthrough/step1.mp4?v=1" type="video/mp4">
+          </video>
+        </div>
+        <div style="background:#fff;border:1px solid #e5ece7;border-radius:22px;padding:30px 24px 26px;position:relative;box-shadow:0 1px 3px rgba(15,40,25,.07);width:100%;flex:1">
+          <div style="position:absolute;top:-16px;left:24px;width:36px;height:36px;border-radius:50%;background:linear-gradient(132deg,#16a34a,#15803d);color:#fff;font-weight:900;font-size:15px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 14px rgba(22,163,74,.35)">1</div>
+          <div style="display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#1d4ed8;background:#dbeafe;border-radius:999px;padding:4px 10px;margin-bottom:8px">Parent view</div>
+          <h3 style="font-size:17px;font-weight:800;margin:0 0 6px">Setup: Add Kids &amp; Chores</h3>
+          <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.6;color:#64748b"><li>Choose your preferred system: <strong>Amount Per Chore</strong>, or <strong>Fixed Amount Per Cycle</strong></li><li>Set your home currency</li><li>Create a profile for each child, with their own PIN and avatar</li><li>Add chores from the library</li></ul>
+        </div>
       </div>
+
+      <div class="pr-hiw-step" style="display:flex;flex-direction:column;align-items:center;gap:22px">
+        <div class="pr-clip-shell" style="width:236px;max-width:100%">
+          <video class="pr-clip" muted loop playsinline preload="none" width="464" height="1004"
+                 poster="images/marketing/walkthrough/step2-poster.webp?v=1"
+                 aria-label="A child's Sprout screen: today's chores, then Make Bed moving to waiting for approval after tapping Done">
+            <source src="images/marketing/walkthrough/step2.mp4?v=1" type="video/mp4">
+          </video>
+        </div>
+        <div style="background:#fff;border:1px solid #e5ece7;border-radius:22px;padding:30px 24px 26px;position:relative;box-shadow:0 1px 3px rgba(15,40,25,.07);width:100%;flex:1">
+          <div style="position:absolute;top:-16px;left:24px;width:36px;height:36px;border-radius:50%;background:linear-gradient(132deg,#16a34a,#15803d);color:#fff;font-weight:900;font-size:15px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 14px rgba(22,163,74,.35)">2</div>
+          <div style="display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#be123c;background:#ffe4e6;border-radius:999px;padding:4px 10px;margin-bottom:8px">Kid view</div>
+          <h3 style="font-size:17px;font-weight:800;margin:0 0 6px">Kids tick off their day</h3>
+          <p style="font-size:14px;line-height:1.6;color:#64748b;margin:0">Each child logs in with their PIN, sees today's chores with friendly pictures, and taps &quot;Done!&quot;</p>
+        </div>
+      </div>
+
+      <div class="pr-hiw-step" style="display:flex;flex-direction:column;align-items:center;gap:22px">
+        <div class="pr-clip-shell" style="width:236px;max-width:100%">
+          <video class="pr-clip" muted loop playsinline preload="none" width="464" height="1004"
+                 poster="images/marketing/walkthrough/step3-poster.webp?v=1"
+                 aria-label="Sprout parent dashboard: three chores waiting for approval, then the queue cleared and both balances updated">
+            <source src="images/marketing/walkthrough/step3.mp4?v=1" type="video/mp4">
+          </video>
+        </div>
+        <div style="background:#fff;border:1px solid #e5ece7;border-radius:22px;padding:30px 24px 26px;position:relative;box-shadow:0 1px 3px rgba(15,40,25,.07);width:100%;flex:1">
+          <div style="position:absolute;top:-16px;left:24px;width:36px;height:36px;border-radius:50%;background:linear-gradient(132deg,#16a34a,#15803d);color:#fff;font-weight:900;font-size:15px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 14px rgba(22,163,74,.35)">3</div>
+          <div style="display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#1d4ed8;background:#dbeafe;border-radius:999px;padding:4px 10px;margin-bottom:8px">Parent view</div>
+          <h3 style="font-size:17px;font-weight:800;margin:0 0 6px">You approve, they grow</h3>
+          <p style="font-size:14px;line-height:1.6;color:#64748b;margin:0">Approve completed chores from your dashboard. Balances update, milestones unlock, the tree grows.</p>
+        </div>
+      </div>
+
     </div>
+    <p style="font-size:12px;color:#94a3b8;margin:26px 0 0;text-align:center">Example of an Amount Per Chore set up</p>
   </div>
 <!-- TRUST STRIP (repeat) -->
   <div style="background:#15803d;padding:26px clamp(20px,5vw,44px)">
@@ -928,6 +975,7 @@ document.querySelectorAll('.faq-toggle').forEach(function(btn) {
 })();
 </script>
 
+<script defer src="/js/walkthrough-clips.js?v=1"></script>
 <script src="/js/utm-capture.js?v=1"></script>
 <script defer src="/js/cookie-consent.js?v=2"></script>
 <script defer src="/js/analytics.js?v=1"></script>
