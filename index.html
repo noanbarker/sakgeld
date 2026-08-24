@@ -279,6 +279,7 @@
   .pr-grid-footer{grid-template-columns:repeat(2,1fr)!important;gap:28px!important}
   .pr-grid-2col{grid-template-columns:1fr!important;gap:28px!important}
   .pr-hiw-grid3{grid-template-columns:1fr!important;row-gap:44px!important;column-gap:0!important}
+  .pr-hiw-step{flex-direction:column-reverse!important}
   .pr-hero-desc{font-weight:700!important}
   .pr-hero-heading{font-size:33.6px!important}
   .pr-grid-3col{grid-template-columns:1fr!important}
@@ -516,7 +517,7 @@
   </div>
 
   <!-- HOW IT WORKS -->
-  <div class="pr-hiw-section" style="max-width:1160px;margin:0 auto;padding:56px clamp(20px,5vw,44px) 80px">
+  <div id="pr-hiw-section" class="pr-hiw-section" style="max-width:1160px;margin:0 auto;padding:56px clamp(20px,5vw,44px) 80px">
     <div style="font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#2563eb">How it works</div>
     <h2 style="font-size:clamp(22px,5.5vw,38px);font-weight:900;letter-spacing:-.02em;margin:10px 0 44px;color:#15803d">Up and running in five minutes.</h2>
     <div class="pr-hiw-grid3" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:32px;align-items:stretch">
@@ -956,8 +957,17 @@ document.querySelectorAll('.faq-toggle').forEach(function(btn) {
   var btn = document.getElementById('pr-sticky-cta-btn');
   if(!bar || !btn) return;
   var showAt = window.innerHeight * 0.8;
+  // The How It Works clips run nearly the full height of a phone screen, and the
+  // sticky bar sits right on top of the part that matters. Stand down while any
+  // of that section is behind the bar, and come back once it has scrolled past.
+  var hiw = document.getElementById('pr-hiw-section');
+  var behindWalkthrough = function(){
+    if(!hiw) return false;
+    var r = hiw.getBoundingClientRect();
+    return r.top < window.innerHeight && r.bottom > (window.innerHeight - 96);
+  };
   var onScroll = function(){
-    if(window.scrollY > showAt){ bar.classList.add('pr-sticky-visible'); }
+    if(window.scrollY > showAt && !behindWalkthrough()){ bar.classList.add('pr-sticky-visible'); }
     else { bar.classList.remove('pr-sticky-visible'); }
   };
   window.addEventListener('scroll', onScroll, {passive:true});
