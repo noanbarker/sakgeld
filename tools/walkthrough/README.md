@@ -73,11 +73,15 @@ from it, and deletes it. It's gitignored and `.vercelignore`d, because a stray
 copy of the app at the site root would be served publicly. If a run crashes and
 leaves it behind, just delete it.
 
-**Output is not byte-identical between runs.** Re-running produces clips a few
-pixels different in places — chore icons render at very slightly different sizes
-depending on which image source Chrome resolves first. It's invisible to the eye,
-but it does mean git will show the files as changed even when nothing meaningful
-did. Only commit a rebuild you actually meant to make.
+**Animations are frozen during capture, on purpose.** `seed.js` injects a
+stylesheet killing every CSS animation and transition before the app paints. The
+kid's chore icons float up and down on a 3.2 second loop, so without it each
+screenshot catches them mid-bob and no two builds ever match. Don't remove it —
+rebuilds stop being reproducible the moment you do.
+
+**Given the same app and the same day, rebuilds are byte-identical.** So if git
+shows the clips as changed, something real changed. Worth a look rather than a
+shrug.
 
 **The date is today's date.** The kid screen shows "Today's chores — Monday, 24
 Aug" or whatever day you build on. Nothing depends on it, but that's why the

@@ -18,6 +18,15 @@
   const scene = params.get('scene') || '1';
   const iso = d => new Date(d).toISOString();
 
+  // Freeze every animation and transition before anything paints. The kid's
+  // chore icons float up and down on a 3.2s loop, so without this each capture
+  // catches the artwork at a different point in its bob and no two builds ever
+  // match. Entrance animations here all finish visible, so stopping them shows
+  // the settled state — which is what we want in a still anyway.
+  const freeze = document.createElement('style');
+  freeze.textContent = '*, *::before, *::after { animation: none !important; transition: none !important; }';
+  document.head.appendChild(freeze);
+
   // The consent banner and tutorial nudge paint before our localStorage flags
   // land, so take them out of the DOM as well as setting the flags.
   function killChrome() {
