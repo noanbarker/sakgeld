@@ -1,0 +1,5 @@
+# Build tooling for the marketing walkthrough clips. Runs on a laptop, has no
+# business being served — the clips it produces are committed under
+# images/marketing/walkthrough/ and deploy normally.
+tools/
+.walkthrough-build/
