@@ -49,8 +49,11 @@ module.exports = async (req, res) => {
     const url = event
       ? 'https://app.loops.so/api/v1/events/send'
       : 'https://app.loops.so/api/v1/contacts/update';
+    // See lib/billing-notifications.js sendLoopsEvent for why contact
+    // properties must be spread flat rather than nested under a
+    // `contactProperties` key.
     const body = event
-      ? { email, eventName: event, eventProperties: properties || {}, contactProperties: properties || {} }
+      ? { email, eventName: event, eventProperties: properties || {}, ...(properties || {}) }
       : { email, ...(properties || {}) };
 
     const loopsRes = await fetch(url, {
