@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){var m=document.cookie.match(/(?:^|; )sprout_geo=([^;]+)/);document.documentElement.setAttribute('data-geo', m ? decodeURIComponent(m[1]) : 'ZA');})();</script>
+<style>.geo-row{display:none}html[data-geo="ROW"] .geo-za{display:none}html[data-geo="ROW"] .geo-row{display:inline}.geo-row-block{display:none}html[data-geo="ROW"] .geo-za-block{display:none}html[data-geo="ROW"] .geo-row-block{display:block}</style>
 <title>Privacy Policy, Sprout</title>
 <meta name="description" content="How Sprout collects, uses, and protects your family's information.">
 <link rel="canonical" href="https://www.sproutearnsave.com/privacy.html">
@@ -306,7 +308,7 @@
   <ul>
     <li>Name and email address</li>
     <li>Password (stored encrypted, we never see or store it in plain text)</li>
-    <li>Billing details entered at signup, handled entirely by Paddle.com, our payment provider and Merchant of Record. Sprout never receives or stores your card number (see Section 5).</li>
+    <li>Billing details entered at signup, handled entirely by our payment provider<span class="geo-za"> — Paystack for South African customers, Paddle for everyone else</span><span class="geo-row"> Paddle.com, our Merchant of Record</span>. Sprout never receives or stores your card number (see Section 5).</li>
   </ul>
   <p><strong>Family information (entered by the parent, about the household):</strong></p>
   <ul>
@@ -318,7 +320,7 @@
   <h2>3. How we use this information</h2>
   <ul>
     <li>To create and run your family's account</li>
-    <li>To process your free trial and subscription (via Paddle, our Merchant of Record)</li>
+    <li>To process your free trial and subscription (via <span class="geo-za">Paystack or Paddle, depending on where you are</span><span class="geo-row">Paddle, our Merchant of Record</span>)</li>
     <li>To send you account-related emails (confirmations, billing notices, support replies)</li>
     <li>To fix bugs and improve the app</li>
   </ul>
@@ -329,12 +331,14 @@
   <p>Sprout is not directed at marketing to children, and we do not knowingly collect personal information directly from children.</p>
 
   <h2>5. Payment processing</h2>
-  <p>All payments are handled by <strong>Paddle.com Market Limited ("Paddle")</strong>, our Merchant of Record and a third-party payment provider acting on our behalf for your subscription. They collect and store your card details securely, Sprout does not see, process, or store your full card number at any point. Paddle's own <a href="https://www.paddle.com/legal/privacy" target="_blank" rel="noopener">privacy policy</a> governs how they handle that payment data.</p>
+  <p class="geo-za-block">If you are in South Africa, your payments are processed by <strong>Paystack Payments South Africa (Pty) Ltd ("Paystack")</strong>, a licensed South African payment service provider acting on our behalf. Paystack collects and stores your card details securely; Sprout does not see, process, or store your full card number at any point. Paystack's own <a href="https://paystack.com/za/privacy" target="_blank" rel="noopener">privacy policy</a> governs how they handle that payment data. Because Paystack is a South African provider, your card data is processed in South Africa.</p>
+  <p><span class="geo-za">For customers outside South Africa, </span>payments are handled by <strong>Paddle.com Market Limited ("Paddle")</strong>, our Merchant of Record and a third-party payment provider acting on our behalf for your subscription. They collect and store your card details securely, Sprout does not see, process, or store your full card number at any point. Paddle's own <a href="https://www.paddle.com/legal/privacy" target="_blank" rel="noopener">privacy policy</a> governs how they handle that payment data.</p>
 
   <h2>6. Who we share information with</h2>
   <ul>
     <li><strong>Supabase</strong>, our database and hosting provider, which stores your account and family data securely.</li>
-    <li><strong>Paddle</strong>, our Merchant of Record and payment processor, which handles billing and receives your name, email, and payment details necessary to process your subscription.</li>
+    <li class="geo-za-block"><strong>Paystack</strong>, our South African payment processor, which handles billing for South African subscriptions and receives your name, email, and payment details necessary to process your subscription.</li>
+    <li><strong>Paddle</strong>, our Merchant of Record and payment processor<span class="geo-za"> for customers outside South Africa</span>, which handles billing and receives your name, email, and payment details necessary to process your subscription.</li>
   </ul>
   <p>We don't share your data with anyone beyond what's needed to run and bill for the service, and we never sell it.</p>
 
@@ -355,7 +359,7 @@
   <p>We keep your data while your account is active. If your subscription is cancelled — including if a card expires or a payment fails — we keep your family's app data (children's profiles, chores and activity history) for a 60-day grace period, so you can pick up exactly where you left off if you reactivate. After 60 days, we permanently delete this data and retain only your name, email address and country. If you close your account outright, we delete or anonymise your personal data within a reasonable period, unless we're required to retain certain records for tax or legal reasons.</p>
 
   <h2>10. International transfers</h2>
-  <p>Our service providers (including Supabase and Paddle) may process or store data outside South Africa. Where this happens, we rely on those providers' own safeguards to keep your information protected to a comparable standard.</p>
+  <p>Some of our service providers (including Supabase and Paddle) may process or store data outside South Africa. Where this happens, we rely on those providers' own safeguards to keep your information protected to a comparable standard.<span class="geo-za"> Paystack, which processes card payments for South African subscriptions, is a South African provider and processes that payment data in South Africa.</span></p>
 
   <h2>11. Changes to this policy</h2>
   <p>If we make material changes to this policy, we'll update the date at the top of this page and, where appropriate, notify you by email.</p>

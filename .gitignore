@@ -3,4 +3,12 @@
 node_modules/
 Sprout-Design-Assessment.md
 design_handoff_pocket_rocket/
+# Local design and marketing source material — brand kit, mascot iterations,
+# playbooks. Not served by the site and not needed to build it.
+Working files/
 .claude/
+
+# Never commit secrets — Paystack/Paddle/Supabase keys live in Vercel env vars.
+.env
+.env.*
+!.env.example

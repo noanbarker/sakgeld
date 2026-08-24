@@ -507,12 +507,16 @@ function getStoredRef() {
 // ─── PADDLE ──────────────────────────────────────────────────────
 const PADDLE_MONTHLY_PRICE_ID = 'pri_01kz8phde0ep7qr2syx293dg83'; // $4.50/month
 const PADDLE_YEARLY_PRICE_ID  = 'pri_01kz8phq5syca08vqrp6nqvwsr'; // $45.00/year
-// South Africa gets its own tax-inclusive prices so R59/R590 is genuinely the total charged, not the base price + VAT on top.
+// Retired: South African sign-ups now go to Paystack instead (openPaystackCheckout),
+// because Paddle is a Merchant of Record and charges SA VAT we aren't required to
+// charge ourselves. These two prices still bill every South African family who
+// subscribed before that switch — a stored card can't be moved between gateways,
+// so they stay on Paddle for good. Don't delete them, and don't reuse them.
 const PADDLE_MONTHLY_PRICE_ID_ZA = 'pri_01kxk0mpc8359xzt2y6cn7n1rb';
 const PADDLE_YEARLY_PRICE_ID_ZA  = 'pri_01kxk0mppxjmn8neh65j572r34';
 // Display-only figures shown on the sign-up page before checkout — kept in sync with pricing.html by hand.
 const SIGNUP_PRICING = {
-    ZA:  { sym: 'R', monthly: '59',   yearly: '590', yearlyMo: '49.17', tax: '' },
+    ZA:  { sym: 'R', monthly: '59',   yearly: '590', yearlyMo: '49.17', tax: 'R1 card check at checkout, refunded immediately' },
     ROW: { sym: '$', monthly: '4.50', yearly: '45',  yearlyMo: '3.75',  tax: '+ local tax calculated on checkout' }
 };
 Paddle.Environment.set('production');
@@ -539,6 +543,33 @@ Paddle.Initialize({
         }
     }
 });
+// Paystack sends the parent back here after they've entered their card
+// (api/paystack-checkout.js sets the callback url). The webhook is what
+// actually refunds the R1 and starts the trial, and it may still be in flight,
+// so this waits for the subscription to appear rather than assuming it has.
+function handlePaystackReturn() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') !== 'paystack') return;
+    // Clear it from the address bar so a refresh doesn't replay this.
+    params.delete('checkout');
+    const query = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (query ? '?' + query : ''));
+    if (window.posthog) posthog.capture('trial_started', { billing_cycle: S.billingCycle || 'monthly', ...getStoredUTM() });
+    if (typeof fbq === 'function' && pendingTrialUserId) fbq('track', 'StartTrial', {}, { eventID: 'trial_started_' + pendingTrialUserId });
+    if (typeof gtag === 'function') gtag('event', 'trial_started');
+    if (currentUser) {
+        toast('🎉 Almost there! Confirming your subscription…');
+        refreshUserAfterCheckout();
+    } else {
+        // Signing up leaves them without a session until they confirm their
+        // address, so there's nothing to poll for yet — same landing place as
+        // the Paddle flow gives a brand-new parent.
+        S.authMode = 'signin';
+        toast('🎉 Trial started! Check your email to confirm your account, then sign in.');
+        render();
+    }
+}
+
 async function refreshUserAfterCheckout() {
     for (let i = 0; i < 4; i++) {
         await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -564,14 +595,46 @@ function resumeCheckout() {
 // decided the price shown on the sign-up page — never the country dropdown,
 // which is kept purely for our own Supabase analytics (see doSignUp).
 function openTrialCheckout({ email, geo, userId, billingCycle, referralCode }) {
-    const isYearly = billingCycle === 'yearly';
     const isZA = geo === 'ZA';
-    const priceId = isZA
-        ? (isYearly ? PADDLE_YEARLY_PRICE_ID_ZA : PADDLE_MONTHLY_PRICE_ID_ZA)
-        : (isYearly ? PADDLE_YEARLY_PRICE_ID : PADDLE_MONTHLY_PRICE_ID);
     if (window.posthog) posthog.capture('checkout_started', { billing_cycle: billingCycle, geo, ...getStoredUTM() });
     if (typeof fbq === 'function') fbq('track', 'InitiateCheckout');
     pendingTrialUserId = userId;
+    if (isZA) { openPaystackCheckout({ userId, billingCycle }); return; }
+    openPaddleCheckout({ email, userId, billingCycle, referralCode });
+}
+
+// South Africa. Paddle is a Merchant of Record and charges SA VAT on our
+// behalf, which we aren't yet required to charge — so South African families
+// are billed directly through Paystack instead, and everyone else stays on
+// Paddle below.
+//
+// Paystack has no free trial of its own. The server opens a R1 charge that
+// only exists to store the card; api/paystack-webhook.js refunds it the
+// moment it lands and starts the real subscription 14 days out.
+async function openPaystackCheckout({ userId, billingCycle }) {
+    try {
+        const res = await fetch('/api/paystack-checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, billingCycle }),
+        });
+        const body = await res.json().catch(() => null);
+        if (!res.ok || !body || !body.authorization_url) {
+            toast('❌ ' + ((body && body.error) || 'Could not start checkout. Please try again.'));
+            return;
+        }
+        // Full redirect rather than an overlay: South African cards almost
+        // always hand off to the bank's own 3-D Secure page, which refuses to
+        // run inside an iframe. Paystack sends them back to /app/?checkout=paystack.
+        window.location.href = body.authorization_url;
+    } catch (e) {
+        toast('❌ Could not start checkout. Please try again.');
+    }
+}
+
+function openPaddleCheckout({ email, userId, billingCycle, referralCode }) {
+    const isYearly = billingCycle === 'yearly';
+    const priceId = isYearly ? PADDLE_YEARLY_PRICE_ID : PADDLE_MONTHLY_PRICE_ID;
     // No customer.address here on purpose — leaving it out lets Paddle work
     // out the customer's real billing country and tax itself.
     Paddle.Checkout.open({
@@ -701,6 +764,7 @@ async function initApp() {
         await checkCycleCloseOut();
     }
     render();
+    handlePaystackReturn();
 }
 
 async function signOut() { await sb.auth.signOut(); }
@@ -1721,7 +1785,7 @@ function vSignupPage() {
                   <span style="font-family:var(--font-family);font-size:46px;font-weight:900;color:var(--color-green-700);letter-spacing:-.02em">${amt}</span>
                   <span style="font-family:var(--font-family);font-size:16px;color:var(--color-text-muted);font-weight:700">${cyc}</span>
                 </div>
-                <div style="font-family:var(--font-family);font-size:12px;color:var(--color-text-muted);font-weight:600;margin-top:3px;min-height:16px">${!isZA ? pr.tax : ''}</div>
+                <div style="font-family:var(--font-family);font-size:12px;color:var(--color-text-muted);font-weight:600;margin-top:3px;min-height:16px">${pr.tax}</div>
                 <div style="font-family:var(--font-family);font-size:14.5px;font-weight:800;color:var(--color-green-600);margin:7px 0 20px">Includes every child in your household.</div>
                 <div style="display:flex;flex-direction:column;gap:11px;font-size:14.5px;color:var(--color-text-primary);margin-bottom:22px;font-family:var(--font-family)">
                   <div style="padding-left:22px;text-indent:-22px">✓ Create recurring and one-off chores</div>
@@ -4703,16 +4767,19 @@ async function openManageSubscription() {
     btns.forEach((b) => { b.disabled = true; b.style.opacity = '0.6'; });
     try {
         const { data: { session } } = await sb.auth.getSession();
-        const res = await fetch('/api/paddle-portal', {
+        const res = await fetch('/api/billing-portal', {
             method: 'POST',
             headers: { Authorization: `Bearer ${session.access_token}` }
         });
         const body = await res.json();
-        if (!res.ok || !body?.urls?.general?.overview) {
+        // Paddle's portal and Paystack's hosted card page both arrive as a plain
+        // url — which one it is was decided server-side from the account.
+        const url = body?.url || body?.urls?.general?.overview;
+        if (!res.ok || !url) {
             toast('❌ ' + (body?.error || 'Could not open subscription management.'));
             return;
         }
-        window.open(body.urls.general.overview, '_blank');
+        window.open(url, '_blank');
     } catch (e) {
         toast('❌ Could not open subscription management.');
     } finally {
