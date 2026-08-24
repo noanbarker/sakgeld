@@ -887,7 +887,12 @@ function choreIconSVG(key, size = 44) {
     const file = CHORE_ICON_FILES[idx];
     const name = CHORE_ICON_NAMES[idx];
     const pngFile = file.replace(/\.webp$/i, '.png');
-    return `<picture><source srcset="../images/chores/${file}" type="image/webp"><img src="../images/chores/${pngFile}" alt="${name}" style="width:${size}px;height:${size}px;object-fit:contain;display:block"></picture>`;
+    // Nearly every chore icon has a space in its filename, and in srcset a space
+    // separates the URL from its descriptor — so an unencoded one gets the
+    // candidate thrown away and every browser silently falls back to the PNG,
+    // which is roughly five times the size. src tolerates spaces; srcset does not.
+    const webpSrc = '../images/chores/' + encodeURIComponent(file);
+    return `<picture><source srcset="${webpSrc}" type="image/webp"><img src="../images/chores/${pngFile}" alt="${name}" style="width:${size}px;height:${size}px;object-fit:contain;display:block"></picture>`;
 }
 
 // ─── TREE GROWTH STAGES ──────────────────────────────────────────
