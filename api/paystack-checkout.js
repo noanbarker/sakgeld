@@ -42,9 +42,20 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // Checked for shape, not just presence. A plan code that is missing *or*
+  // malformed fails identically from here on: Paystack accepts the card-setup
+  // charge regardless, and only rejects the subscription afterwards — leaving
+  // a parent charged, refunded, and with no trial, which is precisely the
+  // outcome this endpoint exists to avoid. Every Paystack plan code is
+  // PLN_ followed by alphanumerics, so a wrong value is caught here, before
+  // any card is touched.
   const planCode = PLAN_CODES[billingCycle];
-  if (!planCode) {
-    console.error('Missing Paystack plan code for billing cycle:', billingCycle);
+  if (!/^PLN_[A-Za-z0-9]+$/.test(String(planCode || ''))) {
+    console.error(
+      `Paystack plan code for "${billingCycle}" is missing or malformed — check the `
+      + `${billingCycle === 'yearly' ? 'PAYSTACK_PLAN_YEARLY_ZA' : 'PAYSTACK_PLAN_MONTHLY_ZA'} `
+      + `environment variable. Expected PLN_..., got: ${JSON.stringify(planCode)}`
+    );
     res.status(500).json({ error: 'Payments are not configured' });
     return;
   }
