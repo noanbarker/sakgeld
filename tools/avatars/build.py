@@ -6,8 +6,9 @@ not enough: an ellipse in a circle is either squashed or clipped, and the figure
 run right to the bottom of their ellipse, so clipping costs them their feet.
 
 So each avatar is instead widened out to a true circle using its own backdrop
-colour, then zoomed slightly — drawn as they are, the character sits in a lot of
-empty colour, which looks generous at 80px and reads as a speck at 32px.
+colour. The artwork itself is left exactly as drawn: cropping in to fill more of
+the circle costs the clothing and props — a scarf, a trowel, a pair of dungarees
+— and that detail is most of what tells one character from another.
 
     python3 tools/avatars/build.py
 
@@ -40,12 +41,6 @@ EDGE_INSET = 1.0
 
 # Supersampling factor for the circular alpha, so edges stay smooth.
 SS = 4
-
-# How much to zoom in, and where to hold the crop. A little over 1 fills the
-# circle without reaching the sprout leaves; the bias keeps the crop high, since
-# the leaves matter and the bottom of the body does not.
-ZOOM = 1.15
-ZOOM_BIAS = 0.30
 
 # One output size for all 24, so nothing in the app has to think about it.
 # Comfortably over twice the largest size the app draws (80px on the PIN screen).
@@ -148,15 +143,6 @@ def widen_to_circle(oval, alpha):
     return square
 
 
-def zoom_in(square):
-    """Scale up and re-crop, holding the crop high so the leaves survive."""
-    size = square.width
-    grown = square.resize((round(size * ZOOM), round(size * ZOOM)), Image.LANCZOS)
-    left = (grown.width - size) // 2
-    top = round((grown.height - size) * ZOOM_BIAS)
-    return grown.crop((left, top, left + size, top + size))
-
-
 def backdrop_colour(pixels, rows, cols):
     """The avatar's own backdrop colour, sampled just inside its left edge."""
     y = (rows.start + rows.stop) // 2
@@ -184,7 +170,7 @@ def main():
         oval = sheet.crop((cols.start, rows.start, cols.stop, rows.stop))
 
         avatar = widen_to_circle(oval, ellipse_alpha(width, height))
-        avatar = zoom_in(avatar).resize((OUT_SIZE, OUT_SIZE), Image.LANCZOS)
+        avatar = avatar.resize((OUT_SIZE, OUT_SIZE), Image.LANCZOS)
         avatar.putalpha(round_mask)
 
         stem = f"avatar-{number:02d}-{slug(name)}"
