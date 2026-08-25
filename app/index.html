@@ -336,6 +336,62 @@
         font-size:20px; will-change:transform,opacity;
         animation:chore-confetti-burst 0.7s ease-out forwards;
       }
+      /* ── Milestone celebration ──────────────────────── */
+      @keyframes sp-cel-in   { from { opacity:0; } to { opacity:1; } }
+      @keyframes sp-cel-pop  {
+        0%   { transform:scale(0.72) translateY(28px); opacity:0; }
+        62%  { transform:scale(1.04) translateY(0); opacity:1; }
+        100% { transform:scale(1) translateY(0); opacity:1; }
+      }
+      @keyframes sp-cel-grow {
+        0%   { transform:scale(0.25); opacity:0; }
+        58%  { transform:scale(1.16); opacity:1; }
+        100% { transform:scale(1); opacity:1; }
+      }
+      @keyframes sp-cel-rays { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+      @keyframes sp-cel-ring { 0% { transform:scale(0.55); opacity:0.5; } 100% { transform:scale(2.1); opacity:0; } }
+      @keyframes sp-cel-fall {
+        0%   { transform:translateY(-14vh) rotate(0deg); opacity:0; }
+        8%   { opacity:1; }
+        100% { transform:translateY(112vh) rotate(var(--sr)); opacity:1; }
+      }
+      .sp-cel-overlay {
+        position:fixed; inset:0; z-index:120; display:flex; align-items:center; justify-content:center;
+        padding:24px; background:rgba(15,23,42,0.55);
+        -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px);
+        animation:sp-cel-in 0.25s ease-out;
+      }
+      .sp-cel-card {
+        position:relative; width:100%; max-width:380px; background:var(--color-surface);
+        border-radius:32px; padding:28px 24px 24px; text-align:center;
+        box-shadow:0 24px 60px rgba(0,0,0,0.28);
+        animation:sp-cel-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+      }
+      .sp-cel-stage {
+        position:relative; height:172px; display:flex; align-items:center; justify-content:center;
+        margin-bottom:8px; overflow:hidden;
+      }
+      .sp-cel-rays {
+        position:absolute; width:210px; height:210px; border-radius:50%; pointer-events:none;
+        background:
+          radial-gradient(circle, rgba(250,204,21,0.20) 0%, rgba(250,204,21,0.07) 46%, transparent 70%),
+          conic-gradient(from 0deg, rgba(250,204,21,0.30) 0 5deg, transparent 5deg 22.5deg);
+        -webkit-mask-image:radial-gradient(circle, #000 26%, rgba(0,0,0,0.45) 52%, transparent 72%);
+        mask-image:radial-gradient(circle, #000 26%, rgba(0,0,0,0.45) 52%, transparent 72%);
+        animation:sp-cel-rays 22s linear infinite;
+      }
+      .sp-cel-ring {
+        position:absolute; width:116px; height:116px; border-radius:50%; pointer-events:none;
+        border:3px solid var(--color-green-600);
+        animation:sp-cel-ring 1.6s ease-out 0.25s 2 both;
+      }
+      .sp-cel-art { position:relative; animation:sp-cel-grow 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.12s both; }
+      .sp-cel-piece {
+        position:fixed; top:0; pointer-events:none; z-index:130;
+        will-change:transform; animation:sp-cel-fall linear forwards;
+      }
+      .sp-cel-dot { width:7px; height:7px; border-radius:50%; background:var(--color-border); }
+      .sp-cel-dot.on { background:var(--color-green-600); }
       .btn-outline {
         border:1.5px solid var(--color-border); color:#374151;
         border-radius:var(--radius-lg); padding:12px;
@@ -407,6 +463,8 @@
       @media (prefers-reduced-motion: reduce) {
         .sp-tab-anim-fwd, .sp-tab-anim-back, .sp-tab-exit-fwd, .sp-tab-exit-back { animation: none !important; }
         .sp-mob-tab-svg, .sp-sidebar-icon, .sp-mob-thumb, .sp-mob-divider { transition: none !important; }
+        .sp-cel-overlay, .sp-cel-card, .sp-cel-art { animation: none !important; }
+        .sp-cel-rays, .sp-cel-ring { display: none !important; }
       }
 
       /* ── Sign-up: pricing + account card ─────────────────────── */
@@ -795,7 +853,8 @@ const S = {
     billingCycle: 'monthly',
     showRefField: false,
     tourStep: -1,
-    faqOpen: null
+    faqOpen: null,
+    celebration: null
 };
 
 // ─── KID EMOJIS ──────────────────────────────────────────────────
@@ -941,6 +1000,150 @@ function treeStageSVG(stageIndex, size = 80) {
     const h = Math.round(size * scale[idx]);
     const pngFile = files[idx].replace(/\.webp$/i, '.png');
     return `<picture><source srcset="../images/${files[idx]}" type="image/webp"><img src="../images/${pngFile}" alt="${TREE_STAGES[idx].label}" style="height:${h}px;width:auto;display:block"></picture>`;
+}
+
+// ─── MILESTONE CELEBRATIONS ──────────────────────────────────────
+// A kid's balance only ever moves while they are logged out — a parent
+// approves a chore, a bonus pays out on the back of it — so the moment to
+// celebrate is the next time the kid opens their own screen, not the moment
+// the balance changed. What each kid has already been shown is kept per
+// device: no stored record means this device has never shown them anything,
+// which seeds silently instead of replaying every milestone they ever passed.
+function celSeenKey(kidId) { return `sprout_seen_milestones_${kidId}`; }
+function loadSeenMilestones(kidId) {
+    try {
+        const raw = localStorage.getItem(celSeenKey(kidId));
+        if (!raw) return null;
+        const v = JSON.parse(raw);
+        return { stage: Number(v.stage) || 0, bonuses: Array.isArray(v.bonuses) ? v.bonuses : [] };
+    } catch { return null; }
+}
+function saveSeenMilestones(kidId, seen) {
+    try { localStorage.setItem(celSeenKey(kidId), JSON.stringify(seen)); } catch {}
+}
+function currentMilestoneState(kid) {
+    return {
+        stage: getTreeStage(kid.balance || 0),
+        bonuses: (cache.bonusMilestones || [])
+            .filter(m => (m.claimedBy || []).some(c => c.kidId === kid.id))
+            .map(m => m.id)
+    };
+}
+function pendingCelebrations(kid) {
+    const now  = currentMilestoneState(kid);
+    const seen = loadSeenMilestones(kid.id);
+    if (!seen) { saveSeenMilestones(kid.id, now); return []; }
+    const items = [];
+    // Bonuses come first: the bonus is what pushed the balance over the line
+    // that grew the tree, so it reads as cause then effect.
+    (cache.bonusMilestones || [])
+        .filter(m => now.bonuses.includes(m.id) && !seen.bonuses.includes(m.id))
+        .sort((a, b) => (a.threshold || 0) - (b.threshold || 0))
+        .forEach(m => items.push({ type: 'bonus', milestone: m }));
+    if (now.stage > seen.stage) items.push({ type: 'tree', from: seen.stage, to: now.stage });
+    // Nothing to show still writes the record: a balance that dropped back below
+    // a threshold has to be remembered as dropped, or re-crossing it never reads
+    // as new again.
+    if (!items.length) saveSeenMilestones(kid.id, now);
+    return items;
+}
+function startCelebration(kidId) {
+    const kid = cache.kids.find(k => k.id === kidId);
+    if (!kid) return;
+    const items = pendingCelebrations(kid);
+    if (!items.length) return;
+    S.celebration = { kidId, items, index: 0 };
+    render();
+    fireCelebrationRain();
+}
+function nextCelebration() {
+    if (!S.celebration) return;
+    if (navigator.vibrate) navigator.vibrate(8);
+    if (S.celebration.index >= S.celebration.items.length - 1) return closeCelebration();
+    S.celebration.index += 1;
+    render();
+    fireCelebrationRain(16);
+}
+function closeCelebration() {
+    const kid = cache.kids.find(k => k.id === S.celebration?.kidId);
+    if (kid) saveSeenMilestones(kid.id, currentMilestoneState(kid));
+    S.celebration = null;
+    render();
+}
+function fireCelebrationRain(count = 22) {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const pieces = ['🎉', '✨', '⭐', '🌟', '🎊', '🍃'];
+    for (let i = 0; i < count; i++) {
+        const el    = document.createElement('div');
+        const dur   = 2.2 + Math.random() * 1.6;
+        const delay = Math.random() * 0.9;
+        el.className   = 'sp-cel-piece';
+        el.textContent = pieces[i % pieces.length];
+        el.style.left  = `${Math.random() * 94}vw`;
+        el.style.fontSize = `${14 + Math.random() * 14}px`;
+        el.style.animationDuration = `${dur}s`;
+        el.style.animationDelay    = `${delay}s`;
+        el.style.setProperty('--sr', `${(Math.random() - 0.5) * 720}deg`);
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), (dur + delay) * 1000 + 150);
+    }
+    if (navigator.vibrate) navigator.vibrate([14, 70, 14, 70, 26]);
+}
+function renderCelebration() {
+    const c = S.celebration;
+    if (!c) return '';
+    const kid  = cache.kids.find(k => k.id === c.kidId);
+    if (!kid) return '';
+    const item   = c.items[c.index];
+    const isLast = c.index >= c.items.length - 1;
+
+    let kicker, headline, chip, art;
+    if (item.type === 'tree') {
+        const from = TREE_STAGES[item.from], to = TREE_STAGES[item.to];
+        kicker   = 'New tree stage';
+        headline = `Hello, ${to.label}!`;
+        chip = `
+          <div style="display:inline-flex;align-items:flex-end;gap:8px;background:var(--color-green-50);border:1px solid var(--color-green-border);border-radius:var(--radius-full);padding:6px 14px;margin-bottom:12px">
+            <span style="display:inline-flex;align-items:flex-end;height:24px">${treeStageSVG(item.from, 20)}</span>
+            <span style="font-family:var(--font-family);font-size:13px;font-weight:800;color:var(--color-green-700);line-height:24px">${from.label} → ${to.label}</span>
+            <span style="display:inline-flex;align-items:flex-end;height:24px">${treeStageSVG(item.to, 24)}</span>
+          </div>`;
+        art = `<div class="sp-cel-ring"></div><div class="sp-cel-art">${treeStageSVG(item.to, 112)}</div>`;
+    } else {
+        const m = item.milestone;
+        kicker   = 'Milestone reached';
+        headline = m.name ? esc(m.name) : `${R(m.threshold)} saved!`;
+        chip = `
+          <div style="display:inline-flex;align-items:center;gap:6px;background:var(--color-green-50);border:1px solid var(--color-green-border);border-radius:var(--radius-full);padding:7px 16px;margin-bottom:12px">
+            ${milestoneStarSVG(16)}
+            <span style="font-family:var(--font-family);font-size:14px;font-weight:800;color:var(--color-green-700)">+${R(m.bonusAmount)} bonus</span>
+          </div>`;
+        art = `<div class="sp-cel-ring"></div><div class="sp-cel-art"><picture><source srcset="../images/sprout-celebrating_800_cropped.webp" type="image/webp"><img src="../images/sprout-celebrating_800_cropped.png" alt="" style="height:132px;width:auto;display:block"></picture></div>`;
+    }
+
+    const sub = item.type !== 'tree'
+        ? `You hit ${R(item.milestone.threshold)} in savings, ${esc(kid.name)}. Your bonus is already in your balance.`
+        : item.to >= TREE_STAGES.length - 1
+            ? `Nice saving, ${esc(kid.name)} — you've grown a whole forest. That's the very top!`
+            : `Nice saving, ${esc(kid.name)}! Keep it up and your tree grows again.`;
+
+    const dots = c.items.length > 1
+        ? `<div style="display:flex;gap:6px;justify-content:center;margin-bottom:14px">${
+            c.items.map((_, i) => `<div class="sp-cel-dot ${i <= c.index ? 'on' : ''}"></div>`).join('')}</div>`
+        : '';
+
+    return `
+    <div class="sp-cel-overlay" onclick="if(event.target===this)nextCelebration()">
+      <div class="sp-cel-card">
+        <div class="sp-cel-stage"><div class="sp-cel-rays"></div>${art}</div>
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-green-700);margin-bottom:6px">${kicker}</p>
+        <h2 style="font-family:var(--font-family);font-size:26px;font-weight:800;color:var(--color-text-primary);margin-bottom:10px">${headline}</h2>
+        ${chip}
+        <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);line-height:1.5;margin-bottom:18px">${sub}</p>
+        ${dots}
+        <button onclick="nextCelebration()" class="btn-primary">${isLast ? "Awesome!" : 'Next'}</button>
+      </div>
+    </div>`;
 }
 
 // ─── CHORE EMOJIS (legacy — kept for fallback) ────────────────────
@@ -3517,6 +3720,7 @@ async function checkPin() {
     if (!error && ok) {
         S.kidId = kidId; S.pin = ''; go('kid');
         writeMissedChores(kidId);
+        startCelebration(kidId);
     } else {
         if (navigator.vibrate) navigator.vibrate([40,40,40]);
         const el = document.getElementById('pin-err');
@@ -4914,7 +5118,7 @@ function render() {
     // a second load, which is exactly the flash this is meant to avoid.
     const prevLogo = app.querySelector('.sp-mobile-logo');
     const showTutorialNudge = tutorialNudgeVisible() && !S.modal;
-    app.innerHTML = html + renderModal() + (showTutorialNudge ? renderTutorialNudge() : '') + toastHtml;
+    app.innerHTML = html + renderModal() + (showTutorialNudge ? renderTutorialNudge() : '') + renderCelebration() + toastHtml;
     if (prevLogo) {
         const newLogo = app.querySelector('.sp-mobile-logo');
         const prevSrc = prevLogo.querySelector('img')?.src;
