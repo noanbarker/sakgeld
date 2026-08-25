@@ -1,0 +1,146 @@
+[
+  {
+    "id": 1,
+    "name": "Safari Boy",
+    "file": "avatar-01-safari-boy",
+    "colour": "#55a5ee"
+  },
+  {
+    "id": 2,
+    "name": "Cap Boy",
+    "file": "avatar-02-cap-boy",
+    "colour": "#3abeb8"
+  },
+  {
+    "id": 3,
+    "name": "Gardener Boy",
+    "file": "avatar-03-gardener-boy",
+    "colour": "#fdc433"
+  },
+  {
+    "id": 4,
+    "name": "Scholar Boy",
+    "file": "avatar-04-scholar-boy",
+    "colour": "#b49cd5"
+  },
+  {
+    "id": 5,
+    "name": "Raincoat Boy 1",
+    "file": "avatar-05-raincoat-boy-1",
+    "colour": "#59ade0"
+  },
+  {
+    "id": 6,
+    "name": "Winter Boy",
+    "file": "avatar-06-winter-boy",
+    "colour": "#f9b3d2"
+  },
+  {
+    "id": 7,
+    "name": "Hiker Boy",
+    "file": "avatar-07-hiker-boy",
+    "colour": "#9cc452"
+  },
+  {
+    "id": 8,
+    "name": "Sporty Boy",
+    "file": "avatar-08-sporty-boy",
+    "colour": "#f97667"
+  },
+  {
+    "id": 9,
+    "name": "Bow Girl",
+    "file": "avatar-09-bow-girl",
+    "colour": "#f6a8b8"
+  },
+  {
+    "id": 10,
+    "name": "Sunhat Girl",
+    "file": "avatar-10-sunhat-girl",
+    "colour": "#fd9259"
+  },
+  {
+    "id": 11,
+    "name": "Flower Girl",
+    "file": "avatar-11-flower-girl",
+    "colour": "#a88fcd"
+  },
+  {
+    "id": 12,
+    "name": "Sunny Girl",
+    "file": "avatar-12-sunny-girl",
+    "colour": "#49c0bb"
+  },
+  {
+    "id": 13,
+    "name": "Explorer Boy",
+    "file": "avatar-13-explorer-boy",
+    "colour": "#deeca8"
+  },
+  {
+    "id": 14,
+    "name": "Adventure Boy",
+    "file": "avatar-14-adventure-boy",
+    "colour": "#bddfec"
+  },
+  {
+    "id": 15,
+    "name": "Raincoat Boy 2",
+    "file": "avatar-15-raincoat-boy-2",
+    "colour": "#fde28d"
+  },
+  {
+    "id": 16,
+    "name": "Surfer Boy",
+    "file": "avatar-16-surfer-boy",
+    "colour": "#bae8d1"
+  },
+  {
+    "id": 17,
+    "name": "Smarty Boy",
+    "file": "avatar-17-smarty-boy",
+    "colour": "#cac5e8"
+  },
+  {
+    "id": 18,
+    "name": "Team Boy",
+    "file": "avatar-18-team-boy",
+    "colour": "#fcc87c"
+  },
+  {
+    "id": 19,
+    "name": "Gardener Girl",
+    "file": "avatar-19-gardener-girl",
+    "colour": "#fcd3cc"
+  },
+  {
+    "id": 20,
+    "name": "Explorer Girl",
+    "file": "avatar-20-explorer-girl",
+    "colour": "#cec2de"
+  },
+  {
+    "id": 21,
+    "name": "Farmer Girl",
+    "file": "avatar-21-farmer-girl",
+    "colour": "#fed087"
+  },
+  {
+    "id": 22,
+    "name": "Artist Girl",
+    "file": "avatar-22-artist-girl",
+    "colour": "#b5d9eb"
+  },
+  {
+    "id": 23,
+    "name": "Bookworm Girl",
+    "file": "avatar-23-bookworm-girl",
+    "colour": "#fde495"
+  },
+  {
+    "id": 24,
+    "name": "Sporty Girl",
+    "file": "avatar-24-sporty-girl",
+    "colour": "#bce5d4"
+  }
+]

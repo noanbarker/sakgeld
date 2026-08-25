@@ -857,19 +857,35 @@ const S = {
     celebration: null
 };
 
-// ─── KID EMOJIS ──────────────────────────────────────────────────
-const KID_EMOJIS = [
-    '😀','😃','😄','😁','😆','😎','🤩','😍','🥰','😜',
-    '🤪','🤓','😇','🥳','🤗','🤠','👻','🥸','😸','🙂',
-    '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯',
-    '🦁','🐮','🐸','🐵','🐔','🐧','🦆','🦉','🦋','🐢',
-    '🐠','🐟','🦄','🦖','🐬','🦭','🐘','🦒','🦓','🐕',
-    '🐩','🐈','🐇','🐿️','🦔','🦜','🦚','🦩','🐲','🦈',
-    '⭐','🌟','🏆','🥇','🎯','🎮','🎲','🎨','🎸','🥊',
-    '⚽','🏀','🎾','🚀','🎭','🏄','🤸','🎠','🎡','🛹',
-    '🌸','🌺','🌻','🌹','🌷','🌳','🌲','🌈','☀️','🌙',
-    '❄️','🔥','💎','🍕','🎂','🍦','🍩','🌊','🎈','🎁'
-];
+// ─── KID AVATARS (image files, keyed the same as AVATAR_NAMES) ────
+// Kids used to pick an emoji; they now pick one of these, and a kid's choice is
+// stored in the same `emoji` column as a number — exactly how chore icons work.
+// Cut from the illustration sheet by tools/avatars/build.py.
+const AVATAR_FILES = {
+  1: 'avatar-01-safari-boy.webp', 2: 'avatar-02-cap-boy.webp',
+  3: 'avatar-03-gardener-boy.webp', 4: 'avatar-04-scholar-boy.webp',
+  5: 'avatar-05-raincoat-boy-1.webp', 6: 'avatar-06-winter-boy.webp',
+  7: 'avatar-07-hiker-boy.webp', 8: 'avatar-08-sporty-boy.webp', 9: 'avatar-09-bow-girl.webp',
+  10: 'avatar-10-sunhat-girl.webp', 11: 'avatar-11-flower-girl.webp',
+  12: 'avatar-12-sunny-girl.webp', 13: 'avatar-13-explorer-boy.webp',
+  14: 'avatar-14-adventure-boy.webp', 15: 'avatar-15-raincoat-boy-2.webp',
+  16: 'avatar-16-surfer-boy.webp', 17: 'avatar-17-smarty-boy.webp',
+  18: 'avatar-18-team-boy.webp', 19: 'avatar-19-gardener-girl.webp',
+  20: 'avatar-20-explorer-girl.webp', 21: 'avatar-21-farmer-girl.webp',
+  22: 'avatar-22-artist-girl.webp', 23: 'avatar-23-bookworm-girl.webp',
+  24: 'avatar-24-sporty-girl.webp'
+};
+
+// Never shown on screen — the picker is pictures only, so a child too young to
+// read can still choose. These are here for alt text and screen readers.
+const AVATAR_NAMES = {
+  1:'Safari Boy', 2:'Cap Boy', 3:'Gardener Boy', 4:'Scholar Boy', 5:'Raincoat Boy 1',
+  6:'Winter Boy', 7:'Hiker Boy', 8:'Sporty Boy', 9:'Bow Girl', 10:'Sunhat Girl',
+  11:'Flower Girl', 12:'Sunny Girl', 13:'Explorer Boy', 14:'Adventure Boy',
+  15:'Raincoat Boy 2', 16:'Surfer Boy', 17:'Smarty Boy', 18:'Team Boy', 19:'Gardener Girl',
+  20:'Explorer Girl', 21:'Farmer Girl', 22:'Artist Girl', 23:'Bookworm Girl', 24:'Sporty Girl'
+};
+const AVATAR_COUNT = Object.keys(AVATAR_FILES).length;
 
 // ─── CHORE ICONS (image files, keyed the same as CHORE_ICON_NAMES) ─
 const CHORE_ICON_FILES = {
@@ -1219,14 +1235,49 @@ function dateStr(iso) { return new Date(iso).toLocaleDateString('en-ZA', { day: 
 // the date from sliding either way across a timezone boundary. Everything else
 // (manual, bonus, reward, expense, allowance) happens when it happens.
 function txDate(t) { return t.choreDate ? t.choreDate + 'T12:00:00' : t.createdAt; }
-function kidIcon(kidOrName) {
+// A kid's face, wherever one is shown. Pass a size in pixels for the places
+// that lay the icon out inline; leave it off and the icon fills whatever
+// fixed-size circle it is dropped into, which is what most call sites give it.
+//
+// Kids added since the avatar picker landed store an avatar number. Kids added
+// before it still store the emoji they picked, and always will unless their
+// parent edits them, so that path has to stay.
+function kidIcon(kidOrName, size) {
+    let emoji = '';
     if (kidOrName && typeof kidOrName === 'object') {
-        if (kidOrName.emoji) return kidOrName.emoji;
+        emoji = kidOrName.emoji || '';
         kidOrName = kidOrName.name || '';
+    } else {
+        emoji = String(kidOrName ?? '');
     }
-    const icons = ['🧒','👦','👧','🧑','🐻','🦁','🐯','🦊'];
-    let h = 0; for (const c of String(kidOrName)) h += c.charCodeAt(0);
-    return icons[h % icons.length];
+
+    // A number always means an avatar. One we don't recognise falls back to the
+    // first rather than printing a bare digit on screen where a face should be.
+    if (/^\d+$/.test(emoji.trim())) {
+        const num = parseInt(emoji, 10);
+        return avatarIMG(AVATAR_FILES[num] ? num : 1, size);
+    }
+
+    // No avatar, so fall back to the emoji the kid picked, or to a face derived
+    // from their name for the handful of kids saved before either existed.
+    if (!emoji) {
+        const icons = ['🧒','👦','👧','🧑','🐻','🦁','🐯','🦊'];
+        let h = 0; for (const c of String(kidOrName)) h += c.charCodeAt(0);
+        emoji = icons[h % icons.length];
+    }
+    return size ? `<span style="font-size:${size}px;line-height:1">${emoji}</span>` : emoji;
+}
+
+function avatarIMG(num, size) {
+    const file = AVATAR_FILES[num];
+    const name = AVATAR_NAMES[num] || '';
+    const pngFile = file.replace(/\.webp$/i, '.png');
+    // Sized when a size is given, otherwise stretched to fill the circle the
+    // call site already draws — so the theme-colour ring around it still shows.
+    const box = size ? `width:${size}px;height:${size}px` : 'width:100%;height:100%';
+    return `<picture><source srcset="../images/avatars/${file}" type="image/webp">` +
+        `<img src="../images/avatars/${pngFile}" alt="${name}" ` +
+        `style="${box};object-fit:cover;border-radius:50%;display:block"></picture>`;
 }
 function go(view, params = {}) { Object.assign(S, params); S.view = view; render(); }
 const PARENT_TAB_ORDER = ['overview', 'money', 'chores', 'kids', 'bonuses', 'rewards', 'settings'];
@@ -1784,7 +1835,11 @@ async function runCycleCloseOut() {
 }
 
 function openModal(type, data = {}) {
-    const defaultEmoji = (type === 'add-kid' || type === 'edit-kid') ? '😀' : '1';
+    // A new kid opens on a different avatar from their siblings, the same way
+    // theme colours already cycle, so a family of four is never four of one face.
+    const defaultEmoji = (type === 'add-kid' || type === 'edit-kid')
+        ? String((DB.load().kids.length % AVATAR_COUNT) + 1)
+        : '1';
     S.selectedEmoji    = data.emoji     || defaultEmoji;
     S.selectedColor    = data.color_key || 'blue';
     S.selectedSchedule = data.schedule  || 'daily';
@@ -2304,7 +2359,7 @@ function vHome() {
                     style="padding:16px 8px 14px;border-radius:16px;border:1.5px solid ${ac.border};background:${ac.bg};cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:filter 0.15s,transform 0.15s"
                     onmouseenter="this.style.filter='brightness(0.96)';this.style.transform='scale(0.98)'"
                     onmouseleave="this.style.filter='';this.style.transform=''">
-                    <span style="font-size:28px">${kidIcon(k)}</span>
+                    ${kidIcon(k, 56)}
                     <span style="font-family:var(--font-family);font-size:13px;font-weight:800;color:${ac.text}">${esc(k.name)}</span>
                     <div style="height:40px;display:flex;align-items:flex-end;justify-content:center">${treeStageSVG(stage, 40)}</div>
                   </button>`;
@@ -2390,7 +2445,7 @@ function vOnboarding() {
     if (step === 'kid') {
         const kidRows = db.kids.map(k => `
           <div class="card flex items-center gap-3" style="padding:10px 14px">
-            <span style="font-size:20px">${kidIcon(k)}</span>
+            ${kidIcon(k, 24)}
             <span style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:14px">${esc(k.name)}</span>
           </div>`).join('');
         body = `
@@ -3303,7 +3358,7 @@ function pBonuses(db) {
             const claimDate = claim ? new Date(claim.claimedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : null;
             return `
             <div style="display:flex;align-items:center;gap:8px;padding:5px 0">
-              <div style="width:24px;height:24px;background:${ac.bg};border:1px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">${kidIcon(k)}</div>
+              <div style="width:32px;height:32px;background:${ac.bg};border:1px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">${kidIcon(k)}</div>
               <span style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-primary);flex:1">${esc(k.name)}</span>
               ${claim
                 ? `<span style="font-family:var(--font-family);font-size:10px;font-weight:700;background:#dcfce7;color:#16a34a;padding:3px 9px;border-radius:99px">✓ Claimed ${claimDate}</span>`
@@ -3389,7 +3444,7 @@ function pRewards(db) {
             const claimDate = achieved ? new Date(achieved.approvedAt || achieved.claimedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : null;
             return `
             <div style="display:flex;align-items:center;gap:8px;padding:5px 0">
-              <div style="width:24px;height:24px;background:${ac.bg};border:1px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">${kidIcon(k)}</div>
+              <div style="width:32px;height:32px;background:${ac.bg};border:1px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">${kidIcon(k)}</div>
               <span style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-primary);flex:1">${esc(k.name)}</span>
               ${achieved
                 ? `<span style="font-family:var(--font-family);font-size:10px;font-weight:700;background:#dcfce7;color:#16a34a;padding:3px 9px;border-radius:99px">✓ Claimed ${claimDate}</span>`
@@ -4143,13 +4198,17 @@ function renderModal() {
             </button>`;
           }).join('')}
         </div>
-        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Emoji <span style="font-size:20px;margin-left:6px;letter-spacing:0">${S.selectedEmoji || data.emoji || '😀'}</span></p>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(32px,1fr));gap:3px;max-height:150px;overflow-y:auto;overflow-x:hidden;border:1.5px solid var(--color-border);border-radius:12px;padding:8px;margin-bottom:16px">
-          ${KID_EMOJIS.map(em => {
-            const sel = (S.selectedEmoji || data.emoji || '😀') === em;
-            return `<button onclick="pickEmoji('${em}')" type="button"
-              style="font-size:20px;width:100%;aspect-ratio:1;min-width:0;border-radius:8px;border:2px solid ${sel?'var(--color-green-600)':'transparent'};background:${sel?'var(--color-green-100)':'transparent'};cursor:pointer">
-              ${em}</button>`;
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:10px">Avatar</p>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;max-height:250px;overflow-y:auto;overflow-x:hidden;border:1.5px solid var(--color-border);border-radius:14px;padding:12px;margin-bottom:16px">
+          ${Object.keys(AVATAR_FILES).map(num => {
+            const n = parseInt(num);
+            const sel = String(S.selectedEmoji) === String(n);
+            // No name on the button — the picture is the label, so a child who
+            // cannot read yet can still pick their own face.
+            return `<button onclick="pickEmoji('${n}')" type="button" aria-label="${AVATAR_NAMES[n]}" aria-pressed="${sel}"
+              style="width:100%;aspect-ratio:1;min-width:0;padding:0;border:none;border-radius:50%;background:none;cursor:pointer;line-height:0;box-shadow:${sel?'0 0 0 3px var(--color-green-600)':'none'};transition:box-shadow 0.12s,transform 0.12s"
+              onmouseenter="this.style.transform='scale(1.07)'" onmouseleave="this.style.transform=''">
+              ${avatarIMG(n)}</button>`;
           }).join('')}
         </div>
         <div style="display:flex;gap:8px;margin-top:4px">
@@ -4200,8 +4259,8 @@ function renderModal() {
           ${db.kids.map(k => {
             const sel = Array.isArray(S.selectedKids) && S.selectedKids.includes(k.id);
             return `<button onclick="toggleKidAssignment('${k.id}')" type="button"
-              style="padding:6px 12px;border-radius:10px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${sel?'var(--color-green-600)':'var(--color-border)'};background:${sel?'var(--color-green-100)':'white'};color:${sel?'var(--color-green-700)':'#6b7280'};cursor:pointer">
-              ${kidIcon(k)} ${esc(k.name)}
+              style="padding:6px 12px;border-radius:10px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${sel?'var(--color-green-600)':'var(--color-border)'};background:${sel?'var(--color-green-100)':'white'};color:${sel?'var(--color-green-700)':'#6b7280'};cursor:pointer;display:inline-flex;align-items:center;gap:7px">
+              ${kidIcon(k, 24)}${esc(k.name)}
             </button>`;
           }).join('')}
         </div>
@@ -4353,7 +4412,7 @@ function renderModal() {
                   const sel = Array.isArray(S.selectedKids) && S.selectedKids.includes(k.id);
                   return `<button onclick="pickQuickTaskKid('${k.id}')" type="button"
                     style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? 'var(--color-green-600)' : 'var(--color-border)'};background:${sel ? 'var(--color-green-100)' : 'white'};color:${sel ? 'var(--color-green-700)' : '#6b7280'};cursor:pointer;display:flex;align-items:center;gap:6px">
-                    <span style="font-size:18px">${kidIcon(k)}</span> ${esc(k.name)}
+                    ${kidIcon(k, 24)} ${esc(k.name)}
                   </button>`;
                 }).join('');
               })()}
@@ -4372,7 +4431,7 @@ function renderModal() {
             const ac = kidAccent(k);
             return `<button onclick="pickBonusKid('${k.id}')" type="button"
               style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? ac.border : 'var(--color-border)'};background:${sel ? ac.bg : 'white'};color:${sel ? ac.text : '#6b7280'};cursor:pointer;display:flex;align-items:center;gap:6px">
-              <span style="font-size:18px">${kidIcon(k)}</span>${esc(k.name)}
+              ${kidIcon(k, 24)}${esc(k.name)}
             </button>`;
         }).join('');
         body = `
@@ -4410,7 +4469,7 @@ function renderModal() {
             const ac = kidAccent(k);
             return `<button onclick="toggleKidAssignment('${k.id}')" type="button"
               style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? ac.border : 'var(--color-border)'};background:${sel ? ac.bg : 'white'};color:${sel ? ac.text : '#6b7280'};cursor:pointer;display:flex;align-items:center;gap:6px">
-              <span style="font-size:18px">${kidIcon(k)}</span>${esc(k.name)}
+              ${kidIcon(k, 24)}${esc(k.name)}
             </button>`;
         }).join('');
         body = `
@@ -4442,7 +4501,7 @@ function renderModal() {
             const sel = data.kidId === k.id;
             return `<button onclick="pickExpenseKid('${k.id}')" type="button"
               style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${ac.border};background:${sel ? ac.bg : 'white'};color:${sel ? ac.text : '#6b7280'};cursor:pointer;display:flex;align-items:center;gap:6px">
-              <span style="font-size:18px">${kidIcon(k)}</span>${esc(k.name)}
+              ${kidIcon(k, 24)}${esc(k.name)}
             </button>`;
         }).join('');
         const todayStr = toLocalDateStr(new Date());
@@ -4482,7 +4541,7 @@ async function addKid() {
     const name          = document.getElementById('k-name').value.trim();
     const pin           = document.getElementById('k-pin').value.trim();
     const date_of_birth = document.getElementById('k-dob').value;
-    const emoji     = S.selectedEmoji || '😀';
+    const emoji     = S.selectedEmoji || '1';
     const color_key = S.selectedColor || 'blue';
     if (!name)                 return toast('⚠️ Please enter a name.');
     if (!/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits (e.g. 1234).');
@@ -4515,7 +4574,7 @@ async function saveKid(id) {
     const name          = document.getElementById('k-name').value.trim();
     const pin           = document.getElementById('k-pin').value.trim();
     const date_of_birth = document.getElementById('k-dob').value;
-    const emoji     = S.selectedEmoji || '😀';
+    const emoji     = S.selectedEmoji || '1';
     const color_key = S.selectedColor || 'blue';
     if (!name)                 return toast('⚠️ Please enter a name.');
     if (pin && !/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits (e.g. 1234).');
