@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>social capture frame</title>
+<!--
+  Same trick as tools/walkthrough/frame.html: headless Chrome will not make its
+  window narrower than 500 CSS pixels, so a 390px phone viewport can only be had
+  inside an iframe. build.py screenshots the window and crops to the iframe.
+
+  Extra here: ?h= sets the iframe height. Tall captures render the whole scroll
+  pane in one shot so build.py can pan down it for a real scrolling motion,
+  rather than cutting between two fixed screens.
+-->
+<style>
+  html, body { margin: 0; padding: 0; background: #fff; }
+  iframe { border: 0; display: block; width: 390px; }
+</style>
+</head>
+<body>
+<script>
+  var q = new URLSearchParams(location.search);
+  var h = parseInt(q.get('h') || '844', 10);
+  document.write('<iframe id="app" style="height:' + h + 'px" src="/.social-build/?' + q.toString() + '"></iframe>');
+
+  // seed.js writes its measurements onto the <html> inside the iframe, but
+  // Chrome's --dump-dom only prints the top document. Copy them up so build.py
+  // can read them. Same origin, so this is just a property access.
+  (function mirror(tries) {
+    var doc;
+    try { doc = document.getElementById('app').contentDocument; } catch (e) { doc = null; }
+    var el = doc && doc.documentElement;
+    if (el && el.hasAttribute('data-demo-ready')) {
+      for (var i = 0; i < el.attributes.length; i++) {
+        var a = el.attributes[i];
+        if (a.name.indexOf('data-') === 0) document.documentElement.setAttribute(a.name, a.value);
+      }
+      return;
+    }
+    if (tries < 300) setTimeout(function () { mirror(tries + 1); }, 50);
+  })(0);
+</script>
+</body>
+</html>

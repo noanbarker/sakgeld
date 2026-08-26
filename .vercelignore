@@ -3,3 +3,4 @@
 # images/marketing/walkthrough/ and deploy normally.
 tools/
 .walkthrough-build/
+.social-build/

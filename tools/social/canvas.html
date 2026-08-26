@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>social canvas</title>
+<!--
+  The frame around the phone: brand background, device shell, caption, footer.
+
+  Rendered by Chrome so it inherits the marketing site's actual look — Nunito,
+  the soft green wash, the same bezel gradient as .pr-clip-shell on index.html —
+  rather than being approximated with drawing calls in Python.
+
+  The screen area is left blank on purpose. Chrome shoots this once per caption
+  as a still "plate", writes the screen rectangle onto <html data-screen>, and
+  build.py pastes the app frames into that rectangle. That way one Chrome render
+  serves every frame of the clip instead of one render per frame.
+
+  Query parameters: ?w= ?h= (CSS pixels, half the output size), ?cap= headline,
+  ?sub= sub-line, ?phone= screen width in CSS pixels.
+-->
+<style>
+  @font-face { font-family:'Nunito'; src:url('/fonts/nunito-latin.woff2') format('woff2');
+               font-weight:100 900; font-style:normal; font-display:block; }
+
+  :root {
+    --green-50:#f0fdf4; --green-100:#dcfce7; --green-200:#bbf7d0;
+    --green-600:#16a34a; --green-700:#15803d;
+    --text:#1e293b; --muted:#64748b; --bg:#f6faf7;
+  }
+
+  html, body { margin:0; padding:0; }
+  body { font-family:'Nunito', system-ui, sans-serif; -webkit-font-smoothing:antialiased; }
+
+  .canvas {
+    position:relative; overflow:hidden; background:var(--bg);
+    display:flex; flex-direction:column; align-items:center;
+  }
+
+  /* The same soft blobs the marketing pages use behind their cards, so a post
+     dropped next to a screenshot of the site reads as the same family. */
+  .blob { position:absolute; border-radius:50%; filter:blur(6px); opacity:.85; }
+  .blob-a { width:64%; aspect-ratio:1; left:-22%; top:-10%;
+            background:radial-gradient(circle at 35% 35%, var(--green-100), rgba(220,252,231,0) 68%); }
+  .blob-b { width:78%; aspect-ratio:1; right:-32%; bottom:-14%;
+            background:radial-gradient(circle at 60% 40%, var(--green-200), rgba(187,247,208,0) 66%); }
+
+  .inner { position:relative; z-index:1; width:100%; height:100%;
+           display:flex; flex-direction:column; align-items:center;
+           padding:var(--pad) var(--pad) calc(var(--pad) * .8); box-sizing:border-box; }
+
+  .logo { height:var(--logo-h); width:auto; display:block; flex-shrink:0; }
+
+  /* A fixed height, not one that follows the words. The phone is sized from
+     whatever room the caption leaves, so a caption that wrapped to two lines
+     would give that beat a smaller phone than its neighbours — and the phone
+     would jump size mid-clip. Reserve room for the longest caption instead. */
+  .cap { text-align:center; margin:var(--cap-top) 0 0; flex-shrink:0;
+         height:var(--cap-h); display:flex; flex-direction:column; justify-content:center; }
+  .cap h1 { margin:0; font-weight:900; font-size:var(--cap-size); line-height:1.12;
+            color:var(--text); letter-spacing:-0.01em; }
+  .cap p  { margin:var(--sub-top) 0 0; font-weight:700; font-size:var(--sub-size);
+            line-height:1.35; color:var(--muted); }
+
+  /* Bezel copied from .pr-clip-shell in index.html — same gradient, same notch,
+     scaled up. If that changes on the site, change it here too. */
+  .shell { position:relative; flex-shrink:0; margin-top:auto; margin-bottom:auto;
+           background:linear-gradient(160deg,#3b4453 0%,#11161e 26%,#0b0f15 74%,#2b3341 100%);
+           border-radius:var(--shell-r); padding:var(--shell-p);
+           box-shadow:0 26px 60px rgba(11,18,26,.22), 0 6px 16px rgba(11,18,26,.14); }
+  .shell::after { content:""; position:absolute; top:var(--shell-p); left:50%;
+                  transform:translateX(-50%); width:calc(var(--phone-w) * .19);
+                  height:calc(var(--phone-w) * .036); background:#0b0f15;
+                  border-radius:0 0 var(--notch-r) var(--notch-r); z-index:2; }
+  /* Left blank: build.py pastes the app frames in here. */
+  .screen { display:block; width:var(--phone-w); height:var(--phone-h);
+            border-radius:var(--screen-r); background:#fff; }
+
+  .foot { flex-shrink:0; display:flex; align-items:center; gap:.5em;
+          font-weight:800; font-size:var(--foot-size); color:var(--green-700);
+          margin-top:var(--cap-top); }
+  .foot .dot { width:.36em; height:.36em; border-radius:50%; background:var(--green-600); }
+</style>
+</head>
+<body>
+<script>
+  const q = new URLSearchParams(location.search);
+  const W = +(q.get('w') || 540);
+  const H = +(q.get('h') || 960);
+
+  // Everything scales off the canvas width, so 9:16, 4:5 and 1:1 all come out
+  // proportioned rather than needing three sets of hand-tuned numbers.
+  const u = W / 540;
+  const vars = {
+    '--pad':        Math.round(34 * u) + 'px',
+    // placeholder; replaced by fitPhone() once the caption's real height is known
+    '--phone-w':    '10px', '--phone-h': '22px',
+    '--logo-h':     Math.round(46 * u) + 'px',
+    '--cap-top':    Math.round(22 * u) + 'px',
+    '--cap-size':   Math.round(38 * u) + 'px',
+    '--sub-top':    Math.round(10 * u) + 'px',
+    '--sub-size':   Math.round(18 * u) + 'px',
+    '--foot-size':  Math.round(17 * u) + 'px',
+    // two lines of headline plus two of sub-line, the most any caption may use
+    '--cap-h':      Math.round(38 * u * 1.12 * 2 + 10 * u + 18 * u * 1.35 * 2) + 'px'
+  };
+
+  const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const cap = q.get('cap') || '';
+  const sub = q.get('sub') || '';
+  const foot = q.get('foot') || 'sproutallowance.com';
+
+  document.write(`
+    <div class="canvas" style="width:${W}px;height:${H}px;${Object.entries(vars).map(([k, v]) => k + ':' + v).join(';')}">
+      <div class="blob blob-a"></div>
+      <div class="blob blob-b"></div>
+      <div class="inner">
+        <picture>
+          <source srcset="/images/Sprout_Logo_400.webp" type="image/webp">
+          <img class="logo" src="/images/Sprout_Logo_400.png" alt="Sprout">
+        </picture>
+        ${cap || sub ? `<div class="cap">${cap ? `<h1>${esc(cap)}</h1>` : ''}${sub ? `<p>${esc(sub)}</p>` : ''}</div>` : ''}
+        <div class="shell"><div class="screen" id="screen"></div></div>
+        ${foot ? `<div class="foot"><span class="dot"></span>${esc(foot)}</div>` : ''}
+      </div>
+    </div>`);
+
+  // The phone takes whatever room the caption leaves, so one template serves
+  // 9:16, 4:5 and 1:1 without three sets of hand-tuned numbers. Measured after
+  // layout because the caption's height depends on how many lines it wraps to.
+  function fitPhone() {
+    const canvas = document.querySelector('.canvas');
+    const inner  = document.querySelector('.inner');
+    const shell  = document.querySelector('.shell');
+    const pad    = parseFloat(getComputedStyle(inner).paddingTop);
+    let taken = pad * 1.8;
+    Array.from(inner.children).forEach(el => {
+      if (el === shell) return;
+      const cs = getComputedStyle(el);
+      taken += el.getBoundingClientRect().height
+             + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
+    });
+    // shell height = phoneW * (844/390) + 2 * (phoneW * 0.031)
+    const byHeight = Math.max(0, canvas.clientHeight - taken) / (844 / 390 + 0.062);
+    const byWidth  = (canvas.clientWidth - pad * 2) / 1.062;
+    const phoneW   = Math.floor(Math.min(byHeight, byWidth));
+    const set = (k, v) => canvas.style.setProperty(k, v + 'px');
+    set('--phone-w', phoneW);
+    set('--phone-h', Math.round(phoneW * 844 / 390));
+    set('--shell-p', Math.round(phoneW * 0.031));
+    set('--shell-r', Math.round(phoneW * 0.115));
+    set('--screen-r', Math.round(phoneW * 0.088));
+    set('--notch-r', Math.round(phoneW * 0.028));
+    return Math.round(phoneW * 0.088);
+  }
+
+  // Hand build.py the exact rectangle to paste app frames into, in output
+  // pixels. Measured rather than recomputed in Python, so the two can never
+  // drift apart.
+  addEventListener('load', () => {
+    const wait = document.fonts ? document.fonts.ready : Promise.resolve();
+    // setTimeout rather than requestAnimationFrame: build.py reads these
+    // attributes back with Chrome's --dump-dom, which does not paint, so frame
+    // callbacks may never run. Timers still fire. getBoundingClientRect forces
+    // the layout we need anyway.
+    wait.then(() => setTimeout(() => {
+      const radius = fitPhone();
+      const r = document.getElementById('screen').getBoundingClientRect();
+      const dpr = +(q.get('scale') || 2);
+      document.documentElement.setAttribute('data-screen',
+        [r.left, r.top, r.width, r.height].map(v => Math.round(v * dpr)).join(','));
+      document.documentElement.setAttribute('data-radius', String(Math.round(radius * dpr)));
+      document.documentElement.setAttribute('data-demo-ready', '1');
+    }, 40));
+  });
+</script>
+</body>
+</html>

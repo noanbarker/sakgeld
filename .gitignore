@@ -13,6 +13,7 @@ Working files/
 .env.*
 !.env.example
 
-# Throwaway copy of the app that tools/walkthrough/build.py renders its
-# screenshots from. Rebuilt on every run and deleted afterwards.
+# Throwaway copies of the app that the clip builders render their screenshots
+# from. Rebuilt on every run and deleted afterwards.
 .walkthrough-build/
+.social-build/
