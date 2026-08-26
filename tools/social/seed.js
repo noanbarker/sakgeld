@@ -61,6 +61,15 @@
   const now   = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 7, 30);
 
+  const withoutLaundry = () => CHORES().filter(c => c.id !== 'c3');
+
+  // A form field's value: whatever the storyboard passed, or the finished value
+  // when it did not pass anything. Passing an empty string is how a beat says
+  // "not filled in yet", so an absent parameter and an empty one differ.
+  function field(name, whenAbsent) {
+    return params.has(name) ? params.get(name) : whenAbsent;
+  }
+
   function approve(which) {
     cache.completions = QUEUE().map(([id, c, k]) => done(id, c, k, which(k)));
     QUEUE().forEach(([, , kidId, amount]) => {
@@ -114,16 +123,42 @@
   const SCENES = {
     // 1. Parent sets up a child, then a chore.
     'parent-kids-1': () => { cache.kids = [KIDS()[0]]; S.view = 'parent'; S.tab = 'kids'; render(); },
+
+    // The form as it stands part-way through being filled in. Every field can be
+    // handed in from the storyboard, so a name can arrive a letter at a time and
+    // a colour can be unpicked and then picked — which is what lets the clip
+    // show the form being filled rather than cutting to it already full.
     'add-kid': () => {
       cache.kids = [KIDS()[0]];
       S.view = 'parent'; S.tab = 'kids';
-      openModal('add-kid', { name: 'Zoe', pin: '1234', date_of_birth: '2018-07-02', emoji: '7', color_key: 'coral' });
+      openModal('add-kid', {
+        name:          field('name', 'Zoe'),
+        pin:           field('kpin', '1234'),
+        date_of_birth: field('dob', '2018-07-02'),
+        // Left empty these fall back to the app's own defaults — blue, and the
+        // next avatar in the cycle — which is exactly the unpicked state.
+        color_key:     field('colour', 'coral'),
+        emoji:         field('avatar', '7')
+      });
     },
     'parent-kids-2': () => { S.view = 'parent'; S.tab = 'kids'; render(); },
+
+    // The chore being added is Sort Laundry, not Make Bed, for one reason: the
+    // icon picker opens on the first illustration, which is the bed. Adding the
+    // bed chore would mean the parent "choosing" an icon that was already
+    // chosen, and the clip would show a finger landing on a tile that does not
+    // change. Sort Laundry's icon is three tiles along, so the choice is visible.
+    'without-laundry': () => { cache.chores = withoutLaundry(); S.view = 'parent'; S.tab = 'chores'; render(); },
     'add-chore': () => {
+      cache.chores = withoutLaundry();
       S.view = 'parent'; S.tab = 'chores';
-      openModal('add-chore', { name: 'Make Bed', description: 'Make your bed every morning',
-                               value: M.bed, emoji: '1', assignedTo: 'all', schedule: 'daily' });
+      openModal('add-chore', {
+        name:        field('cname', 'Sort Laundry'),
+        description: field('cdesc', 'Colours and whites'),
+        value:       field('cval', M.laundry),
+        emoji:       field('cicon', '4'),
+        assignedTo: 'all', schedule: 'daily'
+      });
     },
     'parent-chores': () => { S.view = 'parent'; S.tab = 'chores'; render(); },
 
@@ -150,15 +185,19 @@
     'kid-balance': () => { S.view = 'kid'; S.kidId = 'k2'; S.tab = 'overview'; render(); }
   };
 
-  // Buttons a finger can land on, by scene. Named rather than given as
-  // coordinates so they follow the button when the layout changes.
-  const TAP_TARGETS = {
-    'add-kid':       () => btnByText('Add'),
-    'add-chore':     () => btnByText('Add'),
-    'home':          () => btnByText('Zoe'),
-    'kid-today':     () => btnByText('Done!'),
-    'parent-queue':  () => btnByText('Approve')
-  };
+  // Where a finger lands. The storyboard names a target, never a coordinate, so
+  // the finger follows the button when the layout changes instead of quietly
+  // drifting off it.
+  //
+  //   text:Done!        a button whose label reads that
+  //   #k-name           anything a CSS selector can reach
+  //   [onclick*="..."]  which covers the colour swatches and icon tiles, since
+  //                     each carries its own value in its onclick
+  function findTarget(spec) {
+    if (!spec) return null;
+    if (spec.startsWith('text:')) return btnByText(spec.slice(5));
+    try { return document.querySelector(spec); } catch (e) { return null; }
+  }
 
   function btnByText(text) {
     const all = Array.from(document.querySelectorAll('button'));
@@ -301,7 +340,7 @@
 
     const want = params.get('tap');
     if (want) {
-      const el = (TAP_TARGETS[want] || (() => null))();
+      const el = findTarget(want);
       if (el) {
         const r = el.getBoundingClientRect();
         document.documentElement.setAttribute(

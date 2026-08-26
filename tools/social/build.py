@@ -65,18 +65,20 @@ SCALE = 2                       # capture and render at 2x, then downscale to th
 MAX_TALL = 4200                 # Chrome gets unreliable past a few thousand pixels
 
 ASPECTS = {"9x16": (1080, 1920), "4x5": (1080, 1350), "1x1": (1080, 1080)}
+MARGIN = 20                     # CSS pixels of background around the handset
+PHONE_RATIO = 2.226             # handset height as a multiple of its screen width
 
 FPS = 30
-CROSSFADE = 0.34                # seconds between one beat and the next
-CAP_SWAP = (0.30, 0.72)         # the slice of a crossfade the words change over
-DEFAULT_HOLD = 1.4              # seconds a beat rests once it has finished moving
-SCROLL_SPEED = 620              # pixels of scroll per second
-SCROLL_MIN = 0.35               # ... but never quicker than this
-SCROLL_MAX = 1.20               # ... nor slower
-PIN_DIGIT = 0.20                # seconds per PIN digit
-COUNT_SECS = 1.30               # how long the balance takes to climb
+CROSSFADE = 0.44                # seconds between one beat and the next
+DEFAULT_HOLD = 1.8              # seconds a beat rests once it has finished moving
+SCROLL_SPEED = 477              # pixels of scroll per second
+SCROLL_MIN = 0.46               # ... but never quicker than this
+SCROLL_MAX = 1.56               # ... nor slower
+PIN_DIGIT = 0.26                # seconds per PIN digit
+COUNT_SECS = 1.69               # how long the balance takes to climb
 COUNT_STEPS = 14                # how many balances the climb passes through
-TAP_SECS = 0.62                 # finger down, press, ripple, gone
+TAP_SECS = 0.81                 # finger down, press, ripple, gone
+TYPE_CHAR = 0.14                # seconds per typed character — a real thumb's pace
 
 
 # ─── preflight ────────────────────────────────────────────────────────────────
@@ -141,11 +143,18 @@ def chrome_args(url, extra):
 
 
 def shoot(url, css_w, css_h, dest):
-    subprocess.run(
-        chrome_args(url, [f"--window-size={css_w},{css_h}", f"--screenshot={dest}"]),
-        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    if not Path(dest).exists():
-        sys.exit(f"Chrome produced no screenshot for {url}")
+    # Retried, because roughly one launch in a few hundred comes back having
+    # written nothing at all — no error, no file. A form being filled in is
+    # hundreds of launches, so "rare" happens every run.
+    dest = Path(dest)
+    for attempt in range(3):
+        dest.unlink(missing_ok=True)
+        subprocess.run(
+            chrome_args(url, [f"--window-size={css_w},{css_h}", f"--screenshot={dest}"]),
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if dest.exists():
+            return
+    sys.exit(f"Chrome produced no screenshot after three tries:\n  {url}")
 
 
 def probe(url, css_w, css_h):
@@ -213,20 +222,28 @@ class Screen:
         return out
 
 
-def capture_screen(port, scene, currency, bal=None, pin=None, tap=None, scrolls=False):
-    """Capture one scene. Returns (Screen, tap point in phone CSS pixels or None)."""
+# Screens already captured this clip, keyed by the URL that produced them. A
+# form being filled in revisits the same state repeatedly — once to rest on it,
+# again to measure the button about to be pressed — and each capture is a second
+# of Chrome.
+_SHOTS = {}
+
+
+def capture_screen(port, scene, currency, params=None, tap=None, scrolls=False):
+    """Capture one scene in one state. Returns a Screen."""
     from PIL import Image
 
     def url(**extra):
         q = {"scene": scene, "cur": currency}
-        if bal is not None:
-            q["bal"] = bal
-        if pin is not None:
-            q["pin"] = pin
+        q.update({k: v for k, v in (params or {}).items() if v is not None})
         if tap:
             q["tap"] = tap
         q.update(extra)
         return f"http://127.0.0.1:{port}/.social-build/frame.html?" + urlencode(q)
+
+    key = (url(), scrolls)
+    if key in _SHOTS:
+        return _SHOTS[key]
 
     def grab(u, css_h):
         raw = STAGING / "raw.png"
@@ -236,9 +253,15 @@ def capture_screen(port, scene, currency, bal=None, pin=None, tap=None, scrolls=
         raw.unlink()
         return out
 
-    a = probe(url(), VIEW_W + 210, VIEW_H + 40)
-    pane = [v * SCALE for v in (nums(a.get("pane")) or [0, 0, VIEW_W, VIEW_H])]
-    point = nums(a.get("tap"))
+    # Measuring costs a whole Chrome launch, so only pay for it when something
+    # actually needs the numbers: a finger to place, or a scroll to compute.
+    # A screen resting at the top needs neither.
+    if tap or scrolls:
+        a = probe(url(), VIEW_W + 210, VIEW_H + 40)
+        pane = [v * SCALE for v in (nums(a.get("pane")) or [0, 0, VIEW_W, VIEW_H])]
+        point = nums(a.get("tap"))
+    else:
+        pane, point = [0, 0, VIEW_W * SCALE, VIEW_H * SCALE], None
     base = grab(url(), VIEW_H)
 
     tall = tall_pane = None
@@ -253,23 +276,25 @@ def capture_screen(port, scene, currency, bal=None, pin=None, tap=None, scrolls=
             # which is not where the finger needs to land once we have scrolled.
             point = nums(t.get("tap")) or point
 
-    return Screen(base, pane, tall, tall_pane, point)
+    _SHOTS[key] = Screen(base, pane, tall, tall_pane, point)
+    return _SHOTS[key]
 
 
 # ─── the brand frame around the phone ─────────────────────────────────────────
 
 class Plate:
-    """The still canvas a clip's frames are dropped into: background, bezel, words."""
+    """The still canvas a clip's frames are dropped into: background and bezel."""
 
-    def __init__(self, image, rect, radius):
+    def __init__(self, image, rect, radius, notch=None):
         self.image, self.rect, self.radius = image, rect, radius
+        self.notch = notch      # x, y, w, h, corner radius — drawn over each frame
 
 
-def capture_plate(port, cap, sub, foot, size):
+def capture_plate(port, size):
     from PIL import Image
     out_w, out_h = size
     css_w, css_h = out_w // SCALE, out_h // SCALE
-    q = {"w": css_w, "h": css_h, "scale": SCALE, "cap": cap, "sub": sub, "foot": foot}
+    q = {"w": css_w, "h": css_h, "scale": SCALE, "margin": MARGIN}
     url = f"http://127.0.0.1:{port}/.social-build/canvas.html?" + urlencode(q)
 
     a = probe(url, css_w, css_h)
@@ -280,7 +305,14 @@ def capture_plate(port, cap, sub, foot, size):
     with Image.open(dest) as im:
         image = im.crop((0, 0, out_w, out_h)).convert("RGB")
     dest.unlink()
-    return Plate(image, nums(a["screen"]), int(a["radius"]))
+    return Plate(image, nums(a["screen"]), int(a["radius"]), nums(a.get("notch")))
+
+
+def device_size(width=1080):
+    """A canvas cropped to the handset itself, for when a background is unwanted."""
+    phone_w = (width - MARGIN * SCALE * 2) / 1.062
+    height = round(phone_w * PHONE_RATIO) + MARGIN * SCALE * 2
+    return (width, height + height % 2)
 
 
 # ─── motion ───────────────────────────────────────────────────────────────────
@@ -305,8 +337,9 @@ def draw_tap(img, point, t):
     A finger landing on a button, drawn over the screen.
 
     t runs 0→1 across the press. The disc arrives, shrinks as it makes contact,
-    and a ring spreads out from under it — the same shape a real touch ripple
-    makes, which is what makes it read as a press rather than a floating dot.
+    and two rings spread out from under it — the same shape a real touch ripple
+    makes. Deliberately emphatic: on a silent clip watched at arm's length this
+    is the only thing telling the viewer which button caused what happens next.
     """
     from PIL import Image, ImageDraw
     if not point:
@@ -314,74 +347,171 @@ def draw_tap(img, point, t):
     w, h = img.size
     cx = point[0] / VIEW_W * w
     cy = point[1] / VIEW_H * h
-    r0 = w * 0.075
+    r0 = w * 0.082
 
     layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
 
-    if t < 0.30:                      # arriving
-        k = ease(t / 0.30)
-        r, alpha = r0 * (1.5 - 0.5 * k), int(150 * k)
-    elif t < 0.46:                    # pressed
-        r, alpha = r0 * 0.84, 150
+    def ring(radius, colour, alpha, width):
+        if alpha > 2:
+            d.ellipse([cx - radius, cy - radius, cx + radius, cy + radius],
+                      outline=colour + (int(alpha),), width=max(2, int(width)))
+
+    if t < 0.26:                      # arriving
+        k = ease(t / 0.26)
+        r, on = r0 * (1.55 - 0.55 * k), k
+    elif t < 0.50:                    # held down
+        r, on = r0 * 0.80, 1.0
     else:                             # lifting
-        k = ease((t - 0.46) / 0.54)
-        r, alpha = r0 * (0.84 + 0.16 * k), int(150 * (1 - k))
+        k = ease((t - 0.50) / 0.50)
+        r, on = r0 * (0.80 + 0.20 * k), 1 - k
 
-    # Kept light on purpose: a solid disc over a button hides the very label the
-    # viewer is meant to read. The ring carries the shape, the fill only hints.
-    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(15, 23, 42, int(alpha * 0.16)))
-    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=(15, 23, 42, int(alpha * 0.72)),
-              width=max(2, int(w * 0.0042)))
+    # The fingertip: light enough to read the label under it, ringed so it still
+    # has a hard edge on a white card.
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(255, 255, 255, int(150 * on)))
+    ring(r, (15, 23, 42), 190 * on, w * 0.006)
 
-    if t >= 0.38:                     # the ripple spreading out from the press
-        k = ease_out(min(1.0, (t - 0.38) / 0.50))
-        rr = r0 * (0.9 + 2.4 * k)
-        a = int(120 * (1 - k))
-        if a > 2:
-            d.ellipse([cx - rr, cy - rr, cx + rr, cy + rr],
-                      outline=(22, 163, 74, a), width=max(2, int(w * 0.006)))
+    # Two rings leaving the point of contact, the second trailing the first.
+    for delay, weight in ((0.30, 1.0), (0.42, 0.6)):
+        if t >= delay:
+            k = ease_out(min(1.0, (t - delay) / 0.55))
+            ring(r0 * (0.9 + 2.9 * k), (22, 163, 74), 200 * weight * (1 - k), w * 0.008 * (1 - k * 0.5))
 
     return Image.alpha_composite(img.convert("RGBA"), layer).convert("RGB")
+
+
+def scroll_frames(scr, plate, a, b):
+    """A pan from a to b. A short one should not take as long as a long one."""
+    secs = min(SCROLL_MAX, max(SCROLL_MIN, abs(b - a) / SCROLL_SPEED))
+    n = max(2, round(secs * FPS))
+    for i in range(n):
+        yield fit(scr.at(a + (b - a) * ease(i / (n - 1))), plate)
+
+
+def tap_frames(scr, plate, y):
+    n = max(2, round(TAP_SECS * FPS))
+    still = fit(scr.at(y), plate)
+    point = scr.tap_at(y)
+    for i in range(n):
+        yield draw_tap(still, point, i / (n - 1))
+
+
+def rest(img, secs):
+    """The same frame, held. One image, yielded many times — not many images."""
+    for _ in range(round(secs * FPS)):
+        yield img
+
+
+def step_frames(port, beat, currency, plate):
+    """
+    A beat given as a sequence of small moves: a form being filled in.
+
+    Each step may scroll, then press a button, then change the screen, then
+    rest — skipping whichever of those it doesn't need. The state carries over
+    from step to step, so a name typed one letter at a time is a list of states
+    rather than a list of screens.
+
+    Order matters: the press is drawn on the screen as it stands *before* the
+    change it causes, because that is the order a person sees it happen in.
+    """
+    state = dict(beat.get("params", {}))
+    scene = beat["scene"]
+    y = float(beat.get("y", 0) or 0)
+    last = None
+
+    def shot(tap=None, scrolls=False):
+        return capture_screen(port, scene, currency, params=state, tap=tap, scrolls=scrolls)
+
+    for st in beat["steps"]:
+        # The full-height capture is only worth its two Chrome launches when
+        # this step scrolls, or when we are already part-way down the screen.
+        deep = y > 0 or "y" in st
+        scr = shot(tap=st.get("tap"), scrolls=deep)
+
+        if "y" in st:
+            target = scr.max_y if st["y"] == "end" else float(st["y"])
+            if abs(target - y) > 1:
+                yield from scroll_frames(scr, plate, y, target)
+                y = target
+
+        if "tap" in st:
+            yield from tap_frames(scr, plate, y)
+
+        if "type" in st:
+            # One capture per character, hard cut between them. Dissolving would
+            # turn typing into a smear; a letter appearing is a cut in real life.
+            name, text = st["type"]
+            per = st.get("rate", TYPE_CHAR)
+            for k in range(1, len(text) + 1):
+                state[name] = text[:k]
+                last = fit(shot(scrolls=deep).at(y), plate)
+                yield from rest(last, per)
+
+        if "set" in st:
+            state.update(st["set"])
+
+        if st.get("hold"):
+            last = fit(shot(scrolls=deep).at(y), plate)
+            yield from rest(last, st["hold"])
+
+    if last is None:
+        last = fit(shot(scrolls=y > 0).at(y), plate)
+        yield last
+    yield from rest(last, beat.get("hold", 0))
 
 
 def beat_screens(port, beat, currency, plate, clip_name):
     """
     Turn one beat of the storyboard into the run of app screens it plays through.
 
-    A beat scrolls, then taps, then rests — any of which it may skip. Filling and
-    counting stand alone, because both are already a whole movement.
+    A plain beat scrolls, then taps, then rests — any of which it may skip.
+    Filling, counting and a step list each stand alone, because each is already
+    a whole movement.
 
-    Everything comes back sized to the plate's hole, so the frame loop has only
-    to paste, never to resize.
+    Yielded one at a time rather than returned as a list. A form being filled in
+    runs to several hundred frames, and a frame is four megabytes; holding a
+    whole clip in memory at once is how this ran the machine out of it.
     """
     scene = beat["scene"]
-    hold_n = round(beat.get("hold", DEFAULT_HOLD) * FPS)
-    frames = []
+    hold = beat.get("hold", DEFAULT_HOLD)
+
+    # Captures are worth remembering within a beat — a state gets shot once to
+    # rest on and again to measure the button about to be pressed — but not
+    # across beats, which share nothing and would only pile up.
+    _SHOTS.clear()
+
+    if "steps" in beat:
+        yield from step_frames(port, beat, currency, plate)
+        return
 
     if "pin" in beat:
         # One capture per digit: the dots really do fill in, rather than a dot
         # being drawn on top of a screenshot of an empty pad.
         lo, hi = beat["pin"]
+        last = None
         for n in range(lo, hi + 1):
-            scr = capture_screen(port, scene, currency, pin=n)
-            frames += [fit(scr.at(0), plate)] * max(1, round(PIN_DIGIT * FPS))
-        return frames + [frames[-1]] * hold_n
+            last = fit(capture_screen(port, scene, currency, params={"pin": n}).at(0), plate)
+            yield from rest(last, PIN_DIGIT)
+        yield from rest(last, hold)
+        return
 
     if "count" in beat:
         # The balance climbing, and with it the progress ring and the tree. Each
         # step is a real render, so everything that depends on the number moves
         # together instead of only the digits changing.
         lo, hi = COUNT_USD[clip_name] if currency == "USD" and clip_name in COUNT_USD else beat["count"]
-        per = max(1, round(COUNT_SECS * FPS / COUNT_STEPS))
+        last = None
         for i in range(COUNT_STEPS + 1):
             v = lo + (hi - lo) * ease_out(i / COUNT_STEPS)
-            scr = capture_screen(port, scene, currency, bal=round(v, 2))
-            frames += [fit(scr.at(beat.get("y", 0)), plate)] * per
-        return frames + [frames[-1]] * hold_n
+            scr = capture_screen(port, scene, currency, params={"bal": round(v, 2)})
+            last = fit(scr.at(beat.get("y", 0)), plate)
+            yield from rest(last, COUNT_SECS / COUNT_STEPS)
+        yield from rest(last, hold)
+        return
 
     scrolls = bool(beat.get("scroll")) or bool(beat.get("y")) or "tap" in beat
-    scr = capture_screen(port, scene, currency, tap=beat.get("tap"), scrolls=scrolls)
+    scr = capture_screen(port, scene, currency, params=beat.get("params"),
+                         tap=beat.get("tap"), scrolls=scrolls)
 
     def offset(v):
         # "end" is how far this screen can actually go, which beats writing a
@@ -390,21 +520,15 @@ def beat_screens(port, beat, currency, plate, clip_name):
 
     if "scroll" in beat:
         a, b = (offset(v) for v in beat["scroll"])
-        # A short pan should not take as long as a long one, or it crawls.
-        secs = min(SCROLL_MAX, max(SCROLL_MIN, abs(b - a) / SCROLL_SPEED))
-        n = max(2, round(secs * FPS))
-        frames += [fit(scr.at(a + (b - a) * ease(i / (n - 1))), plate) for i in range(n)]
+        yield from scroll_frames(scr, plate, a, b)
         y = b
     else:
         y = offset(beat.get("y", 0))
 
-    still = fit(scr.at(y), plate)
-
     if "tap" in beat:
-        n = max(2, round(TAP_SECS * FPS))
-        frames += [draw_tap(still, scr.tap_at(y), i / (n - 1)) for i in range(n)]
+        yield from tap_frames(scr, plate, y)
 
-    return frames + [still] * hold_n
+    yield from rest(fit(scr.at(y), plate), hold)
 
 
 # ─── assembling and encoding ──────────────────────────────────────────────────
@@ -412,6 +536,21 @@ def beat_screens(port, beat, currency, plate, clip_name):
 def compose(plate, screen, mask):
     out = plate.image.copy()
     out.paste(screen, (plate.rect[0], plate.rect[1]), mask)
+    return out
+
+
+def paste_screen(plate, screen, mask):
+    """One app frame, dropped into the handset, with the camera notch on top."""
+    from PIL import ImageDraw
+    out = plate.image.copy()
+    out.paste(screen, (plate.rect[0], plate.rect[1]), mask)
+    if plate.notch:
+        x, y, w, h, r = plate.notch
+        # Square along the top, where it meets the bezel; rounded where it hangs
+        # down into the screen.
+        ImageDraw.Draw(out).rounded_rectangle(
+            [x, y - r, x + w, y + h], radius=r, fill=(11, 15, 21),
+            corners=(False, False, True, True))
     return out
 
 
@@ -424,27 +563,26 @@ def rounded_mask(w, h, r):
     return m.resize((w, h), Image.LANCZOS)
 
 
-def render(ffmpeg, segments, mp4, poster, crf):
+def render(ffmpeg, plate, beats, mp4, poster, crf):
     """
     Walk the beats, crossfading between them, straight into ffmpeg.
 
-    Frames are written as they are made and thrown away again. A ten second 9:16
-    clip is three hundred frames of six megabytes; holding them all would cost
-    two gigabytes for no reason.
+    Beats arrive as generators and frames are written as they are made. Only the
+    handful held back for the next crossfade is ever in memory at once: a frame
+    is four megabytes, and the setup clip runs past seven hundred of them.
+    Holding a whole clip is what ran the machine out of memory.
+
+    Returns the number of frames written.
     """
     from PIL import Image
-    fade_n = round(CROSSFADE * FPS)
-    first = None
-    w, h = segments[0][0].image.size
+    from collections import deque
+    from itertools import islice
 
-    plate, frames = segments[0]
+    fade_n = round(CROSSFADE * FPS)
     mask = rounded_mask(*plate.rect[2:], plate.radius)
-    # Every beat's phone must land in the same place, or a crossfade would paste
-    # one beat's screen through the other beat's hole. canvas.html reserves a
-    # fixed caption block to guarantee it; this is the tripwire if that changes.
-    odd = [p.rect for p, _ in segments if p.rect != plate.rect]
-    if odd:
-        sys.exit(f"the phone is not the same size on every beat: {plate.rect} vs {odd[0]}")
+    w, h = plate.image.size
+    first = None
+    written = 0
 
     proc = subprocess.Popen(
         [ffmpeg, "-y", "-loglevel", "error",
@@ -455,73 +593,39 @@ def render(ffmpeg, segments, mp4, poster, crf):
          "-g", str(FPS * 2), "-movflags", "+faststart", str(mp4)],
         stdin=subprocess.PIPE)
 
-    def write(im):
-        nonlocal first
+    def write(screen):
+        nonlocal first, written
+        out = paste_screen(plate, screen, mask)
         if first is None:
-            first = im.copy()
-        proc.stdin.write(im.tobytes())
+            first = out.copy()
+        proc.stdin.write(out.tobytes())
+        written += 1
 
-    for i, (plate, frames) in enumerate(segments):
-        mask = rounded_mask(*plate.rect[2:], plate.radius)
-        nxt = segments[i + 1] if i + 1 < len(segments) else None
-        tail = fade_n if nxt else 0
-        body = frames[:len(frames) - tail] if tail else frames
-
-        for f in body:
-            write(compose(plate, f, mask))
-
-        if nxt:
-            nplate, nframes = nxt
-            for j in range(tail):
-                k = (j + 1) / (tail + 1)
-                # The screen dissolves across the whole crossfade, but the words
-                # change over a slice in the middle of it. Fading a headline into
-                # a different headline at the same rate leaves several frames of
-                # both being legible at once, which reads as a mistake.
-                lo, hi = CAP_SWAP
-                kc = ease(min(1.0, max(0.0, (k - lo) / (hi - lo))))
-                bg = Image.blend(plate.image, nplate.image, kc)
-                screen = Image.blend(frames[len(frames) - tail + j],
-                                     nframes[min(j, len(nframes) - 1)], k)
-                out = bg
-                out.paste(screen, (plate.rect[0], plate.rect[1]), mask)
-                write(out)
-            # the frames the fade consumed are not replayed by the next segment
-            segments[i + 1] = (nplate, nframes[tail:] or nframes[-1:])
+    tail = []                     # the previous beat's last frames, held back
+    for it in beats:
+        it = iter(it)
+        if tail:
+            head = list(islice(it, len(tail)))
+            for j, f in enumerate(head):
+                write(Image.blend(tail[j], f, (j + 1) / (len(tail) + 1)))
+            for f in tail[len(head):]:
+                write(f)          # the beat was shorter than the crossfade
+            tail = []
+        pending = deque()
+        for f in it:
+            pending.append(f)
+            if len(pending) > fade_n:
+                write(pending.popleft())
+        tail = list(pending)
+    for f in tail:
+        write(f)                  # the last beat has nothing to fade into
 
     proc.stdin.close()
     if proc.wait() != 0:
         sys.exit(f"ffmpeg failed writing {mp4.name}")
     if first is not None:
         first.save(poster, quality=90, method=6)
-
-
-def scout(port, scene, currency, dest):
-    """
-    Save a scene at its full height with a ruler down the side.
-
-    Choosing a scroll offset by trial and error means a rebuild per guess. This
-    gives you the whole screen with the numbers written on it, so the offsets in
-    clips.py can be read off a picture instead.
-    """
-    from PIL import Image, ImageDraw
-    scr = capture_screen(port, scene, currency, scrolls=True)
-    img = (scr.tall or scr.base).convert("RGB")
-    w, h = img.size
-    out = Image.new("RGB", (w + 96, h), "white")
-    out.paste(img, (96, 0))
-    d = ImageDraw.Draw(out)
-    for css in range(0, int(h / SCALE) + 1, 50):
-        y = css * SCALE
-        major = css % 250 == 0
-        d.line([(96 - (26 if major else 14), y), (96, y)], fill="#94a3b8", width=2)
-        if major:
-            d.line([(96, y), (w + 96, y)], fill="#e2e8f0", width=1)
-            d.text((8, y + 4), str(css), fill="#334155")
-    # The window the phone actually shows, if you scrolled to 0.
-    d.rectangle([96, 0, w + 95, VIEW_H * SCALE - 1], outline="#16a34a", width=3)
-    out.save(dest)
-    return dest, int(h / SCALE), round(scr.max_y)
+    return written
 
 
 # ─── main ─────────────────────────────────────────────────────────────────────
@@ -530,23 +634,23 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("clips", nargs="*", help="clip names to build (default: all)")
-    ap.add_argument("--aspect", choices=sorted(ASPECTS), default="9x16")
+    ap.add_argument("--aspect", choices=sorted(ASPECTS) + ["device"], default="9x16",
+                    help='"device" crops to the handset itself (default: 9x16)')
     ap.add_argument("--currency", choices=["ZAR", "USD"], default="ZAR")
     ap.add_argument("--crf", type=int, default=21, help="H.264 quality, lower is better and bigger")
     ap.add_argument("--stills", action="store_true", help="posters only, skip the video")
-    ap.add_argument("--foot", default="sproutallowance.com", help="the line along the bottom")
     ap.add_argument("--scout", metavar="SCENE",
                     help="save that scene full-height with a ruler, to read scroll offsets off")
     args = ap.parse_args()
 
     if args.scout:
-        ffmpeg = preflight()
+        preflight()
         port = free_port()
         httpd = None
         try:
             stage()
             httpd = serve(port)
-            dest = ROOT / "Working files" / "social" / f"scout-{args.scout}.png"
+            dest = OUT_DIR / f"scout-{args.scout}.png"
             dest.parent.mkdir(parents=True, exist_ok=True)
             path, total, scrollable = scout(port, args.scout, args.currency, dest)
             print(f"{args.scout}: {total}px tall, scrolls {scrollable}px\n{path}")
@@ -562,7 +666,7 @@ def main():
     wanted = args.clips or list(CLIPS)
 
     ffmpeg = preflight()
-    size = ASPECTS[args.aspect]
+    size = device_size() if args.aspect == "device" else ASPECTS[args.aspect]
     suffix = "" if args.currency == "ZAR" else "-usd"
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -574,27 +678,31 @@ def main():
         print(f"serving {ROOT} on port {port}")
         print(f"{args.aspect} · {args.currency} · {size[0]}×{size[1]}\n")
 
+        # One handset, one background, no words — so the frame is the same for
+        # every beat of every clip and is worth rendering once.
+        plate = capture_plate(port, size)
+
         for name in wanted:
             clip = CLIPS[name]
+            total = len(clip["beats"])
             print(f"{name} — {clip['title']}")
-            segments = []
-            for i, beat in enumerate(clip["beats"]):
-                plate = capture_plate(port, beat.get("cap", ""), beat.get("sub", ""), args.foot, size)
-                frames = beat_screens(port, beat, args.currency, plate, name)
-                segments.append((plate, frames))
-                print(f"  beat {i + 1}/{len(clip['beats'])}  {beat['scene']:<14} {len(frames):>3} frames")
+
+            def beats_of(clip=clip, name=name, total=total):
+                for i, beat in enumerate(clip["beats"]):
+                    print(f"  beat {i + 1}/{total}  {beat['scene']}")
+                    yield beat_screens(port, beat, args.currency, plate, name)
 
             stem = f"{name}-{args.aspect}{suffix}"
             poster = OUT_DIR / f"{stem}.webp"
             mp4 = OUT_DIR / f"{stem}.mp4"
             if args.stills:
-                plate, frames = segments[0]
-                compose(plate, frames[0], rounded_mask(*plate.rect[2:], plate.radius)).save(poster, quality=90, method=6)
+                first = next(iter(next(beats_of())))
+                paste_screen(plate, first,
+                             rounded_mask(*plate.rect[2:], plate.radius)).save(poster, quality=90, method=6)
                 print(f"  {poster.name:26} {poster.stat().st_size // 1024:5} KB\n")
             else:
-                render(ffmpeg, segments, mp4, poster, args.crf)
-                secs = sum(len(f) for _, f in segments) / FPS
-                print(f"  {mp4.name:26} {mp4.stat().st_size // 1024:5} KB   {secs:.1f}s\n")
+                n = render(ffmpeg, plate, beats_of(), mp4, poster, args.crf)
+                print(f"  {mp4.name:26} {mp4.stat().st_size // 1024:5} KB   {n / FPS:.1f}s\n")
 
         print(f"written to {OUT_DIR}")
     finally:
