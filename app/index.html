@@ -774,6 +774,7 @@ async function loadCache() {
         distributions: (distRes.data || []).map(d => ({ ...d, kidId: d.kid_id, createdAt: d.created_at })),
         cycleHistory: (chRes.data || []).map(h => ({ ...h, kidId: h.kid_id, periodType: h.period_type, startDate: h.start_date, endDate: h.end_date, weightCompleted: h.weight_completed, weightAssigned: h.weight_assigned, amountCeiling: h.amount_ceiling, amountPaid: h.amount_paid, createdAt: h.created_at })),
     };
+    await signChoreImages();
 }
 
 async function initApp() {
@@ -840,6 +841,9 @@ const S = {
     toast: null,
     toastTimer: null,
     selectedEmoji: null,
+    chorePhotoBlob: null,    // compressed and waiting to upload on save
+    chorePhotoPreview: null, // object URL for that blob
+    chorePhotoPath: null,    // the photo already stored for this chore, if any
     selectedColor: 'blue',
     selectedSchedule: 'daily',
     selectedDays: [],
@@ -945,6 +949,7 @@ const UI_ICON_PATHS = {
   banknote: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
   help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 4"/><path d="M12 17h.01"/>',
   bag: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+  camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
 };
 function uiIcon(name, size = 16, stroke = 2) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round">${UI_ICON_PATHS[name] || ''}</svg>`;
@@ -952,6 +957,101 @@ function uiIcon(name, size = 16, stroke = 2) {
 
 function milestoneStarSVG(size = 20) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="var(--color-gold-400)" stroke="none"><path d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z"/></svg>`;
+}
+
+// ─── CUSTOM CHORE PHOTOS ─────────────────────────────────────────
+// A parent can photograph the actual bed or the actual dog bowl instead of
+// picking one of the 41 illustrations above. The photo is squared and shrunk
+// in the browser before it ever reaches Supabase, and lives in a private
+// bucket keyed by the parent's own user id.
+const CHORE_PHOTO_BUCKET  = 'chore-photos';
+const CHORE_PHOTO_SIZE    = 512;    // the tile is 128px, so this still looks sharp on a 3× screen
+const CHORE_PHOTO_QUALITY = 0.82;
+const CHORE_PHOTO_TTL     = 604800; // signed URLs last a week; re-signed on every load anyway
+
+// path -> signed URL. Rendering is synchronous, so the URLs have to be in hand
+// before the first paint; loadCache() fills this in before it returns.
+const choreImgURL = {};
+
+async function signChoreImages() {
+    const paths = [...new Set((cache.chores || []).map(c => c.image_path).filter(Boolean))];
+    if (!paths.length) return;
+    const { data, error } = await sb.storage.from(CHORE_PHOTO_BUCKET).createSignedUrls(paths, CHORE_PHOTO_TTL);
+    if (error) return;
+    (data || []).forEach(r => { if (r.signedUrl) choreImgURL[r.path] = r.signedUrl; });
+}
+
+// Squares, shrinks and re-encodes a camera photo: roughly 3 MB in, 20–70 KB out.
+// Redrawing through a canvas also strips every scrap of EXIF, so the GPS
+// coordinates baked into a phone photo never leave the parent's device.
+async function compressChorePhoto(file) {
+    let src;
+    if (window.createImageBitmap) {
+        // Without `from-image` the orientation flag is ignored and half the
+        // photos taken on a phone come out lying on their side.
+        try { src = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+        catch (e) { src = await createImageBitmap(file); }
+    } else {
+        src = await new Promise((res, rej) => {
+            const img = new Image(), url = URL.createObjectURL(file);
+            img.onload  = () => { URL.revokeObjectURL(url); res(img); };
+            img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('decode failed')); };
+            img.src = url;
+        });
+    }
+    const side   = Math.min(src.width, src.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = CHORE_PHOTO_SIZE;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(src, (src.width - side) / 2, (src.height - side) / 2, side, side,
+                       0, 0, CHORE_PHOTO_SIZE, CHORE_PHOTO_SIZE);
+    if (src.close) src.close();
+    const encode = type => new Promise(res => canvas.toBlob(res, type, CHORE_PHOTO_QUALITY));
+    // Safari can't encode WebP from a canvas — it silently hands back a PNG
+    // many times the size — so check what actually came out rather than
+    // trusting the format we asked for, and fall back to JPEG.
+    let blob = await encode('image/webp');
+    if (!blob || blob.type !== 'image/webp') blob = await encode('image/jpeg');
+    if (!blob) throw new Error('encode failed');
+    return blob;
+}
+
+async function uploadChorePhoto(choreId) {
+    const blob = S.chorePhotoBlob;
+    const ext  = blob.type === 'image/webp' ? 'webp' : 'jpg';
+    // The first path segment is the user id — that's what the storage policies
+    // check, so a parent can only ever read or write inside their own folder.
+    const path = `${currentUser.id}/${choreId}-${Date.now()}.${ext}`;
+    const { error } = await sb.storage.from(CHORE_PHOTO_BUCKET).upload(path, blob, {
+        contentType: blob.type,
+        cacheControl: '31536000', // every filename is unique, so it can cache forever
+        upsert: false,
+    });
+    if (error) return null;
+    const { data } = await sb.storage.from(CHORE_PHOTO_BUCKET).createSignedUrl(path, CHORE_PHOTO_TTL);
+    if (data && data.signedUrl) choreImgURL[path] = data.signedUrl;
+    return path;
+}
+
+// Only ever called when a photo is replaced or the parent removes it. Deleting
+// a chore archives it rather than dropping the row, and the archived chore still
+// renders in the kid's completed list — so its photo has to stay put.
+async function removeChorePhoto(path) {
+    if (!path) return;
+    await sb.storage.from(CHORE_PHOTO_BUCKET).remove([path]);
+    delete choreImgURL[path];
+}
+
+// Every chore tile in the app goes through here. A photo fills the whole tile;
+// an illustration keeps its padding and sits centred at the size asked for.
+function choreIcon(c, size = 44) {
+    const path = c && c.image_path;
+    if (path && choreImgURL[path]) {
+        return `<img src="${choreImgURL[path]}" alt="${esc((c && c.name) || '')}" style="width:100%;height:100%;object-fit:cover;display:block">`;
+    }
+    return choreIconSVG(c && c.emoji, size);
 }
 
 function choreIconSVG(key, size = 44) {
@@ -1841,6 +1941,8 @@ function openModal(type, data = {}) {
         ? String((DB.load().kids.length % AVATAR_COUNT) + 1)
         : '1';
     S.selectedEmoji    = data.emoji     || defaultEmoji;
+    resetChorePhotoState();
+    S.chorePhotoPath   = data.image_path || null;
     S.selectedColor    = data.color_key || 'blue';
     S.selectedSchedule = data.schedule  || 'daily';
     S.selectedDays     = data.days      ? [...data.days] : [];
@@ -1860,7 +1962,7 @@ function openModal(type, data = {}) {
     S.modal = { type, data }; render();
 }
 function pickKidColor(key) { snapModalInputs(); S.selectedColor = key; render(); }
-function closeModal() { S.modal = null; render(); }
+function closeModal() { S.modal = null; resetChorePhotoState(); render(); }
 
 function snapModalInputs() {
     if (!S.modal) return;
@@ -1908,7 +2010,42 @@ function snapModalInputs() {
     }
 }
 function pickExpenseKid(kidId) { snapModalInputs(); S.modal.data = { ...S.modal.data, kidId }; render(); }
-function pickEmoji(em) { snapModalInputs(); S.selectedEmoji = em; render(); }
+function pickEmoji(em) {
+    snapModalInputs();
+    S.selectedEmoji = em;
+    // A photo and an illustration are alternatives, not layers — choosing one
+    // drops the other, so what the parent sees selected is what gets saved.
+    const t = S.modal && S.modal.type;
+    if (t === 'add-chore' || t === 'edit-chore') resetChorePhotoState();
+    render();
+}
+
+function resetChorePhotoState() {
+    if (S.chorePhotoPreview) URL.revokeObjectURL(S.chorePhotoPreview);
+    S.chorePhotoBlob    = null;
+    S.chorePhotoPreview = null;
+    S.chorePhotoPath    = null;
+}
+
+// Kicks off from the hidden file input in the chore modal. On a phone this is
+// the OS picker — camera or library — so there's no permission prompt to handle.
+async function pickChorePhoto(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    if (!/^image\//.test(file.type)) return toast('⚠️ That file is not a photo.');
+    if (file.size > 25 * 1024 * 1024) return toast('⚠️ That photo is too big. Try one under 25 MB.');
+    snapModalInputs();
+    let blob;
+    try { blob = await compressChorePhoto(file); }
+    catch (e) { return toast('❌ Could not read that photo. Try another one.'); }
+    if (S.chorePhotoPreview) URL.revokeObjectURL(S.chorePhotoPreview);
+    S.chorePhotoBlob    = blob;
+    S.chorePhotoPreview = URL.createObjectURL(blob);
+    render();
+}
+
+function clearChorePhoto() { snapModalInputs(); resetChorePhotoState(); render(); }
 function setSchedule(s) { snapModalInputs(); S.selectedSchedule = s; render(); }
 function setWeight(w) { snapModalInputs(); S.selectedWeight = w; render(); }
 function setAllKids() { snapModalInputs(); S.selectedKids = 'all'; render(); }
@@ -3102,7 +3239,7 @@ function pChores(db) {
                 : `${who} · ${choreWeight(c)}× weighting`;
             return `
             <div class="card flex items-center gap-3">
-              <div style="width:96px;height:96px;background:var(--color-green-50);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${choreIconSVG(c.emoji, 72)}</div>
+              <div style="width:96px;height:96px;background:var(--color-green-50);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">${choreIcon(c, 72)}</div>
               <div class="flex-1 min-w-0">
                 <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary)">${esc(c.name)}</p>
                 <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${valueLine}</p>
@@ -3996,7 +4133,7 @@ function vKid() {
             : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
               ${ready.map(c => `
                 <div class="card flex items-center gap-4">
-                  <div style="flex-shrink:0;width:128px;height:128px;background:${ac.bg};border-radius:14px;display:flex;align-items:center;justify-content:center" class="sp-chore-icon">${choreIconSVG(c.emoji, 88)}</div>
+                  <div style="flex-shrink:0;width:128px;height:128px;background:${ac.bg};border-radius:14px;display:flex;align-items:center;justify-content:center;overflow:hidden" class="sp-chore-icon">${choreIcon(c, 88)}</div>
                   <div class="flex-1 min-w-0">
                     <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary)">${esc(c.name)}</p>
                     ${c.description ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${esc(c.description)}</p>` : ''}
@@ -4016,7 +4153,7 @@ function vKid() {
               const chore = db.chores.find(x => x.id === c.choreId);
               return `
               <div class="card flex items-center gap-4" style="background:#fffbeb;border:1.5px solid #fde68a">
-                <div style="flex-shrink:0;width:128px;height:128px;background:#fef3c7;border-radius:14px;display:flex;align-items:center;justify-content:center;opacity:0.7">${choreIconSVG(chore?.emoji, 88)}</div>
+                <div style="flex-shrink:0;width:128px;height:128px;background:#fef3c7;border-radius:14px;display:flex;align-items:center;justify-content:center;opacity:0.7;overflow:hidden">${choreIcon(chore, 88)}</div>
                 <div class="flex-1 min-w-0">
                   <p style="font-family:var(--font-family);font-weight:800;color:#92400e">${esc(chore?.name) || 'Deleted chore'}</p>
                   <p style="font-family:var(--font-family);font-size:12px;color:#b45309;margin-top:2px">Waiting for parent ⏳</p>
@@ -4221,10 +4358,29 @@ function renderModal() {
         const e = type === 'edit-chore';
         const selIcon = S.selectedEmoji || data.emoji || '1';
         const selIconNum = parseInt(selIcon);
-        const selIconName = CHORE_ICON_NAMES[selIconNum] || (selIcon || '⭐');
+        // A photo waiting to upload, or the one already saved for this chore.
+        const photoURL = S.chorePhotoPreview || (S.chorePhotoPath ? choreImgURL[S.chorePhotoPath] : null);
+        const usingPhoto = !!photoURL;
+        const selIconName = usingPhoto ? 'Your own photo' : (CHORE_ICON_NAMES[selIconNum] || (selIcon || '⭐'));
+        const photoRow = `
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Your Own Photo</p>
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">
+          <label title="Take or choose a photo"
+            style="flex-shrink:0;width:104px;height:104px;border-radius:14px;cursor:pointer;overflow:hidden;display:flex;align-items:center;justify-content:center;background:${usingPhoto?'transparent':'var(--color-green-50)'};border:2px ${usingPhoto?'solid var(--color-green-600)':'dashed var(--color-border)'}">
+            ${usingPhoto
+              ? `<img src="${photoURL}" alt="Your chore photo" style="width:100%;height:100%;object-fit:cover;display:block">`
+              : `<span style="color:var(--color-green-600)">${uiIcon('camera', 30)}</span>`}
+            <input type="file" accept="image/*" onchange="pickChorePhoto(this)" style="display:none">
+          </label>
+          <div style="flex:1;min-width:0">
+            <p style="font-family:var(--font-family);font-size:13px;font-weight:700;color:var(--color-text-primary)">${usingPhoto ? 'Using your photo' : 'Photograph the real thing'}</p>
+            <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${usingPhoto ? 'This replaces the illustration below.' : 'Tap to use your camera or photo library. Frame the subject in the middle — it gets cropped square.'}</p>
+            ${usingPhoto ? `<button onclick="clearChorePhoto()" type="button" style="margin-top:6px;padding:5px 11px;border-radius:10px;font-family:var(--font-family);font-size:12px;font-weight:700;border:1.5px solid var(--color-border);background:white;color:var(--color-coral-text);cursor:pointer">Remove photo</button>` : ''}
+          </div>
+        </div>`;
         const iconGrid = Object.keys(CHORE_ICON_FILES).map(num => {
             const n = parseInt(num);
-            const isSel = String(n) === String(selIcon) || n === selIconNum;
+            const isSel = !usingPhoto && (String(n) === String(selIcon) || n === selIconNum);
             return `<button onclick="pickEmoji('${n}')" type="button" title="${CHORE_ICON_NAMES[n]}"
                 style="width:104px;height:104px;border-radius:14px;border:2px solid ${isSel?'var(--color-green-600)':'transparent'};background:${isSel?'var(--color-green-100)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.1s">
                 ${choreIconSVG(n, 80)}
@@ -4285,7 +4441,8 @@ function renderModal() {
             </button>`;
           }).join('')}
         </div>` : '<div style="margin-bottom:14px"></div>'}
-        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:4px">Chore Icon <span style="font-size:11px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--color-green-700);margin-left:6px">${selIconName}</span></p>
+        ${photoRow}
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:4px">${usingPhoto ? 'Or Pick An Illustration' : 'Chore Icon'} <span style="font-size:11px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--color-green-700);margin-left:6px">${selIconName}</span></p>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:340px;overflow-y:auto;border:1.5px solid var(--color-border);border-radius:12px;padding:6px;margin-bottom:16px">
           ${iconGrid}
         </div>
@@ -4617,9 +4774,20 @@ async function addChore() {
     if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('⚠️ Please select at least one kid.');
     const id = uid();
     const now = new Date().toISOString();
-    const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: desc, value: val, weight, assigned_to: assignedTo, emoji, schedule, days, created_at: now, schedule_updated_at: now });
-    if (error) return toast('❌ Could not save. Check your connection.');
-    cache.chores.push({ id, name, description: desc, value: val, weight, assignedTo, emoji, schedule, days, created_at: now, schedule_updated_at: now });
+    let imagePath = null;
+    if (S.chorePhotoBlob) {
+        imagePath = await uploadChorePhoto(id);
+        if (!imagePath) return toast('❌ Could not upload the photo. Check your connection.');
+    }
+    // A chore with a photo still carries an illustration underneath it, shown
+    // only if the photo ever fails to load. "Custom" is the honest stand-in;
+    // leaving the default would put a picture of a bed on the dog's dinner.
+    const icon = imagePath ? '37' : emoji;
+    const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: desc, value: val, weight, assigned_to: assignedTo, emoji: icon, image_path: imagePath, schedule, days, created_at: now, schedule_updated_at: now });
+    // The row is what makes the photo reachable, so a failed insert has to take
+    // the just-uploaded file with it rather than leaving it orphaned in the bucket.
+    if (error) { await removeChorePhoto(imagePath); return toast('❌ Could not save. Check your connection.'); }
+    cache.chores.push({ id, name, description: desc, value: val, weight, assignedTo, emoji: icon, image_path: imagePath, schedule, days, created_at: now, schedule_updated_at: now });
     trackLoops(cache.chores.length === 1 ? 'first_chore_created' : null, { choreCount: cache.chores.length });
     if (window.posthog) posthog.capture('chore_created', { choreCount: cache.chores.length });
     closeModal(); toast('Chore added!');
@@ -4642,14 +4810,29 @@ async function saveChore(id) {
     if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('⚠️ Please select at least one kid.');
     const c = cache.chores.find(x => x.id === id);
     const scheduleChanged = c && (c.schedule !== schedule || JSON.stringify(c.days || []) !== JSON.stringify(days));
+    const oldPath = c ? (c.image_path || null) : null;
+    // Null when the parent removed the photo or picked an illustration instead.
+    let imagePath = S.chorePhotoPath || null;
+    if (S.chorePhotoBlob) {
+        imagePath = await uploadChorePhoto(id);
+        if (!imagePath) return toast('❌ Could not upload the photo. Check your connection.');
+    }
+    // See addChore: the illustration is the fallback if the photo won't load.
+    const icon = imagePath ? '37' : emoji;
     const update = isCycleMode()
-        ? { name, description: desc, weight, assigned_to: assignedTo, emoji, schedule, days }
-        : { name, description: desc, value: val, assigned_to: assignedTo, emoji, schedule, days };
+        ? { name, description: desc, weight, assigned_to: assignedTo, emoji: icon, image_path: imagePath, schedule, days }
+        : { name, description: desc, value: val, assigned_to: assignedTo, emoji: icon, image_path: imagePath, schedule, days };
     if (scheduleChanged) update.schedule_updated_at = new Date().toISOString();
     const { error } = await sb.from('chores').update(update).eq('id', id).eq('user_id', currentUser.id);
-    if (error) return toast('❌ Could not save.');
+    if (error) {
+        if (imagePath !== oldPath) await removeChorePhoto(imagePath);
+        return toast('❌ Could not save.');
+    }
+    // Only now that the row points elsewhere is the old file safe to drop.
+    if (oldPath && oldPath !== imagePath) await removeChorePhoto(oldPath);
     if (c) {
-        c.name = name; c.description = desc; c.assignedTo = assignedTo; c.emoji = emoji; c.schedule = schedule; c.days = days;
+        c.image_path = imagePath;
+        c.name = name; c.description = desc; c.assignedTo = assignedTo; c.emoji = icon; c.schedule = schedule; c.days = days;
         if (isCycleMode()) c.weight = weight; else c.value = val;
         if (scheduleChanged) c.schedule_updated_at = update.schedule_updated_at;
     }

@@ -6,6 +6,26 @@ const GRACE_PERIOD_MS = 60 * 24 * 60 * 60 * 1000;
 // to go first, before the tables they point to.
 const CHILD_TABLES = ['completions', 'transactions', 'reward_completions'];
 const PARENT_TABLES = ['kids', 'chores', 'rewards', 'bonus_milestones'];
+const CHORE_PHOTO_BUCKET = 'chore-photos';
+
+// Custom chore photos live in a bucket, not a table, so deleting the rows
+// leaves them behind. Each family's photos sit in a folder named after their
+// user id, which is what makes them findable once the chores are gone.
+async function purgeChorePhotos(supabaseAdmin, userId) {
+  const { data, error } = await supabaseAdmin.storage.from(CHORE_PHOTO_BUCKET).list(userId, { limit: 1000 });
+  if (error) {
+    console.error(`Failed to list chore photos for user ${userId}:`, error.message);
+    return false;
+  }
+  if (!data.length) return true;
+  const paths = data.map(f => `${userId}/${f.name}`);
+  const { error: removeError } = await supabaseAdmin.storage.from(CHORE_PHOTO_BUCKET).remove(paths);
+  if (removeError) {
+    console.error(`Failed to delete chore photos for user ${userId}:`, removeError.message);
+    return false;
+  }
+  return true;
+}
 
 // Runs once a day via the Vercel Cron job in vercel.json. For any account
 // whose subscription has been canceled for 60+ days, deletes all of that
@@ -38,7 +58,9 @@ module.exports = async (req, res) => {
       if (meta.subscription_status !== 'canceled' || !meta.canceled_at) continue;
       if (new Date(meta.canceled_at).getTime() > cutoff) continue;
 
-      let failed = false;
+      // Photos first: the chore rows are the only record of which files exist,
+      // so dropping them before the bucket would strand the images for good.
+      let failed = !(await purgeChorePhotos(supabaseAdmin, user.id));
       for (const table of [...CHILD_TABLES, ...PARENT_TABLES]) {
         const { error: deleteError } = await supabaseAdmin.from(table).delete().eq('user_id', user.id);
         if (deleteError) {
