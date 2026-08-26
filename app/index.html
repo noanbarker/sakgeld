@@ -1044,12 +1044,16 @@ async function removeChorePhoto(path) {
     delete choreImgURL[path];
 }
 
-// Every chore tile in the app goes through here. A photo fills the whole tile;
-// an illustration keeps its padding and sits centred at the size asked for.
+// Every chore tile in the app goes through here. A photo is drawn at exactly
+// the same size as an illustration rather than filling the tile: the drawings
+// have transparent backgrounds, so a full-bleed photo broke the rhythm of a
+// row by having no margin where everything beside it had 20px of one.
 function choreIcon(c, size = 44) {
     const path = c && c.image_path;
     if (path && choreImgURL[path]) {
-        return `<img src="${choreImgURL[path]}" alt="${esc((c && c.name) || '')}" style="width:100%;height:100%;object-fit:cover;display:block">`;
+        // Corner radius tracks the size so the 72px and 88px tiles match.
+        const r = Math.round(size * 0.14);
+        return `<img src="${choreImgURL[path]}" alt="${esc((c && c.name) || '')}" style="width:${size}px;height:${size}px;object-fit:cover;border-radius:${r}px;display:block">`;
     }
     return choreIconSVG(c && c.emoji, size);
 }
@@ -3239,7 +3243,7 @@ function pChores(db) {
                 : `${who} · ${choreWeight(c)}× weighting`;
             return `
             <div class="card flex items-center gap-3">
-              <div style="width:96px;height:96px;background:var(--color-green-50);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">${choreIcon(c, 72)}</div>
+              <div style="width:96px;height:96px;background:var(--color-green-50);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${choreIcon(c, 72)}</div>
               <div class="flex-1 min-w-0">
                 <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary)">${esc(c.name)}</p>
                 <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${valueLine}</p>
@@ -4133,7 +4137,7 @@ function vKid() {
             : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
               ${ready.map(c => `
                 <div class="card flex items-center gap-4">
-                  <div style="flex-shrink:0;width:128px;height:128px;background:${ac.bg};border-radius:14px;display:flex;align-items:center;justify-content:center;overflow:hidden" class="sp-chore-icon">${choreIcon(c, 88)}</div>
+                  <div style="flex-shrink:0;width:128px;height:128px;background:${ac.bg};border-radius:14px;display:flex;align-items:center;justify-content:center" class="sp-chore-icon">${choreIcon(c, 88)}</div>
                   <div class="flex-1 min-w-0">
                     <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary)">${esc(c.name)}</p>
                     ${c.description ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${esc(c.description)}</p>` : ''}
@@ -4153,7 +4157,7 @@ function vKid() {
               const chore = db.chores.find(x => x.id === c.choreId);
               return `
               <div class="card flex items-center gap-4" style="background:#fffbeb;border:1.5px solid #fde68a">
-                <div style="flex-shrink:0;width:128px;height:128px;background:#fef3c7;border-radius:14px;display:flex;align-items:center;justify-content:center;opacity:0.7;overflow:hidden">${choreIcon(chore, 88)}</div>
+                <div style="flex-shrink:0;width:128px;height:128px;background:#fef3c7;border-radius:14px;display:flex;align-items:center;justify-content:center;opacity:0.7">${choreIcon(chore, 88)}</div>
                 <div class="flex-1 min-w-0">
                   <p style="font-family:var(--font-family);font-weight:800;color:#92400e">${esc(chore?.name) || 'Deleted chore'}</p>
                   <p style="font-family:var(--font-family);font-size:12px;color:#b45309;margin-top:2px">Waiting for parent ⏳</p>
@@ -4366,9 +4370,9 @@ function renderModal() {
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Your Own Photo</p>
         <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">
           <label title="Take or choose a photo"
-            style="flex-shrink:0;width:104px;height:104px;border-radius:14px;cursor:pointer;overflow:hidden;display:flex;align-items:center;justify-content:center;background:${usingPhoto?'transparent':'var(--color-green-50)'};border:2px ${usingPhoto?'solid var(--color-green-600)':'dashed var(--color-border)'}">
+            style="flex-shrink:0;width:104px;height:104px;border-radius:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;background:var(--color-green-50);border:2px ${usingPhoto?'solid var(--color-green-600)':'dashed var(--color-border)'}">
             ${usingPhoto
-              ? `<img src="${photoURL}" alt="Your chore photo" style="width:100%;height:100%;object-fit:cover;display:block">`
+              ? `<img src="${photoURL}" alt="Your chore photo" style="width:80px;height:80px;object-fit:cover;border-radius:11px;display:block">`
               : `<span style="color:var(--color-green-600)">${uiIcon('camera', 30)}</span>`}
             <input type="file" accept="image/*" onchange="pickChorePhoto(this)" style="display:none">
           </label>
