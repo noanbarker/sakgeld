@@ -25,7 +25,20 @@
 (function () {
   const params = new URLSearchParams(location.search);
   const scene  = params.get('scene') || 'parent-kids-1';
+
+  // The child the clips follow: whose PIN is tapped in, whose chores are shown,
+  // whose "Approve all" the parent presses, whose balance climbs. The other
+  // child stays in shot as a sibling, so the screens read as a family rather
+  // than an only child. One line switches which of them the story is about;
+  // the tap targets that name them are in clips.py.
+  const HERO = 'k1';                       // k1 Liam, k2 Zoe
+  const OTHER = HERO === 'k1' ? 'k2' : 'k1';
   const usd    = (params.get('cur') || 'ZAR') === 'USD';
+  // Sprout has two allowance systems and they change what the app asks a parent
+  // for: an amount on every chore, or one amount per child per cycle with the
+  // chores merely weighted. Whole screens differ between them, so it is a
+  // parameter the storyboard sets rather than something fixed here.
+  const mode   = params.get('mode') === 'per_cycle' ? 'per_cycle' : 'per_chore';
   const iso    = d => new Date(d).toISOString();
 
   // Freeze every animation and transition before anything paints. The kid's
@@ -40,8 +53,8 @@
   // Rand figures for the South African cut. The rest-of-world cut runs the same
   // story at dollar-sized amounts rather than a straight currency conversion.
   const M = usd
-    ? { bed: 0.5, pets: 1, laundry: 2, plants: 0.75, liam: 30, zoe: 48, milestone: 50, bonus: 5, milestoneName: 'First $50 saved' }
-    : { bed: 5, pets: 10, laundry: 15, plants: 8, liam: 320, zoe: 480, milestone: 500, bonus: 50, milestoneName: 'First R500 saved' };
+    ? { bed: 0.5, pets: 1, school: 2, plants: 0.75, liam: 48, zoe: 30, milestone: 50, bonus: 5, milestoneName: 'First $50 saved' }
+    : { bed: 5, pets: 10, school: 15, plants: 8, liam: 480, zoe: 320, milestone: 500, bonus: 50, milestoneName: 'First R500 saved' };
 
   const KIDS = () => ([
     { id: 'k1', user_id: 'demo-user', name: 'Liam', emoji: '3', balance: M.liam, created_at: iso('2026-01-04'), color_key: 'blue',  date_of_birth: '2016-03-14' },
@@ -51,18 +64,22 @@
   const CHORES = () => ([
     { id: 'c1', name: 'Make Bed',    description: 'Make your bed every morning', value: M.bed,     weight: 1, assignedTo: 'all', emoji: '1',  schedule: 'daily', days: [], created_at: iso('2026-01-05') },
     { id: 'c2', name: 'Feed Pets',   description: 'Food and fresh water',        value: M.pets,    weight: 1, assignedTo: 'all', emoji: '27', schedule: 'daily', days: [], created_at: iso('2026-01-05') },
-    { id: 'c3', name: 'Sort Laundry',description: 'Colours and whites',          value: M.laundry, weight: 1, assignedTo: 'all', emoji: '4',  schedule: 'daily', days: [], created_at: iso('2026-01-05') },
+    { id: 'c3', name: 'Pack School Bag', description: 'Books, lunch and shoes',    value: M.school,  weight: 1, assignedTo: 'all', emoji: '30', schedule: 'daily', days: [], created_at: iso('2026-01-05') },
     { id: 'c4', name: 'Water Plants',description: 'All the indoor plants',       value: M.plants,  weight: 1, assignedTo: 'all', emoji: '29', schedule: 'daily', days: [], created_at: iso('2026-01-05') }
   ]);
 
   // What is sitting in the approval queue: [completionId, chore, kid, amount].
-  // One each, so the clip can show the parent approving Zoe's and leaving her
-  // brother's where it is — and so approving hers moves her balance by exactly
-  // what Make Bed is worth, rather than by some sum of several chores.
-  const QUEUE = () => ([['p1', 'c1', 'k2', M.bed], ['p2', 'c2', 'k1', M.pets]]);
+  // One each, so the clip can show the parent approving the hero's and leaving
+  // the sibling's where it is — and so approving it moves the hero's balance by
+  // exactly what Make Bed is worth, rather than by some sum of several chores.
+  const QUEUE = () => ([['p1', 'c1', HERO, M.bed], ['p2', 'c2', OTHER, M.pets]]);
 
   const now   = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 7, 30);
+  const monday = (() => {
+    const d = new Date(today); const day = d.getDay();
+    d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day)); d.setHours(0, 0, 0, 0); return d;
+  })();
 
   const withoutMakeBed = () => CHORES().filter(c => c.id !== 'c1');
 
@@ -89,9 +106,9 @@
 
   // Chores already approved earlier in the week, so the progress rings read as a
   // family mid-routine rather than an account opened five minutes ago.
+  const dstr = d => { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+
   function weekOfEarnings() {
-    const dstr = d => { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
-    const monday = (() => { const d = new Date(today); const day = d.getDay(); d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day)); d.setHours(0, 0, 0, 0); return d; })();
     const out = []; let n = 0;
     const tx = (kidId, amount, name, d) => out.push({
       id: 't' + (++n), kidId, type: 'chore', amount, description: name,
@@ -99,9 +116,20 @@
     });
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday); d.setDate(monday.getDate() + i);
+      // Nobody has earned Saturday's pocket money on a Thursday. Left running to
+      // the end of the week, the days still to come sort above today in the
+      // history — so the chore the reel just had approved would not be the row
+      // at the top, which is the whole point of the closing shot.
+      if (d > today) break;
       const rows = [['k1', M.bed, 'Make Bed'], ['k1', M.pets, 'Feed Pets'], ['k2', M.bed, 'Make Bed'], ['k2', M.plants, 'Water Plants']];
-      if (i < 3) rows.push(['k2', M.laundry, 'Sort Laundry'], ['k1', M.laundry, 'Sort Laundry']);
-      rows.forEach(([kidId, amount, name]) => tx(kidId, amount, name, d));
+      if (i < 3) rows.push(['k2', M.school, 'Pack School Bag'], ['k1', M.school, 'Pack School Bag']);
+      rows.forEach(([kidId, amount, name]) => {
+        // The hero's Make Bed today is the one the story is about. It is waiting
+        // for approval, not earned, so it must not already be in his history —
+        // the parent approving it is what puts it there.
+        if (kidId === HERO && name === 'Make Bed' && dstr(d) === dstr(today)) return;
+        tx(kidId, amount, name, d);
+      });
     }
     return out;
   }
@@ -141,7 +169,10 @@
         // Left empty these fall back to the app's own defaults — blue, and the
         // next avatar in the cycle — which is exactly the unpicked state.
         color_key:     field('colour', 'coral'),
-        emoji:         field('avatar', '9')
+        emoji:         field('avatar', '9'),
+        // Only rendered under Amount per Cycle, where a child is given a figure
+        // for the week rather than a rate for each chore. Ignored otherwise.
+        cycle_amount:  field('kcycle', '50')
       });
     },
     'parent-kids-2': () => { S.view = 'parent'; S.tab = 'kids'; render(); },
@@ -161,6 +192,9 @@
         description: field('cdesc', 'Make your bed every morning'),
         value:       field('cval', M.bed),
         emoji:       field('cicon', '1'),
+        // Under Amount per Cycle the form drops the value field altogether and
+        // asks for a weighting instead, which is the whole point of the shot.
+        weight:      field('cweight', '1'),
         assignedTo: 'all', schedule: 'daily'
       });
     },
@@ -168,25 +202,53 @@
 
     // 2. The child signs in.
     'home':     () => { S.view = 'home'; render(); },
-    'kid-pin':  () => { S.view = 'kid-pin'; S.pinKidId = 'k2'; S.pin = '1234'.slice(0, +(params.get('pin') || 0)); render(); },
-    'kid-today':() => { S.view = 'kid'; S.kidId = 'k2'; S.tab = 'overview'; render(); },
+    'kid-pin':  () => { S.view = 'kid-pin'; S.pinKidId = HERO; S.pin = '1234'.slice(0, +(params.get('pin') || 0)); render(); },
+    'kid-today':() => { S.view = 'kid'; S.kidId = HERO; S.tab = 'overview'; render(); },
 
     // 3. A chore is marked Done.
     'kid-done': () => {
-      cache.completions = [done('p2', 'c1', 'k2')];
-      S.view = 'kid'; S.kidId = 'k2'; S.tab = 'overview'; render();
+      cache.completions = [done('p1', 'c1', HERO)];
+      S.view = 'kid'; S.kidId = HERO; S.tab = 'overview'; render();
     },
 
     // 4. The parent approves. Two cuts of the same moment: the whole queue
     //    cleared, or only the child whose "Approve all" was pressed. The second
     //    is what really happens after one press, so it is what the reel uses.
+    //    The sibling's chore stays in the queue, which is the point.
     'parent-queue':   () => { cache.completions = QUEUE().map(([id, c, k]) => done(id, c, k, false)); S.view = 'parent'; S.tab = 'overview'; render(); },
     'parent-cleared': () => { approve(() => true);  S.view = 'parent'; S.tab = 'overview'; render(); },
-    'parent-approved-zoe': () => { approve(kid => kid === 'k2'); S.view = 'parent'; S.tab = 'overview'; render(); },
+    'parent-approved': () => { approve(kid => kid === HERO); S.view = 'parent'; S.tab = 'overview'; render(); },
 
     // 5. The balance climbs and the tree grows. ?bal drives it frame by frame.
-    'kid-balance': () => { S.view = 'kid'; S.kidId = 'k2'; S.tab = 'overview'; render(); }
+    'kid-balance': () => { S.view = 'kid'; S.kidId = HERO; S.tab = 'overview'; render(); },
+
+    // 6. Back in the child's dashboard once the parent has approved: the chore
+    //    is approved, the R5 is in the balance, and it is in the history — the
+    //    payoff shot. Two cuts, history shut and history open, so the clip can
+    //    show the button being pressed and then what it opens.
+    'kid-approved': () => approvedKidView(false),
+    'kid-history':  () => approvedKidView(true),
+
+    // 7. Where the parent chooses between the two allowance systems. Which one
+    //    is selected, and whether the Cycle Length card is there at all, both
+    //    follow from ?mode — so one scene covers both halves of the story.
+    'settings':  () => { S.view = 'parent'; S.tab = 'settings'; S.settingsSection = null; render(); },
+    'allowance': () => { S.view = 'parent'; S.tab = 'settings'; S.settingsSection = 'allowance'; render(); }
   };
+
+  // The child's own view of a chore that has just been approved. approve() moves
+  // the balance and marks the completion, but the app writes the transaction on
+  // the way through and this seed does not — so the history would come up
+  // without the very row the shot is about.
+  function approvedKidView(open) {
+    approve(kid => kid === HERO);
+    cache.transactions.unshift({
+      id: 't-approved', kidId: HERO, type: 'chore', amount: M.bed,
+      description: 'Make Bed', choreDate: dstr(today), createdAt: iso(today)
+    });
+    S.historyOpen = open;
+    S.view = 'kid'; S.kidId = HERO; S.tab = 'overview'; render();
+  }
 
   // Where a finger lands. The storyboard names a target, never a coordinate, so
   // the finger follows the button when the layout changes instead of quietly
@@ -196,9 +258,28 @@
   //   #k-name           anything a CSS selector can reach
   //   [onclick*="..."]  which covers the colour swatches and icon tiles, since
   //                     each carries its own value in its onclick
+  //   card:Cycle Length  the panel or row that contains that wording, for
+  //                      pointing at a block of the screen that has no id
+  //   history:Make Bed   the newest row in the child's history saying that.
+  //                      A line in a list has no id and no fixed position, but
+  //                      it does say what it is — and scoping the search to the
+  //                      list matters, because the same chore is in there four
+  //                      times over from earlier in the week and the shot is
+  //                      about the one that was just approved.
   function findTarget(spec) {
     if (!spec) return null;
     if (spec.startsWith('text:')) return btnByText(spec.slice(5));
+    if (spec.startsWith('card:')) {
+      const want = spec.slice(5);
+      return Array.from(document.querySelectorAll('.card')).find(c => c.textContent.includes(want)) || null;
+    }
+    if (spec.startsWith('history:')) {
+      const want = spec.slice(8);
+      const btn = btnByText('Hide history') || btnByText('Show history');
+      const list = btn && btn.closest('div') && btn.closest('div').nextElementSibling;
+      if (!list) return null;
+      return Array.from(list.querySelectorAll('.card')).find(c => c.textContent.includes(want)) || null;
+    }
     try { return document.querySelector(spec); } catch (e) { return null; }
   }
 
@@ -275,7 +356,15 @@
     currentUser = {
       id: 'demo-user',
       email: 'demo@sprout.app',
-      user_metadata: { subscription_status: 'active', currency: usd ? 'USD' : 'ZAR' }
+      user_metadata: {
+        subscription_status: 'active',
+        currency: usd ? 'USD' : 'ZAR',
+        allowance_mode: mode,
+        cycle_period: 'weekly',
+        // Anchored to this Monday, so the settings screen reads "this cycle runs
+        // from Monday to Sunday" rather than from whatever today happens to be.
+        cycle_anchor_date: dstr(monday)
+      }
     };
 
     cache = baseCache();
@@ -286,7 +375,7 @@
     // header and the tree stage are both drawn from it.
     const bal = params.get('bal');
     if (bal !== null) {
-      const kid = cache.kids.find(k => k.id === 'k2');
+      const kid = cache.kids.find(k => k.id === HERO);
       if (kid) kid.balance = parseFloat(bal);
     }
 

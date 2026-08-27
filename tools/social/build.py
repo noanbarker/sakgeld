@@ -47,6 +47,7 @@ import socketserver
 import subprocess
 import sys
 import threading
+import time
 from collections import OrderedDict
 from pathlib import Path
 from urllib.parse import urlencode
@@ -80,6 +81,7 @@ COUNT_RATE = 0.18               # seconds the balance rests on each figure
 TYPE_CHAR = 0.055               # seconds per typed character
 PRESS_SECS = 0.50               # button down, held, back up, ring gone
 PRESS_STEPS = 4                 # how many depths the press is rendered at
+PULSE_SECS = 1.30               # one breath of the ring that points something out
 
 
 # ─── preflight ────────────────────────────────────────────────────────────────
@@ -146,41 +148,75 @@ def stage():
 
 def chrome_args(url, extra):
     return [CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+            "--no-first-run", "--no-default-browser-check",
             "--force-device-scale-factor=%d" % SCALE, "--virtual-time-budget=20000",
+            f"--user-data-dir={STAGING}/chrome-profile",
             *extra, url]
 
 
-def shoot(url, css_w, css_h, dest):
-    # Retried, because roughly one launch in a few hundred fails — sometimes by
-    # writing no file at all, sometimes by writing half a PNG. Both come back
-    # with a zero exit status and nothing on stderr, so the only way to know is
-    # to decode the result. A clip is hundreds of launches; "rare" happens on
-    # most runs, and an unchecked half-file surfaces much later as a crash in
-    # the middle of a beat.
+def run_chrome(url, css_w, css_h, extra, out, ready, stdout_to=None, patience=60):
+    """
+    Run Chrome once and wait for the file it was asked to write, not for Chrome.
+
+    Chrome 151 does the work and then simply stays up: the screenshot is on disk
+    in a couple of seconds and the process is still running a minute later.
+    Waiting on the exit status — which is what this did until Chrome changed
+    under it — hangs the build outright, with nothing on stderr to say why. So
+    watch the file, and kill Chrome the moment its output is complete.
+    """
+    out = Path(out)
+    out.unlink(missing_ok=True)
+    sink = open(stdout_to, "w") if stdout_to else None
+    proc = subprocess.Popen(chrome_args(url, [f"--window-size={css_w},{css_h}", *extra]),
+                            stdout=sink or subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        deadline = time.time() + patience
+        while time.time() < deadline:
+            # A file that exists is not a file that is finished — Chrome writes
+            # a PNG in pieces, so completeness is decided by the caller.
+            if out.exists() and out.stat().st_size and ready(out):
+                return True
+            if proc.poll() is not None and out.exists() and ready(out):
+                return True
+            time.sleep(0.05)
+        return False
+    finally:
+        proc.kill()
+        proc.wait()
+        if sink:
+            sink.close()
+
+
+def png_ready(path):
     from PIL import Image
-    dest = Path(dest)
+    try:
+        with Image.open(path) as im:
+            im.load()          # a truncated file raises here, not on open
+        return True
+    except (OSError, SyntaxError):
+        return False
+
+
+def shoot(url, css_w, css_h, dest):
+    # Retried, because roughly one launch in a few hundred produces nothing
+    # usable — sometimes no file, sometimes half a PNG — with nothing on stderr
+    # to say so. A clip is hundreds of launches; "rare" happens on most runs,
+    # and an unchecked half-file surfaces much later as a crash in the middle of
+    # a beat.
     for _ in range(4):
-        dest.unlink(missing_ok=True)
-        subprocess.run(
-            chrome_args(url, [f"--window-size={css_w},{css_h}", f"--screenshot={dest}"]),
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if not dest.exists():
-            continue
-        try:
-            with Image.open(dest) as im:
-                im.load()          # decodes fully; a truncated file raises here
+        if run_chrome(url, css_w, css_h, [f"--screenshot={dest}"], dest, png_ready):
             return
-        except OSError:
-            continue
     sys.exit(f"Chrome produced no usable screenshot after four tries:\n  {url}")
 
 
 def probe(url, css_w, css_h):
     """Read the measurements seed.js and canvas.html write onto <html>."""
-    out = subprocess.run(
-        chrome_args(url, [f"--window-size={css_w},{css_h}", "--dump-dom"]),
-        capture_output=True, text=True).stdout
-    m = re.search(r"<html\b([^>]*)>", out)
+    dump = STAGING / "dom.html"
+    ok = run_chrome(url, css_w, css_h, ["--dump-dom"], dump,
+                    lambda p: "</html>" in p.read_text(errors="ignore"), stdout_to=dump)
+    if not ok:
+        return {}
+    m = re.search(r"<html\b([^>]*)>", dump.read_text(errors="ignore"))
     if not m:
         return {}
     return dict(re.findall(r'data-([a-z-]+)="([^"]*)"', m.group(1)))
@@ -398,6 +434,43 @@ def draw_ring(img, rect, t):
     return Image.alpha_composite(img.convert("RGBA"), layer).convert("RGB")
 
 
+def draw_pulse(img, rect, t):
+    """
+    A ring drawn round something already on the screen, to point at it.
+
+    Not a press — nothing is being touched. It is how the clip says "this row,
+    this one" about a line in a list that a viewer has no reason to pick out on
+    their own. It breathes rather than sitting still, because a static outline
+    on a still screen reads as part of the design.
+    """
+    from PIL import Image, ImageDraw
+    if not rect:
+        return img
+    w, h = img.size
+    sx, sy = w / VIEW_W, h / VIEW_H
+    x, y, bw, bh, r = rect
+
+    # Two breaths over the shot: in quickly, out slowly, and never all the way
+    # out — the ring has to still be there when the frame is paused on.
+    phase = (t % PULSE_SECS) / PULSE_SECS
+    k = 0.55 + 0.45 * (ease_out(phase / 0.3) if phase < 0.3 else 1 - ease((phase - 0.3) / 0.7))
+    spread = 6 * sx
+
+    layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ImageDraw.Draw(layer).rounded_rectangle(
+        [x * sx - spread, y * sy - spread, (x + bw) * sx + spread, (y + bh) * sy + spread],
+        radius=(r + 6) * sx, outline=(22, 163, 74, int(235 * k)),
+        width=max(3, int(w * 0.009)))
+    return Image.alpha_composite(img.convert("RGBA"), layer).convert("RGB")
+
+
+def highlight_frames(scr, plate, y, rect, secs):
+    """The screen held still with the ring pulsing on it. One render, many frames."""
+    base = fit(scr.at(y), plate)
+    for i in range(round(secs * FPS)):
+        yield draw_pulse(base, rect, i / FPS)
+
+
 def scroll_frames(scr, plate, a, b):
     """A pan from a to b. A short one should not take as long as a long one."""
     secs = min(SCROLL_MAX, max(SCROLL_MIN, abs(b - a) / SCROLL_SPEED))
@@ -554,7 +627,7 @@ def beat_screens(port, beat, currency, plate, clip_name):
 
     scrolls = bool(beat.get("scroll")) or bool(beat.get("y")) or "tap" in beat
     scr = capture_screen(port, scene, currency, params=beat.get("params"),
-                         tap=beat.get("tap"), scrolls=scrolls)
+                         tap=beat.get("tap") or beat.get("ring"), scrolls=scrolls)
 
     def offset(v):
         # "end" is how far this screen can actually go, which beats writing a
@@ -575,6 +648,10 @@ def beat_screens(port, beat, currency, plate, clip_name):
                 p["press"], p["amt"] = press, amt
             return capture_screen(port, scene, currency, params=p, tap=tap, scrolls=scrolls)
         yield from press_frames(shot, plate, y, beat["tap"], beat.get("secs"))
+
+    if "ring" in beat:
+        yield from highlight_frames(scr, plate, y, scr.tap_at(y), hold)
+        return
 
     yield from rest(fit(scr.at(y), plate), hold)
 

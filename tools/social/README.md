@@ -15,10 +15,21 @@ a Reel.
 | `mark-done` | Zoe taps **Done!** and the chore moves to waiting for approval |
 | `approve` | The parent taps **Approve all** and the balance moves |
 | `growing` | The savings climb a rand at a time and the tree grows from Small Tree to Big Tree |
-| `full` | All six, joined into one reel — about half a minute |
+| `child-done` | `kid-login`'s closing pan and `mark-done` in one clip, for reels that skip the sign-in |
+| `full` | All six sections, joined into one reel — about half a minute |
+| `chore-to-savings` | The four-step cut: chore set, chore done, chore approved, savings grown — about 22 seconds |
+| `chore-loop` | Twenty seconds to a brief: the list is already there, a chore is done, the parent approves it, and it turns up in the child's history |
+| `allowance-systems` | Amount per Chore against Amount per Cycle — the same three screens under each, so the difference is the only thing moving. About 27 seconds |
 
-One thread runs through it: Make Bed is added, Zoe marks Make Bed done, the
-parent approves Zoe's Make Bed, and her balance moves by exactly that R5.
+One thread runs through it: Make Bed is added, Liam marks Make Bed done, the
+parent approves Liam's Make Bed — leaving his sister's chore in the queue — and
+his balance moves by exactly that R5, from R480 to R485, which is where the
+`growing` section then picks the counting up.
+
+`HERO` at the top of `seed.js` is the child all of that follows. Switching it
+between `k1` and `k2` moves the whole story to the other child; the two tap
+targets that name one by name — the tile on the home screen, and the right
+"Approve all" — are in `clips.py`.
 
 Every frame is a screenshot of `app/index.html` running against fake demo data —
 not a drawing of it, and not a screen recording either. The app is real; the
@@ -71,6 +82,29 @@ pip3 install --user pillow imageio-ffmpeg
 to do. The script checks for all of this and says what is missing.
 
 ## Changing what the clips show
+
+### Pointing at something
+
+`tap` presses a button. `ring` points at something nobody is touching — the row
+in the history the whole clip has been about, which a viewer has no reason to
+pick out of a list of twelve. It draws a ring that breathes, over a still
+screen, for as long as the beat holds.
+
+    {"scene": "kid-history", "y": 950, "ring": "history:Make Bed", "hold": 2.8}
+
+`history:` scopes the search to the child's history list, because the same chore
+is in there four times over from earlier in the week. `card:` finds the panel
+containing some wording. Anything else is a CSS selector, which is usually the
+sharpest way to name a control the app already tags:
+`[onclick*="chooseAllowanceMode('per_cycle')"]`.
+
+### The two allowance systems
+
+`?mode=per_chore|per_cycle` puts the app into one or the other, and the storyboard
+sets it per beat. It is not cosmetic: under Amount per Cycle a Cycle Length card
+appears in Settings, the Add Kid form grows a "this cycle's amount" field, and the
+Add Chore form loses its value field and gains a weighting. `allowance-systems`
+is built around exactly those three differences.
 
 `clips.py` is the storyboard — the order, the pacing, which screen each beat
 lands on, what gets typed into which field. It is meant to be edited. `build.py`
@@ -151,6 +185,13 @@ inside a still screen. `seed.js` works out which case it is; don't hard-code it.
 out of a beat's params gives the finished value; passing `""` gives an empty
 field. That is how a form can be shown part-filled.
 
+**Chrome no longer quits when it is finished.** Chrome 151 writes the
+screenshot in about two seconds and then stays up indefinitely. Waiting on its
+exit status — which this did until Chrome changed under it — hangs the build
+forever with nothing on stderr to say why. `run_chrome()` watches for the file,
+checks it is complete, and kills Chrome itself. `tools/walkthrough/build.py`
+still has the old code and will hang.
+
 **Every screenshot is decoded before it is accepted.** Roughly one Chrome launch
 in a few hundred fails — sometimes writing no file, sometimes half a PNG — with a
 zero exit status and nothing on stderr. Checking only that a file appeared lets
@@ -190,11 +231,11 @@ Aug" or whatever day you build on.
 
 ## Known gaps
 
-`--currency USD` produces a broken `growing` section. The savings-tree thresholds
-are fixed absolute figures — 100 / 250 / 500 / 1000 — and do not scale with
-currency, so the dollar-sized balances in `COUNT_USD` never cross one and the
-tree never grows. Either give the dollar cut its own thresholds or count over a
-range that crosses them.
+`--currency USD` has not been re-checked since the story moved to Liam. The
+savings-tree thresholds are fixed absolute figures — 100 / 250 / 500 / 1000 —
+and do not scale with currency, so `COUNT_USD` has to be a range that crosses
+one of them for the tree to grow at all. It is now 48 → 56, which crosses 50,
+but nobody has watched the result.
 
 `--stills full` builds the section stills and stops without producing one for the
 reel.
