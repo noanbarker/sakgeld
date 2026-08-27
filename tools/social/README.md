@@ -4,13 +4,21 @@ Short, silent, looping clips of the real app, framed as a handset on a plain
 background. No headlines and no logo — the clip is the screen, and whatever
 words go with a post get written in the post.
 
+The six sections each run under seven seconds. `full` is all of them joined, for
+a Reel.
+
 | Clip | What it shows |
 |---|---|
-| `setup` | The parent adds Zoe — typing her name, her PIN, picking her colour and avatar — then adds the Make Bed chore the same way |
+| `add-child` | The parent adds Zoe — her name and PIN typed, her colour and avatar chosen |
+| `add-chore` | The same for a chore: Make Bed typed in, its illustration picked |
 | `kid-login` | Zoe picks herself, taps in her PIN, lands on today's chores |
 | `mark-done` | Zoe taps **Done!** and the chore moves to waiting for approval |
 | `approve` | The parent taps **Approve all** and the balance moves |
-| `growing` | The savings climb and the tree grows from Small Tree to Big Tree |
+| `growing` | The savings climb a rand at a time and the tree grows from Small Tree to Big Tree |
+| `full` | All six, joined into one reel — about half a minute |
+
+One thread runs through it: Make Bed is added, Zoe marks Make Bed done, the
+parent approves Zoe's Make Bed, and her balance moves by exactly that R5.
 
 Every frame is a screenshot of `app/index.html` running against fake demo data —
 not a drawing of it, and not a screen recording either. The app is real; the
@@ -27,7 +35,7 @@ They land in `Working files/social/`, which is outside the website — nothing h
 gets deployed or committed. Upload from there.
 
 ```bash
-python3 tools/social/build.py setup              # just one clip
+python3 tools/social/build.py add-child          # just one clip
 python3 tools/social/build.py --aspect 4x5       # feed cut instead of 9:16
 python3 tools/social/build.py --aspect device    # cropped to the handset itself
 python3 tools/social/build.py --currency USD     # dollar amounts
@@ -41,8 +49,15 @@ which crops to the handset and leaves almost no background.
 Each clip also writes a `.webp` of its first frame — the still to use as a
 thumbnail, or as a plain image post.
 
-`setup` takes a few minutes on its own: filling in a form means a fresh capture
-per typed letter. The others are well under a minute each.
+The two form clips take a few minutes each: every typed letter and every depth
+of a button press is a fresh capture. The other four are well under a minute, and
+`full` is the sum of all six plus a moment to join them.
+
+`full` is assembled from finished section files rather than captured in one long
+run. A twenty-minute build has no way to survive anything going wrong and no way
+to resume; sections can be checked on their own, and reworking one costs one
+section. `join` in `clips.py` lists them, so a section and the reel can never
+drift apart.
 
 ### First time
 
@@ -72,13 +87,16 @@ state from one to the next:
 
 ```python
 {"scene": "add-kid", "params": {"name": "", "kpin": ""}, "steps": [
-    {"tap": "#k-name"},
-    {"type": ("name", "Zoe"), "hold": 0.45},
-    {"tap": "#k-pin"},
-    {"type": ("kpin", "1234")},
+    {"type": ("name", "Zoe"), "hold": 0.2},
+    {"type": ("kpin", "1234"), "hold": 0.2},
+    {"tap": "[onclick*=\"pickKidColor('coral')\"]"},
+    {"set": {"colour": "coral"}, "hold": 0.25},
     {"y": "end", "tap": "text:Add"},
 ]}
 ```
+
+Press the decisions, not every field. Tapping a box before typing in it is true
+to life but tells a viewer nothing, and each press costs half a second.
 
 `seed.js` holds the pretend family — the children, the chores, the amounts — and
 the named scenes. Add a scene there and `clips.py` can use it.
@@ -86,8 +104,12 @@ the named scenes. Add a scene there and `clips.py` can use it.
 ### Pacing
 
 The constants at the top of `build.py` set the pace of everything: `TYPE_CHAR` is
-seconds per typed letter, `TAP_SECS` a whole press, `SCROLL_SPEED` pixels per
-second, `CROSSFADE` the join between beats. Change one and every clip follows.
+seconds per typed letter, `PRESS_SECS` a whole button press, `SCROLL_SPEED`
+pixels per second, `CROSSFADE` the join between beats. Change one and every clip
+follows.
+
+`PRESS_STEPS` is how many depths a press is rendered at — more is smoother and
+slower to build, since each depth is its own capture.
 
 ### Finding a scroll position
 
@@ -101,6 +123,12 @@ That writes the whole screen at full height with a ruler down the side and the
 phone's own window outlined in green, so the numbers can be read off a picture.
 
 ## Things that will trip you up
+
+**A press is rendered by the app, not drawn over it.** `seed.js` pushes the real
+button in and dims it, so it keeps its own shape, shadow and background. Only the
+ring that spreads out as it lifts is drawn here, from the button's measured
+outline — the app has no state for that. A marker floating above the screen would
+sit over the very label the viewer needs to read.
 
 **A tap is aimed at a target, never a coordinate.** Either a label (`text:Done!`)
 or anything a CSS selector reaches (`#k-name`, or
@@ -122,6 +150,20 @@ inside a still screen. `seed.js` works out which case it is; don't hard-code it.
 **An absent parameter and an empty one mean different things.** Leaving `name`
 out of a beat's params gives the finished value; passing `""` gives an empty
 field. That is how a form can be shown part-filled.
+
+**Every screenshot is decoded before it is accepted.** Roughly one Chrome launch
+in a few hundred fails — sometimes writing no file, sometimes half a PNG — with a
+zero exit status and nothing on stderr. Checking only that a file appeared lets
+the half-written one through, and it then fails somewhere else entirely, in a
+different place each run. `shoot()` decodes and retries. Don't take that out.
+
+**Two builds at once will wreck each other.** They share `.social-build/`, and
+whichever finishes first deletes it under the other. `stage()` refuses to start
+if the folder exists — if a run was killed and left it behind, delete it.
+
+**The capture cache is deliberately small.** A screen is four megabytes, or
+fourteen with its full-height twin, and typing a sentence makes one state per
+letter that is never looked at again. `SHOT_CACHE` bounds it.
 
 **Animations are frozen during capture, on purpose.** The kid's chore icons float
 on a 3.2 second loop, so without freezing them each capture catches the artwork
@@ -145,6 +187,20 @@ behind, just delete it.
 
 **The date is today's date.** The kid screen says "Today's chores — Wednesday, 26
 Aug" or whatever day you build on.
+
+## Known gaps
+
+`--currency USD` produces a broken `growing` section. The savings-tree thresholds
+are fixed absolute figures — 100 / 250 / 500 / 1000 — and do not scale with
+currency, so the dollar-sized balances in `COUNT_USD` never cross one and the
+tree never grows. Either give the dollar cut its own thresholds or count over a
+range that crosses them.
+
+`--stills full` builds the section stills and stops without producing one for the
+reel.
+
+`--aspect 4x5`, `1x1` and `device` have not been exercised since the handset
+frame was rewritten.
 
 ## The handset
 

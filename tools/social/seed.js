@@ -45,7 +45,7 @@
 
   const KIDS = () => ([
     { id: 'k1', user_id: 'demo-user', name: 'Liam', emoji: '3', balance: M.liam, created_at: iso('2026-01-04'), color_key: 'blue',  date_of_birth: '2016-03-14' },
-    { id: 'k2', user_id: 'demo-user', name: 'Zoe',  emoji: '7', balance: M.zoe,  created_at: iso('2026-01-04'), color_key: 'coral', date_of_birth: '2018-07-02' }
+    { id: 'k2', user_id: 'demo-user', name: 'Zoe',  emoji: '9', balance: M.zoe,  created_at: iso('2026-01-04'), color_key: 'coral', date_of_birth: '2018-07-02' }
   ]);
 
   const CHORES = () => ([
@@ -55,13 +55,16 @@
     { id: 'c4', name: 'Water Plants',description: 'All the indoor plants',       value: M.plants,  weight: 1, assignedTo: 'all', emoji: '29', schedule: 'daily', days: [], created_at: iso('2026-01-05') }
   ]);
 
-  // The three chores sitting in the approval queue: [completionId, chore, kid, amount]
-  const QUEUE = () => ([['p1', 'c3', 'k2', M.laundry], ['p2', 'c1', 'k2', M.bed], ['p3', 'c2', 'k1', M.pets]]);
+  // What is sitting in the approval queue: [completionId, chore, kid, amount].
+  // One each, so the clip can show the parent approving Zoe's and leaving her
+  // brother's where it is — and so approving hers moves her balance by exactly
+  // what Make Bed is worth, rather than by some sum of several chores.
+  const QUEUE = () => ([['p1', 'c1', 'k2', M.bed], ['p2', 'c2', 'k1', M.pets]]);
 
   const now   = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 7, 30);
 
-  const withoutLaundry = () => CHORES().filter(c => c.id !== 'c3');
+  const withoutMakeBed = () => CHORES().filter(c => c.id !== 'c1');
 
   // A form field's value: whatever the storyboard passed, or the finished value
   // when it did not pass anything. Passing an empty string is how a beat says
@@ -138,25 +141,26 @@
         // Left empty these fall back to the app's own defaults — blue, and the
         // next avatar in the cycle — which is exactly the unpicked state.
         color_key:     field('colour', 'coral'),
-        emoji:         field('avatar', '7')
+        emoji:         field('avatar', '9')
       });
     },
     'parent-kids-2': () => { S.view = 'parent'; S.tab = 'kids'; render(); },
 
-    // The chore being added is Sort Laundry, not Make Bed, for one reason: the
-    // icon picker opens on the first illustration, which is the bed. Adding the
-    // bed chore would mean the parent "choosing" an icon that was already
-    // chosen, and the clip would show a finger landing on a tile that does not
-    // change. Sort Laundry's icon is three tiles along, so the choice is visible.
-    'without-laundry': () => { cache.chores = withoutLaundry(); S.view = 'parent'; S.tab = 'chores'; render(); },
+    // Make Bed, so that the chore added here is the same one the child marks
+    // done and the parent then approves — one thread through the whole reel.
+    //
+    // The cost of that: the icon picker opens on the first illustration, which
+    // is the bed, so the tile the parent presses is already the chosen one. The
+    // press is visible — the tile depresses and rings — but nothing switches.
+    'without-makebed': () => { cache.chores = withoutMakeBed(); S.view = 'parent'; S.tab = 'chores'; render(); },
     'add-chore': () => {
-      cache.chores = withoutLaundry();
+      cache.chores = withoutMakeBed();
       S.view = 'parent'; S.tab = 'chores';
       openModal('add-chore', {
-        name:        field('cname', 'Sort Laundry'),
-        description: field('cdesc', 'Colours and whites'),
-        value:       field('cval', M.laundry),
-        emoji:       field('cicon', '4'),
+        name:        field('cname', 'Make Bed'),
+        description: field('cdesc', 'Make your bed every morning'),
+        value:       field('cval', M.bed),
+        emoji:       field('cicon', '1'),
         assignedTo: 'all', schedule: 'daily'
       });
     },
@@ -174,12 +178,11 @@
     },
 
     // 4. The parent approves. Two cuts of the same moment: the whole queue
-    //    cleared, or only the one child whose "Approve all" the finger lands on.
-    //    The second is what really happens after a single tap, so it is what the
-    //    approve clip uses.
+    //    cleared, or only the child whose "Approve all" was pressed. The second
+    //    is what really happens after one press, so it is what the reel uses.
     'parent-queue':   () => { cache.completions = QUEUE().map(([id, c, k]) => done(id, c, k, false)); S.view = 'parent'; S.tab = 'overview'; render(); },
     'parent-cleared': () => { approve(() => true);  S.view = 'parent'; S.tab = 'overview'; render(); },
-    'parent-approved-liam': () => { approve(kid => kid === 'k1'); S.view = 'parent'; S.tab = 'overview'; render(); },
+    'parent-approved-zoe': () => { approve(kid => kid === 'k2'); S.view = 'parent'; S.tab = 'overview'; render(); },
 
     // 5. The balance climbs and the tree grows. ?bal drives it frame by frame.
     'kid-balance': () => { S.view = 'kid'; S.kidId = 'k2'; S.tab = 'overview'; render(); }
@@ -197,6 +200,26 @@
     if (!spec) return null;
     if (spec.startsWith('text:')) return btnByText(spec.slice(5));
     try { return document.querySelector(spec); } catch (e) { return null; }
+  }
+
+  // The part of a control that actually looks like a button.
+  //
+  // A colour swatch is a transparent <button> wrapping a coloured circle and a
+  // caption; measuring the button gives a tall box round both, and the ring
+  // then reads as a focus outline rather than a press on the circle. Where the
+  // button paints nothing itself, use the child that does.
+  function painted(el) {
+    if (!el) return null;
+    const cs = getComputedStyle(el);
+    const bare = (cs.backgroundColor === 'rgba(0, 0, 0, 0)' || cs.backgroundColor === 'transparent')
+              && cs.backgroundImage === 'none';
+    if (!bare) return el;
+    const kid = Array.from(el.children).find(c => {
+      if (c.tagName === 'IMG' || c.tagName === 'PICTURE') return true;
+      const k = getComputedStyle(c);
+      return k.backgroundColor !== 'rgba(0, 0, 0, 0)' && k.backgroundColor !== 'transparent';
+    });
+    return kid ? painted(kid) : el;
   }
 
   function btnByText(text) {
@@ -319,12 +342,27 @@
       // frame callbacks may never run. Timers still fire.
       setTimeout(() => {
         measure();
+        applyPress();          // after measuring, so the rect is the resting one
         document.documentElement.setAttribute('data-demo-ready', '1');
       }, 60);
     });
   }
 
   let paneRect = [0, 0, 390, 844];
+
+  // A button mid-press: pushed in and dimmed, the way it looks under a thumb.
+  // Rendered by the app rather than drawn over it, so the button keeps its own
+  // shape, shadow and background — and so the press is on the button itself
+  // rather than a marker floating above the screen.
+  function applyPress() {
+    const spec = params.get('press');
+    const amt = parseFloat(params.get('amt') || '0');
+    if (!spec || !(amt > 0)) return;
+    const el = findTarget(spec);
+    if (!el) return;
+    el.style.transform = 'scale(' + (1 - 0.09 * amt).toFixed(4) + ')';
+    el.style.filter = 'brightness(' + (1 - 0.18 * amt).toFixed(4) + ')';
+  }
 
   function measure() {
     // Written onto <html> so build.py can read them back with --dump-dom. The
@@ -338,13 +376,16 @@
     document.documentElement.setAttribute('data-tall-h', String(h));
     document.documentElement.setAttribute('data-pane', paneRect.join(','));
 
-    const want = params.get('tap');
+    // The button's shape, measured before any press shrinks it, so the ring
+    // build.py draws around it matches its outline and its corners.
+    const want = params.get('tap') || params.get('press');
     if (want) {
-      const el = findTarget(want);
+      const el = painted(findTarget(want));
       if (el) {
         const r = el.getBoundingClientRect();
+        const radius = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
         document.documentElement.setAttribute(
-          'data-tap', [r.left + r.width / 2, r.top + r.height / 2].map(Math.round).join(','));
+          'data-tap', [r.left, r.top, r.width, r.height, radius].map(Math.round).join(','));
       }
     }
   }
