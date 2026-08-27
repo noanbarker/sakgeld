@@ -17,3 +17,6 @@ Working files/
 # from. Rebuilt on every run and deleted afterwards.
 .walkthrough-build/
 .social-build/
+
+# Throwaway copy of the savings-tree section that its clip builder renders from.
+.treegrow-build/
