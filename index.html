@@ -621,7 +621,7 @@
           </div>
           <div class="pr-treegrow-mobile" style="display:none;flex-direction:column;align-items:center">
             <div class="pr-treegrow-mobile-box" style="height:150px;display:flex;align-items:flex-end;justify-content:center">
-              <picture><source srcset="images/1_Seedling_v2.webp" type="image/webp"><img loading="lazy" class="pr-treegrow-mobile-img" src="images/1_Seedling_v2.png" alt="Day one" style="height:38px;width:auto;display:block;transition:opacity .22s ease,height .4s cubic-bezier(.22,1,.36,1)"></picture>
+              <picture><source class="pr-treegrow-mobile-src" srcset="images/1_Seedling_v2.webp" type="image/webp"><img loading="lazy" class="pr-treegrow-mobile-img" src="images/1_Seedling_v2.png" alt="Day one" style="height:38px;width:auto;display:block;transition:opacity .22s ease,height .4s cubic-bezier(.22,1,.36,1)"></picture>
             </div>
             <div class="pr-treegrow-mobile-label" style="font-size:13px;font-weight:800;color:#15803d;margin-top:8px">Day one</div>
           </div>
@@ -867,11 +867,17 @@ document.querySelectorAll('.faq-toggle').forEach(function(btn) {
       });
     }
     var mobileImg = root.querySelector('.pr-treegrow-mobile-img');
+    var mobileSrc = root.querySelector('.pr-treegrow-mobile-src');
     var mobileLabel = root.querySelector('.pr-treegrow-mobile-label');
     var trees = slots.map(function(s){
       var img = s.querySelector('img');
+      // The <source> as well as the <img>. A browser that takes the WebP picks
+      // it from the source and ignores whatever src says, so a stage carrying
+      // only its PNG cannot actually be shown.
+      var src = s.querySelector('source');
       var label = s.querySelector('div:last-child');
-      return { src: img.src, alt: img.alt, label: label ? label.textContent : img.alt };
+      return { src: img.src, webp: src ? src.getAttribute('srcset') : null,
+               alt: img.alt, label: label ? label.textContent : img.alt };
     });
     var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var STAGGER = 1100;
@@ -880,6 +886,9 @@ document.querySelectorAll('.faq-toggle').forEach(function(btn) {
     function setMobileStage(i, animate){
       if (!mobileImg) return;
       var apply = function(){
+        // Ahead of src, and not instead of it: the <source> wins wherever WebP
+        // is supported, and the <img> is what everywhere else falls back to.
+        if (mobileSrc && trees[i].webp) mobileSrc.srcset = trees[i].webp;
         mobileImg.src = trees[i].src;
         mobileImg.alt = trees[i].alt;
         if (mobileLabel) mobileLabel.textContent = trees[i].label;
