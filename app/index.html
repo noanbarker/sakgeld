@@ -851,6 +851,7 @@ const S = {
     selectedColor: 'blue',
     selectedSchedule: 'daily',
     selectedDays: [],
+    selectedKidDays: {},   // per-kid rota: { kidId: ['Mon','Wed'] }
     selectedKids: 'all',
     parentPin: '',
     historyOpen: false,
@@ -1711,11 +1712,34 @@ function weeklyPossible(db, kidId) {
                 const exp = c.expiresOn || '';
                 return (exp >= monStr && exp <= sunStr) ? s + c.value : s;
             }
-            const freq = (!c.schedule || c.schedule === 'daily') ? 7 : (c.days || []).length;
+            const freq = (!c.schedule || c.schedule === 'daily') ? 7
+                       : c.schedule === 'per_kid' ? choreKidDays(c, kidId).length
+                       : (c.days || []).length;
             return s + (c.value * freq);
         }, 0);
 }
-function choreScheduleLabel(c) {
+// A 'per_kid' chore keeps its days as { kidId: ['Mon','Wed'] } in the same
+// jsonb column an ordinary weekly chore fills with a flat ['Mon','Wed'].
+// Everything that asks "is this chore on today?" therefore has to say who it is
+// asking about, because the answer differs per kid.
+function choreKidDays(c, kidId) {
+    if (!c || c.schedule !== 'per_kid') return null;
+    const map = (c.days && typeof c.days === 'object' && !Array.isArray(c.days)) ? c.days : {};
+    return map[kidId] || [];
+}
+function sortDays(arr) {
+    return DAYS.filter(d => (arr || []).includes(d));
+}
+// The parent's chore card has no single kid in view, so a per-kid chore spells
+// out the whole rota instead of a bare day list.
+function chorePerKidLabel(c, kids) {
+    const map = (c.days && typeof c.days === 'object' && !Array.isArray(c.days)) ? c.days : {};
+    const parts = kids
+        .filter(k => (map[k.id] || []).length)
+        .map(k => `${k.name}: ${sortDays(map[k.id]).join(', ')}`);
+    return parts.length ? parts.join(' · ') : 'No days set';
+}
+function choreScheduleLabel(c, kidId) {
     if (c.oneOff) {
         const today = toLocalDateStr(new Date());
         if (!c.expiresOn || c.expiresOn <= today) return 'Today only';
@@ -1723,23 +1747,32 @@ function choreScheduleLabel(c) {
         return `Until ${d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}`;
     }
     if (!c.schedule || c.schedule === 'daily') return 'Daily';
+    if (c.schedule === 'per_kid') {
+        if (!kidId) return 'Per kid';
+        const kd = sortDays(choreKidDays(c, kidId));
+        if (kd.length === 0) return 'No days set';
+        if (kd.length === 7) return 'Daily';
+        return kd.join(', ');
+    }
     if (!c.days || c.days.length === 0) return 'No days set';
     if (c.days.length === 7) return 'Daily';
     return c.days.join(', ');
 }
-function choreIsForToday(c) {
+function choreIsForToday(c, kidId) {
     if (c.oneOff) return c.expiresOn >= toLocalDateStr(new Date());
     if (!c.schedule || c.schedule === 'daily') return true;
     const today = DAYS[(new Date().getDay() + 6) % 7];
+    if (c.schedule === 'per_kid') return choreKidDays(c, kidId).includes(today);
     return (c.days || []).includes(today);
 }
 function toLocalDateStr(d) {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-function choreIsForDate(c, d) {
+function choreIsForDate(c, d, kidId) {
     if (c.oneOff) return c.expiresOn === toLocalDateStr(d);
     if (!c.schedule || c.schedule === 'daily') return true;
     const day = DAYS[(d.getDay() + 6) % 7];
+    if (c.schedule === 'per_kid') return choreKidDays(c, kidId).includes(day);
     return (c.days || []).includes(day);
 }
 function choreScheduleWasActiveOn(c, d) {
@@ -1754,7 +1787,7 @@ async function writeMissedChores(kidId) {
         const d = new Date();
         d.setDate(d.getDate() - ago);
         const due = toLocalDateStr(d);
-        const scheduled = db.chores.filter(c => !c.archived && choreAssignedTo(c, kidId) && choreIsForDate(c, d) && choreScheduleWasActiveOn(c, d));
+        const scheduled = db.chores.filter(c => !c.archived && choreAssignedTo(c, kidId) && choreIsForDate(c, d, kidId) && choreScheduleWasActiveOn(c, d));
         for (const chore of scheduled) {
             const exists = cache.completions.some(c =>
                 c.choreId === chore.id && c.kidId === kidId && c.dueDate === due
@@ -1783,6 +1816,11 @@ function choreAssignedTo(c, kidId) {
     return c.assignedTo === kidId;
 }
 function choreAssignmentLabel(c, kids) {
+    if (c.schedule === 'per_kid') {
+        const named = kids.filter(k => choreKidDays(c, k.id).length).map(k => k.name);
+        if (named.length === 0) return 'Nobody yet';
+        return named.length === kids.length ? 'All kids' : named.join(', ');
+    }
     if (!c.assignedTo || c.assignedTo === 'all') return 'All kids';
     if (Array.isArray(c.assignedTo)) {
         if (c.assignedTo.length === kids.length) return 'All kids';
@@ -1845,7 +1883,7 @@ function cycleWeightTotals(db, kidId, startStr, endStr) {
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const dStr = toLocalDateStr(d);
         if (dStr > todayStr) continue;
-        const scheduled = db.chores.filter(c => !c.oneOff && choreAssignedTo(c, kidId) && choreIsForDate(c, d) && choreScheduleWasActiveOn(c, d));
+        const scheduled = db.chores.filter(c => !c.oneOff && choreAssignedTo(c, kidId) && choreIsForDate(c, d, kidId) && choreScheduleWasActiveOn(c, d));
         for (const chore of scheduled) {
             const w = choreWeight(chore);
             assigned += w;
@@ -1953,7 +1991,10 @@ function openModal(type, data = {}) {
     S.chorePhotoPath   = data.image_path || null;
     S.selectedColor    = data.color_key || 'blue';
     S.selectedSchedule = data.schedule  || 'daily';
-    S.selectedDays     = data.days      ? [...data.days] : [];
+    S.selectedDays     = Array.isArray(data.days) ? [...data.days] : [];
+    S.selectedKidDays  = (data.days && typeof data.days === 'object' && !Array.isArray(data.days))
+                       ? Object.fromEntries(Object.entries(data.days).map(([k, v]) => [k, [...v]]))
+                       : {};
     S.selectedWeight   = data.weight == null ? 1 : (+data.weight || 1);
     if (type === 'quick-task') {
         S.selectedKids = [];
@@ -2071,6 +2112,29 @@ function toggleDay(d) {
     const i = S.selectedDays.indexOf(d);
     if (i === -1) S.selectedDays.push(d); else S.selectedDays.splice(i, 1);
     render();
+}
+function toggleKidDay(kidId, d) {
+    snapModalInputs();
+    const map = { ...S.selectedKidDays };
+    const arr = [...(map[kidId] || [])];
+    const i = arr.indexOf(d);
+    if (i === -1) arr.push(d); else arr.splice(i, 1);
+    map[kidId] = arr;
+    S.selectedKidDays = map;
+    render();
+}
+// The rota rows follow the "Assigned to" chips, so a kid dropped from the
+// assignment stops carrying days with them.
+function choreRotaKids(kids) {
+    return S.selectedKids === 'all' ? kids : kids.filter(k => (S.selectedKids || []).includes(k.id));
+}
+function choreRotaPayload(kids) {
+    const out = {};
+    for (const k of choreRotaKids(kids)) {
+        const d = sortDays(S.selectedKidDays[k.id]);
+        if (d.length) out[k.id] = d;
+    }
+    return out;
 }
 
 // ─── TREE SVG (Sprout logo) ───────────────────────────────────────
@@ -3251,7 +3315,7 @@ function pChores(db) {
               <div class="flex-1 min-w-0">
                 <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary)">${esc(c.name)}</p>
                 <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${valueLine}</p>
-                <p style="font-family:var(--font-family);font-size:12px;color:var(--color-green-600);font-weight:600;margin-top:2px">${choreScheduleLabel(c)}</p>
+                <p style="font-family:var(--font-family);font-size:12px;color:var(--color-green-600);font-weight:600;margin-top:2px">${c.schedule === 'per_kid' ? esc(chorePerKidLabel(c, db.kids)) : choreScheduleLabel(c)}</p>
               </div>
               <div class="flex flex-col gap-1 flex-shrink-0">
                 <button onclick="editChore('${c.id}')" title="Edit" class="icon-btn">${uiIcon('pencil', 15)}</button>
@@ -3991,7 +4055,7 @@ function vKid() {
     const ac       = kidAccent(kid);
     const today    = new Date().toDateString();
     const todayDate = toLocalDateStr(new Date());
-    const allChores = db.chores.filter(c => !c.archived && choreAssignedTo(c, kid.id) && choreIsForToday(c));
+    const allChores = db.chores.filter(c => !c.archived && choreAssignedTo(c, kid.id) && choreIsForToday(c, kid.id));
     const doneToday = db.completions.filter(c =>
         c.kidId === kid.id && !c.rejected && !c.missed &&
         (c.dueDate ? c.dueDate === todayDate : new Date(c.completedAt).toDateString() === today)
@@ -4147,7 +4211,7 @@ function vKid() {
                     ${c.description ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${esc(c.description)}</p>` : ''}
                     <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:4px">
                       <p style="font-family:var(--font-family);color:${ac.header};font-weight:800;white-space:nowrap">${c.oneOff || !isCycleMode() ? `+ ${R(c.value)}` : `${choreWeight(c)}× weighting`}</p>
-                      <span style="font-size:10px;background:${ac.bg};color:${ac.text};border-radius:6px;padding:2px 7px;font-family:var(--font-family);font-weight:700;white-space:nowrap">${choreScheduleLabel(c)}</span>
+                      <span style="font-size:10px;background:${ac.bg};color:${ac.text};border-radius:6px;padding:2px 7px;font-family:var(--font-family);font-weight:700;white-space:nowrap">${choreScheduleLabel(c, kid.id)}</span>
                     </div>
                   </div>
                   <button onclick="markDone('${c.id}', event)"
@@ -4429,14 +4493,18 @@ function renderModal() {
           }).join('')}
         </div>
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Schedule</p>
-        <div style="display:flex;gap:8px;margin-bottom:12px">
+        <div style="display:flex;gap:6px;margin-bottom:12px">
           <button onclick="setSchedule('daily')" type="button"
-            style="flex:1;padding:8px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedSchedule==='daily'?'var(--color-green-600)':'var(--color-border)'};background:${S.selectedSchedule==='daily'?'var(--color-green-100)':'white'};color:${S.selectedSchedule==='daily'?'var(--color-green-700)':'#6b7280'};cursor:pointer">
+            style="flex:1;padding:8px 4px;border-radius:12px;font-size:12px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedSchedule==='daily'?'var(--color-green-600)':'var(--color-border)'};background:${S.selectedSchedule==='daily'?'var(--color-green-100)':'white'};color:${S.selectedSchedule==='daily'?'var(--color-green-700)':'#6b7280'};cursor:pointer">
             📅 Daily
           </button>
           <button onclick="setSchedule('weekly')" type="button"
-            style="flex:1;padding:8px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedSchedule==='weekly'?'var(--color-green-600)':'var(--color-border)'};background:${S.selectedSchedule==='weekly'?'var(--color-green-100)':'white'};color:${S.selectedSchedule==='weekly'?'var(--color-green-700)':'#6b7280'};cursor:pointer">
+            style="flex:1;padding:8px 4px;border-radius:12px;font-size:12px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedSchedule==='weekly'?'var(--color-green-600)':'var(--color-border)'};background:${S.selectedSchedule==='weekly'?'var(--color-green-100)':'white'};color:${S.selectedSchedule==='weekly'?'var(--color-green-700)':'#6b7280'};cursor:pointer">
             📆 Specific days
+          </button>
+          <button onclick="setSchedule('per_kid')" type="button"
+            style="flex:1;padding:8px 4px;border-radius:12px;font-size:12px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedSchedule==='per_kid'?'var(--color-green-600)':'var(--color-border)'};background:${S.selectedSchedule==='per_kid'?'var(--color-green-100)':'white'};color:${S.selectedSchedule==='per_kid'?'var(--color-green-700)':'#6b7280'};cursor:pointer">
+            🔄 Per kid
           </button>
         </div>
         ${S.selectedSchedule === 'weekly' ? `
@@ -4448,6 +4516,28 @@ function renderModal() {
               ${d}
             </button>`;
           }).join('')}
+        </div>` : S.selectedSchedule === 'per_kid' ? `
+        <div style="border:1.5px solid var(--color-border);border-radius:14px;padding:10px 10px 8px;margin-bottom:14px">
+          <div style="display:grid;grid-template-columns:64px repeat(7,minmax(0,1fr));gap:4px;margin-bottom:4px">
+            <div></div>
+            ${DAYS.map(d => `<div style="text-align:center;font-family:var(--font-family);font-size:10px;font-weight:800;color:var(--color-text-muted)">${d}</div>`).join('')}
+          </div>
+          ${choreRotaKids(db.kids).map(k => `
+          <div style="display:grid;grid-template-columns:64px repeat(7,minmax(0,1fr));gap:4px;align-items:center;margin-bottom:4px">
+            <div style="display:flex;align-items:center;gap:5px;min-width:0">
+              ${kidIcon(k, 22)}
+              <span style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k.name)}</span>
+            </div>
+            ${DAYS.map(d => {
+              const sel = (S.selectedKidDays[k.id] || []).includes(d);
+              return `<button onclick="toggleKidDay('${k.id}','${d}')" type="button" title="${esc(k.name)} — ${d}" aria-pressed="${sel}"
+                style="height:30px;padding:0;border-radius:9px;border:2px solid ${sel?'var(--color-green-600)':'var(--color-border)'};background:${sel?'var(--color-green-600)':'white'};color:white;cursor:pointer;display:flex;align-items:center;justify-content:center">
+                ${sel ? uiIcon('check', 13) : ''}
+              </button>`;
+            }).join('')}
+          </div>`).join('')}
+          <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:8px">Tap a square to give that kid that day. A day nobody has is skipped.</p>
+          ${choreRotaKids(db.kids).length === 0 ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-coral-text);font-weight:700;margin-top:4px">Pick at least one kid above first.</p>` : ''}
         </div>` : '<div style="margin-bottom:14px"></div>'}
         ${photoRow}
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:4px">${usingPhoto ? 'Or Pick An Illustration' : 'Chore Icon'} <span style="font-size:11px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--color-green-700);margin-left:6px">${selIconName}</span></p>
@@ -4776,9 +4866,12 @@ async function addChore() {
     const assignedTo = S.selectedKids;
     const emoji      = S.selectedEmoji || '⭐';
     const schedule   = S.selectedSchedule || 'daily';
-    const days       = schedule === 'weekly' ? [...S.selectedDays] : [];
+    const days       = schedule === 'per_kid' ? choreRotaPayload(DB.load().kids)
+                     : schedule === 'weekly'  ? [...S.selectedDays]
+                     : [];
     if (!name) return toast('⚠️ Please enter a chore name.');
     if (schedule === 'weekly' && days.length === 0) return toast('⚠️ Please select at least one day.');
+    if (schedule === 'per_kid' && Object.keys(days).length === 0) return toast('⚠️ Please give at least one kid a day.');
     if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('⚠️ Please select at least one kid.');
     const id = uid();
     const now = new Date().toISOString();
@@ -4812,9 +4905,12 @@ async function saveChore(id) {
     const assignedTo = S.selectedKids;
     const emoji      = S.selectedEmoji || '⭐';
     const schedule   = S.selectedSchedule || 'daily';
-    const days       = schedule === 'weekly' ? [...S.selectedDays] : [];
+    const days       = schedule === 'per_kid' ? choreRotaPayload(DB.load().kids)
+                     : schedule === 'weekly'  ? [...S.selectedDays]
+                     : [];
     if (!name) return toast('⚠️ Please enter a chore name.');
     if (schedule === 'weekly' && days.length === 0) return toast('⚠️ Please select at least one day.');
+    if (schedule === 'per_kid' && Object.keys(days).length === 0) return toast('⚠️ Please give at least one kid a day.');
     if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('⚠️ Please select at least one kid.');
     const c = cache.chores.find(x => x.id === id);
     const scheduleChanged = c && (c.schedule !== schedule || JSON.stringify(c.days || []) !== JSON.stringify(days));
