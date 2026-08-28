@@ -53,12 +53,14 @@
   // Rand figures for the South African cut. The rest-of-world cut runs the same
   // story at dollar-sized amounts rather than a straight currency conversion.
   const M = usd
-    ? { bed: 0.5, pets: 1, school: 2, plants: 0.75, liam: 48, zoe: 30, milestone: 50, bonus: 5, milestoneName: 'First $50 saved' }
-    : { bed: 5, pets: 10, school: 15, plants: 8, liam: 480, zoe: 320, milestone: 500, bonus: 50, milestoneName: 'First R500 saved' };
+    ? { bed: 0.5, pets: 1, school: 2, plants: 0.75, liam: 48, zoe: 30, milestone: 50, bonus: 5, milestoneName: 'First $50 saved',
+        payout: 10.5, payoutOther: 9.7, payoutPrev: 9.8, payoutOtherPrev: 9 }
+    : { bed: 5, pets: 10, school: 15, plants: 8, liam: 480, zoe: 320, milestone: 500, bonus: 50, milestoneName: 'First R500 saved',
+        payout: 105, payoutOther: 97, payoutPrev: 98, payoutOtherPrev: 90 };
 
   const KIDS = () => ([
-    { id: 'k1', user_id: 'demo-user', name: 'Liam', emoji: '3', balance: M.liam, created_at: iso('2026-01-04'), color_key: 'blue',  date_of_birth: '2016-03-14' },
-    { id: 'k2', user_id: 'demo-user', name: 'Zoe',  emoji: '9', balance: M.zoe,  created_at: iso('2026-01-04'), color_key: 'coral', date_of_birth: '2018-07-02' }
+    { id: 'k1', user_id: 'demo-user', name: 'Liam', emoji: '3', balance: M.liam, created_at: iso('2026-01-04'), color_key: 'blue',  date_of_birth: '2016-03-14', last_distribution_at: iso(payoutDay(-1)) },
+    { id: 'k2', user_id: 'demo-user', name: 'Zoe',  emoji: '9', balance: M.zoe,  created_at: iso('2026-01-04'), color_key: 'coral', date_of_birth: '2018-07-02', last_distribution_at: iso(payoutDay(-1)) }
   ]);
 
   const CHORES = () => ([
@@ -82,6 +84,26 @@
   })();
 
   const withoutMakeBed = () => CHORES().filter(c => c.id !== 'c1');
+
+  // Payday is the Sunday evening before a week starts. Setting each kid's
+  // last_distribution_at to the most recent one is what makes "owed now" come
+  // out as this week's earnings and nothing older — which is the figure the
+  // Distributions screen exists to give a parent.
+  function payoutDay(offset) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + offset);
+    d.setHours(18, 0, 0, 0);
+    return d;
+  }
+
+  const PAYOUTS = () => ([
+    ['d1', HERO,  M.payout,          -1],
+    ['d2', OTHER, M.payoutOther,     -1],
+    ['d3', HERO,  M.payoutPrev,      -8],
+    ['d4', OTHER, M.payoutOtherPrev, -8],
+  ]).map(function (row) {
+    return { id: row[0], kidId: row[1], amount: row[2], createdAt: iso(payoutDay(row[3])) };
+  });
 
   // A form field's value: whatever the storyboard passed, or the finished value
   // when it did not pass anything. Passing an empty string is how a beat says
@@ -144,7 +166,7 @@
         { id: 'b1', name: M.milestoneName, threshold: M.milestone, bonusAmount: M.bonus,
           assignedTo: 'all', claimedBy: [], created_at: iso('2026-01-05') }
       ],
-      rewards: [], rewardCompletions: [], distributions: [], cycleHistory: []
+      rewards: [], rewardCompletions: [], distributions: PAYOUTS(), cycleHistory: []
     };
   }
 
@@ -233,7 +255,16 @@
     //    is selected, and whether the Cycle Length card is there at all, both
     //    follow from ?mode — so one scene covers both halves of the story.
     'settings':  () => { S.view = 'parent'; S.tab = 'settings'; S.settingsSection = null; render(); },
-    'allowance': () => { S.view = 'parent'; S.tab = 'settings'; S.settingsSection = 'allowance'; render(); }
+    'allowance': () => { S.view = 'parent'; S.tab = 'settings'; S.settingsSection = 'allowance'; render(); },
+
+    // 8. What the parent owes, and whether the bank agrees.
+    //    parent-balances clears the approval queue: that shot is about the
+    //    balances themselves, and a stack of pending approvals above them only
+    //    pushes them off the bottom of the screen.
+    'parent-balances': () => { cache.completions = []; S.view = 'parent'; S.tab = 'overview'; render(); },
+    'money':           () => { S.view = 'parent'; S.tab = 'money'; S.moneySection = null; render(); },
+    'distributions':   () => { S.view = 'parent'; S.tab = 'money'; S.moneySection = 'distributions'; render(); },
+    'recon':           () => { S.view = 'parent'; S.tab = 'money'; S.moneySection = 'recon'; render(); }
   };
 
   // The child's own view of a chore that has just been approved. approve() moves
@@ -349,6 +380,18 @@
   }
 
   function seed() {
+    // Reconciliation keeps the parent's typed-in bank figures in localStorage
+    // rather than in the app's own state, so that is where a clip has to put
+    // them to show the tool filling up a figure at a time. An absent parameter
+    // means the box has not been typed in yet, which is a different thing from
+    // a zero in it.
+    const recon = {};
+    ['k1', 'k2'].forEach(function (id) {
+      const v = params.get('rec-' + id);
+      if (v !== null && v !== '') recon[id] = v;
+    });
+    localStorage.setItem('sprout_recon', JSON.stringify(recon));
+
     localStorage.setItem('sprout_currency', usd ? 'USD' : 'ZAR');
     localStorage.setItem('sprout_cookie_consent', 'rejected');
     localStorage.setItem('sprout_tutorial_nudge_dismissed', 'true');

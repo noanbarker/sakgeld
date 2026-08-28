@@ -307,6 +307,107 @@ CLIPS = {
         ],
     },
 
+    # ── 10 ──────────────────────────────────────────────────────────────────
+    # The child's side, to a brief, and the only clip with no parent screen in
+    # it at all. That is the point: a child signs in as themselves, sees their
+    # own things, and does something about one of them.
+    #
+    # It ends on the savings rather than on an approval, because at this moment
+    # nothing has been approved — the chore is waiting for a parent, and a
+    # balance that climbed here would be a lie. What is true, and is the reward
+    # the brief is after, is what is already banked and how close the next tree
+    # is: R 485, a small tree, and R 20 to the big one.
+    "child-screen": {
+        "title": "Their own login, their own screen",
+        "beats": [
+            # · whose phone this is: two faces, and one of them is yours
+            {"scene": "home", "hold": 2.2},
+            {"scene": "home", "tap": "text:Liam", "hold": 0.4},
+
+            # · four digits, pressed. The dots fill in behind the keys rather
+            #   than being drawn over a picture of the pad.
+            {"scene": "kid-pin", "params": {"pin": 0}, "steps": [
+                {"hold": 0.3},
+                {"tap": "text:1", "secs": 0.3}, {"set": {"pin": 1}},
+                {"tap": "text:2", "secs": 0.3}, {"set": {"pin": 2}},
+                {"tap": "text:3", "secs": 0.3}, {"set": {"pin": 3}},
+                {"tap": "text:4", "secs": 0.3}, {"set": {"pin": 4}, "hold": 0.9},
+            ]},
+
+            # · the hero screen: his name, his face, his savings
+            {"scene": "kid-today", "hold": 3.2},
+
+            # · and his chores. Held long enough to read all three pictures,
+            #   which is the whole argument for a child who cannot yet read the
+            #   words next to them.
+            {"scene": "kid-today", "scroll": (0, 300), "hold": 3.6},
+
+            # · one tap, one chore
+            {"scene": "kid-today", "y": 300, "tap": "text:Done!", "hold": 2.6},
+
+            # · and it has moved somewhere he can see, under Waiting for parent
+            {"scene": "kid-done", "scroll": (300, "end"), "hold": 3.0},
+
+            # · back to the top of his own screen for what it was all for
+            {"scene": "kid-done", "scroll": ("end", 0), "hold": 0.4},
+            {"scene": "kid-done", "ring": "card:Earnings this week", "hold": 3.6},
+        ],
+    },
+
+    # ── 11 ──────────────────────────────────────────────────────────────────
+    # What a parent still owes, and whether the bank agrees — the two money
+    # tools, in one pass. Twenty seconds for three screens, so each one is given
+    # its one idea and nothing else.
+    #
+    #     the dashboard    what each child has
+    #     Distributions    what is owed since payday, and what was paid before
+    #     Reconciliation   what should be in the bank, against what is
+    #
+    # The figures are not invented for the clip: owed comes out of the same
+    # transactions the rest of the app runs on, counted from the Sunday the last
+    # payout was recorded, and expected-in-bank is that arithmetic done for you.
+    # Change the demo week and every one of these numbers follows.
+    "money-tools": {
+        "title": "What you owe, and whether the bank agrees",
+        "beats": [
+            # · the balances, at the foot of the parent's own dashboard
+            {"scene": "parent-balances", "y": "end", "hold": 2.8},
+
+            # · back to the top for the tab bar, which is where Money lives.
+            #   Aimed by id, not by label: the sidebar has a Money button too and
+            #   it is display:none on a phone, so asking for the button that says
+            #   "Money" measures a box of nothing.
+            {"scene": "parent-balances", "scroll": ("end", 0), "tap": "#mnav-money", "hold": 0.4},
+
+            {"scene": "money", "hold": 1.8},
+            {"scene": "money", "tap": "text:Distributions", "hold": 0.4},
+
+            # · owed now, per child, since the date they were last squared up
+            {"scene": "distributions", "ring": "card:Distribution Made", "hold": 3.4},
+
+            # · and under it, what has already been handed over
+            {"scene": "distributions", "scroll": (0, "end"), "hold": 3.0},
+
+            {"scene": "distributions", "scroll": ("end", 0),
+             "tap": "text:Back to Money Management", "hold": 0.3},
+            {"scene": "money", "tap": "text:Reconciliation", "hold": 0.4},
+
+            # · the tool does the sum — balance minus what is still owed — and
+            #   the parent types in what the bank actually says. Both figures
+            #   before either is typed, so the arithmetic is visible first.
+            {"scene": "recon", "params": {"rec-k1": "", "rec-k2": ""}, "steps": [
+                {"hold": 2.4},
+                {"type": ("rec-k1", "365"), "hold": 0.7},
+                {"type": ("rec-k2", "210"), "hold": 0.6},
+            ]},
+
+            # · and the total lands. The summary only exists once every child
+            #   has a figure against them, which is what makes it an ending.
+            {"scene": "recon", "params": {"rec-k1": "365", "rec-k2": "210"},
+             "y": "end", "ring": "card:Total expected", "hold": 3.8},
+        ],
+    },
+
     # ── the reels ───────────────────────────────────────────────────────────
     # One continuous flow, built from the six above rather than copied out of
     # them — so reworking a section updates the reel too, and the sections can

@@ -19,6 +19,8 @@ a Reel.
 | `full` | All six sections, joined into one reel — about half a minute |
 | `chore-to-savings` | The four-step cut: chore set, chore done, chore approved, savings grown — about 22 seconds |
 | `chore-loop` | Twenty seconds to a brief: the list is already there, a chore is done, the parent approves it, and it turns up in the child's history |
+| `money-tools` | The parent's money side: balances, Distributions, Reconciliation. About 20 seconds |
+| `child-screen` | The child's side and nothing else: their profile, their PIN, their chores, their savings. About 21 seconds |
 | `allowance-systems` | Amount per Chore against Amount per Cycle — the same three screens under each, so the difference is the only thing moving. About 27 seconds |
 
 One thread runs through it: Make Bed is added, Liam marks Make Bed done, the
@@ -97,6 +99,20 @@ is in there four times over from earlier in the week. `card:` finds the panel
 containing some wording. Anything else is a CSS selector, which is usually the
 sharpest way to name a control the app already tags:
 `[onclick*="chooseAllowanceMode('per_cycle')"]`.
+
+### The money screens
+
+`Distributions` and `Reconciliation` both run off seeded state rather than
+anything the clip fakes. Each kid carries a `last_distribution_at` — the Sunday
+evening before the demo week — and `PAYOUTS()` fills the history behind it, so
+"owed now" is genuinely this week's approved transactions and nothing older.
+Change the demo week and every figure on both screens follows.
+
+Reconciliation keeps the parent's typed-in bank figures in `localStorage`, not in
+the app's state, so `?rec-k1=` and `?rec-k2=` are what a beat types into. An
+absent parameter means the box has not been filled in, which the tool treats
+differently from a zero in it — and the summary only appears once every child has
+a figure, which is what makes it an ending.
 
 ### The two allowance systems
 
