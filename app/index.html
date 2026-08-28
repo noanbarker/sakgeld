@@ -453,6 +453,10 @@
         .sp-recon-row > div:nth-child(3) { border-top: 1px solid var(--color-border); padding-top: 12px; margin-top: 8px; text-align: left !important; }
       }
 
+      /* ── Modal sheet: scrolls, but without the visible outer scrollbar ── */
+      .modal-sheet { scrollbar-width: none; -ms-overflow-style: none; }
+      .modal-sheet::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
       /* ── Parent dashboard: animated tab transitions (mobile only) ── */
       @media (max-width: 767px) {
         .sp-tab-anim-fwd  { animation: spTabSlideRight 0.42s cubic-bezier(0.16,1,0.3,1); }
