@@ -1,0 +1,65 @@
+/*!
+ * Icons: Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com
+ * License - https://fontawesome.com/license/free
+ * (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License)
+ * Copyright 2026 Fonticons, Inc.
+ *
+ * Cut down to the sixteen Classic Solid icons Sprout actually uses, so the
+ * font file is 2 KB instead of 117 KB.
+ *
+ * To add an icon: add its --fa rule at the bottom, then rebuild the font from
+ * the full Font Awesome Free download with every codepoint we use:
+ *   python3 -m fontTools.subset fa-solid-900.woff2 \
+ *     --unicodes=f071,f057,f058,f252,f140,f091,f4d8,f023,e4e1,f783,f073,f53a,f51e,f290,f021 \
+ *     --flavor=woff2 --output-file=fa-sprout-solid.woff2
+ */
+
+@font-face {
+  font-family: "Font Awesome 7 Free";
+  font-style: normal;
+  font-weight: 900;
+  font-display: block;
+  src: url("/fonts/fa-sprout-solid.woff2") format("woff2");
+}
+
+.fa-solid {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  display: var(--fa-display, inline-block);
+  font-family: "Font Awesome 7 Free";
+  font-style: normal;
+  font-weight: 900;
+  font-synthesis: none;
+  font-variant: normal;
+  line-height: 1;
+  text-align: center;
+  text-rendering: auto;
+  /* Font Awesome pads every icon to a fixed 1.25em box. Ours sit inline beside
+     text in toasts and chips, where that padding reads as a stray gap, so they
+     take their natural width instead. .fa-fw restores the fixed box. */
+  width: var(--fa-width, auto);
+}
+
+.fa-solid::before { content: var(--fa) / ""; }
+@supports not (content: "" / "") {
+  .fa-solid::before { content: var(--fa); }
+}
+
+.fa-fw { --fa-width: 1.25em; }
+
+/* ── Icons in use ─────────────────────────────────────────────── */
+.fa-triangle-exclamation { --fa: "\f071"; }  /* validation warnings */
+.fa-circle-xmark         { --fa: "\f057"; }  /* save + delete failures */
+.fa-circle-check         { --fa: "\f058"; }  /* confirmations, chore done */
+.fa-hourglass-half       { --fa: "\f252"; }  /* waiting for parent */
+.fa-bullseye             { --fa: "\f140"; }  /* quick tasks */
+.fa-trophy               { --fa: "\f091"; }  /* rewards, top tier */
+.fa-seedling             { --fa: "\f4d8"; }  /* savings tree */
+.fa-lock                 { --fa: "\f023"; }  /* parent PIN */
+.fa-children             { --fa: "\e4e1"; }  /* all kids */
+.fa-calendar-day         { --fa: "\f783"; }  /* daily schedule, weekly payout */
+.fa-calendar-days        { --fa: "\f073"; }  /* specific days */
+.fa-arrows-rotate        { --fa: "\f021"; }  /* per-kid rota */
+.fa-money-bill-wave      { --fa: "\f53a"; }  /* payouts */
+.fa-coins                { --fa: "\f51e"; }  /* manual adjustments */
+.fa-bag-shopping         { --fa: "\f290"; }  /* money spent */

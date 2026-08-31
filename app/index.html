@@ -11,6 +11,7 @@
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#16a34a">
     <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/css/icons.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -589,7 +590,7 @@ Paddle.Initialize({
             if (currentUser) {
                 // Existing signed-in user finishing checkout from the subscription gate —
                 // the webhook needs a moment to reach Supabase, so poll briefly for it.
-                toast('🎉 Almost there! Confirming your subscription…');
+                toast('Almost there! Confirming your subscription…', 'success');
                 refreshUserAfterCheckout();
             } else {
                 if (window.posthog) posthog.capture('trial_started', { billing_cycle: S.billingCycle || 'monthly', ...getStoredUTM() });
@@ -599,7 +600,7 @@ Paddle.Initialize({
                 if (typeof fbq === 'function') fbq('track', 'StartTrial', {}, { eventID: 'trial_started_' + pendingTrialUserId });
                 if (typeof gtag === 'function') gtag('event', 'trial_started');
                 S.authMode = 'signin';
-                toast('🎉 Trial started! Check your email to confirm your account, then sign in.');
+                toast('Trial started! Check your email to confirm your account, then sign in.', 'success');
                 render();
             }
         }
@@ -620,14 +621,14 @@ function handlePaystackReturn() {
     if (typeof fbq === 'function' && pendingTrialUserId) fbq('track', 'StartTrial', {}, { eventID: 'trial_started_' + pendingTrialUserId });
     if (typeof gtag === 'function') gtag('event', 'trial_started');
     if (currentUser) {
-        toast('🎉 Almost there! Confirming your subscription…');
+        toast('Almost there! Confirming your subscription…', 'success');
         refreshUserAfterCheckout();
     } else {
         // Signing up leaves them without a session until they confirm their
         // address, so there's nothing to poll for yet — same landing place as
         // the Paddle flow gives a brand-new parent.
         S.authMode = 'signin';
-        toast('🎉 Trial started! Check your email to confirm your account, then sign in.');
+        toast('Trial started! Check your email to confirm your account, then sign in.', 'success');
         render();
     }
 }
@@ -682,7 +683,7 @@ async function openPaystackCheckout({ userId, billingCycle }) {
         });
         const body = await res.json().catch(() => null);
         if (!res.ok || !body || !body.authorization_url) {
-            toast('❌ ' + ((body && body.error) || 'Could not start checkout. Please try again.'));
+            toast(((body && body.error) || 'Could not start checkout. Please try again.'), 'error');
             return;
         }
         // Full redirect rather than an overlay: South African cards almost
@@ -690,7 +691,7 @@ async function openPaystackCheckout({ userId, billingCycle }) {
         // run inside an iframe. Paystack sends them back to /app/?checkout=paystack.
         window.location.href = body.authorization_url;
     } catch (e) {
-        toast('❌ Could not start checkout. Please try again.');
+        toast('Could not start checkout. Please try again.', 'error');
     }
 }
 
@@ -1066,7 +1067,7 @@ function choreIcon(c, size = 44) {
 function choreIconSVG(key, size = 44) {
     const num = parseInt(key);
     // Fall back to the "Custom" icon (37) for unknown/legacy keys (e.g. older
-    // quick tasks saved with a '⭐'), rather than misleadingly showing Make Bed.
+    // quick tasks saved with a star), rather than misleadingly showing Make Bed.
     const idx = (num >= 1 && num <= 41) ? num : 37;
     const file = CHORE_ICON_FILES[idx];
     const name = CHORE_ICON_NAMES[idx];
@@ -1081,11 +1082,11 @@ function choreIconSVG(key, size = 44) {
 
 // ─── TREE GROWTH STAGES ──────────────────────────────────────────
 const TREE_STAGES = [
-    { key: 'seedling',   label: 'Seedling',   emoji: '🌱', description: 'Just getting started' },
-    { key: 'sapling',    label: 'Sapling',    emoji: '🌿', description: 'Growing strong' },
-    { key: 'small-tree', label: 'Small Tree', emoji: '🌳', description: 'Looking good' },
-    { key: 'big-tree',   label: 'Big Tree',   emoji: '🌟', description: 'Thriving saver' },
-    { key: 'forest',     label: 'Forest',     emoji: '🏆', description: 'Champion grower' },
+    { key: 'seedling',   label: 'Seedling',   description: 'Just getting started' },
+    { key: 'sapling',    label: 'Sapling',    description: 'Growing strong' },
+    { key: 'small-tree', label: 'Small Tree', description: 'Looking good' },
+    { key: 'big-tree',   label: 'Big Tree',   description: 'Thriving saver' },
+    { key: 'forest',     label: 'Forest',     description: 'Champion grower' },
 ];
 
 const DEFAULT_TREE_THRESHOLDS = { t1: 100, t2: 250, t3: 500, t4: 1000 };
@@ -1100,7 +1101,7 @@ function loadTreeThresholds() {
 }
 async function saveTreeThresholds(t) {
     const { data, error } = await sb.auth.updateUser({ data: { tree_thresholds: t } });
-    if (error) { toast('❌ Could not save thresholds.'); return false; }
+    if (error) { toast('Could not save thresholds.', 'error'); return false; }
     if (data?.user) currentUser = data.user;
     localStorage.setItem('sprout_tree_thresholds', JSON.stringify(t));
     return true;
@@ -1271,13 +1272,6 @@ function renderCelebration() {
     </div>`;
 }
 
-// ─── CHORE EMOJIS (legacy — kept for fallback) ────────────────────
-const CHORE_EMOJIS = [
-    '🧹','🧺','🍽️','🛁','🧽','🗑️','🐕','🌿','🛏️','🚗',
-    '🍳','🛒','📚','🧸','🪟','🧻','🚿','🐈','🐟','🌻',
-    '🪣','🏡','💪','⭐','🌟','🎯','🧤','🔧','📦','🍕',
-    '🧁','🥗','🪴','🐇','🦜','🌊','🧊','🎒','🖥️','🛋️'
-];
 
 // ─── KID ACCENT COLORS ───────────────────────────────────────────
 const KID_ACCENT_OPTIONS = [
@@ -1367,13 +1361,10 @@ function kidIcon(kidOrName, size) {
         return avatarIMG(AVATAR_FILES[num] ? num : 1, size);
     }
 
-    // No avatar, so fall back to the emoji the kid picked, or to a face derived
-    // from their name for the handful of kids saved before either existed.
-    if (!emoji) {
-        const icons = ['🧒','👦','👧','🧑','🐻','🦁','🐯','🦊'];
-        let h = 0; for (const c of String(kidOrName)) h += c.charCodeAt(0);
-        emoji = icons[h % icons.length];
-    }
+    // Nothing saved at all, so show the first illustrated avatar rather than
+    // inventing a face from their name. Kids who picked an emoji of their own
+    // before the illustrations existed still get it, on the line below.
+    if (!emoji) return avatarIMG(1, size);
     return size ? `<span style="font-size:${size}px;line-height:1">${emoji}</span>` : emoji;
 }
 
@@ -1616,9 +1607,26 @@ function renderTour() {
       </div>
     </div>`;
 }
-function toast(msg, icon = null) {
+// One icon per kind of message, so every warning looks like every other
+// warning without an icon being pasted into each individual string.
+const TOAST_ICONS = {
+    warn:    'triangle-exclamation',
+    error:   'circle-xmark',
+    success: 'circle-check',
+    waiting: 'hourglass-half',
+    task:    'bullseye',
+    reward:  'trophy',
+    tree:    'seedling',
+    pin:     'lock',
+};
+
+function faIcon(name, extra = '') {
+    return `<i class="fa-solid fa-${name}${extra ? ' ' + extra : ''}" aria-hidden="true"></i>`;
+}
+
+function toast(msg, kind = null) {
     if (S.toastTimer) clearTimeout(S.toastTimer);
-    S.toast = msg; S.toastIcon = icon; render();
+    S.toast = msg; S.toastIcon = TOAST_ICONS[kind] ? faIcon(TOAST_ICONS[kind]) : null; render();
     const duration = Math.min(6000, Math.max(2800, msg.length * 60));
     S.toastTimer = setTimeout(() => { S.toast = null; S.toastIcon = null; render(); }, duration);
 }
@@ -2082,12 +2090,12 @@ async function pickChorePhoto(input) {
     const file = input.files && input.files[0];
     input.value = '';
     if (!file) return;
-    if (!/^image\//.test(file.type)) return toast('⚠️ That file is not a photo.');
-    if (file.size > 25 * 1024 * 1024) return toast('⚠️ That photo is too big. Try one under 25 MB.');
+    if (!/^image\//.test(file.type)) return toast('That file is not a photo.', 'warn');
+    if (file.size > 25 * 1024 * 1024) return toast('That photo is too big. Try one under 25 MB.', 'warn');
     snapModalInputs();
     let blob;
     try { blob = await compressChorePhoto(file); }
-    catch (e) { return toast('❌ Could not read that photo. Try another one.'); }
+    catch (e) { return toast('Could not read that photo. Try another one.', 'error'); }
     if (S.chorePhotoPreview) URL.revokeObjectURL(S.chorePhotoPreview);
     S.chorePhotoBlob    = blob;
     S.chorePhotoPreview = URL.createObjectURL(blob);
@@ -2360,7 +2368,7 @@ async function doForgotParentPin() {
     localStorage.setItem('sprout_recovery_intent', 'pin');
     const redirectTo = window.location.origin + window.location.pathname;
     const { error } = await sb.auth.resetPasswordForEmail(currentUser.email, { redirectTo });
-    if (error) { toast('❌ Could not send reset email.'); return; }
+    if (error) { toast('Could not send reset email.', 'error'); return; }
     toast('Check your email for a link to reset your PIN.');
 }
 function vResetPassword() {
@@ -2709,7 +2717,7 @@ function vOnboarding() {
         <h2 style="font-family:var(--font-family);font-size:20px;font-weight:900;color:var(--color-text-primary);margin-bottom:6px">Protect the parent dashboard? (optional)</h2>
         <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:20px">A PIN stops kids from wandering into Settings, approvals, or balances on a shared device. You can skip this and set one later from Settings.</p>
         <div class="card mb-4" style="padding:14px 16px">
-          <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">${hasParentPin ? '🔐 A PIN is set' : '⚠️ No PIN set'}</p>
+          <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">${hasParentPin ? faIcon('lock') + ' A PIN is set' : faIcon('triangle-exclamation') + ' No PIN set'}</p>
           <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${hasParentPin ? 'Anyone opening the Parent dashboard on this device will need it.' : 'Anyone can currently open the Parent dashboard without one.'}</p>
         </div>
         <button onclick="openModal('set-parent-pin')" class="btn-outline mb-3" style="width:100%">${hasParentPin ? 'Change PIN' : '+ Set Parent PIN'}</button>
@@ -2924,8 +2932,8 @@ async function captureExpense() {
     snapModalInputs();
     const { kidId, amount: amtStr, description, date } = S.modal.data;
     const amount = parseFloat(amtStr) || 0;
-    if (!kidId)    return toast('⚠️ Please select a kid.');
-    if (amount<=0) return toast('⚠️ Please enter a valid amount.');
+    if (!kidId)    return toast('Please select a kid.', 'warn');
+    if (amount<=0) return toast('Please enter a valid amount.', 'warn');
     const k = cache.kids.find(x => x.id === kidId);
     if (!k) return;
     const desc = (description || '').trim() || 'Money spent';
@@ -3913,7 +3921,7 @@ function pSettings() {
                 <div style="flex:1;min-width:0">
                   <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
                     <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">${tier.name}</p>
-                    ${tier.stage === 4 ? `<span style="font-family:var(--font-family);font-size:10px;font-weight:700;background:var(--color-green-100);color:var(--color-green-700);padding:2px 8px;border-radius:99px">TOP TIER 🏆</span>` : ''}
+                    ${tier.stage === 4 ? `<span style="font-family:var(--font-family);font-size:10px;font-weight:700;background:var(--color-green-100);color:var(--color-green-700);padding:2px 8px;border-radius:99px">TOP TIER ${faIcon('trophy')}</span>` : ''}
                   </div>
                   <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${TREE_STAGES[tier.stage].description}</p>
                   <p style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-green-600);margin-top:3px">${tier.range}</p>
@@ -4065,7 +4073,8 @@ function vKid() {
     const ready     = allChores.filter(c => !doneTodayIds.includes(c.id));
     const txns      = db.transactions.filter(t => t.kidId === kid.id)
                         .sort((a,b) => new Date(txDate(b))-new Date(txDate(a)));
-    const typeIcon  = { payout:'💸', weekly:'📅', chore:'✅', manual:'💰', bonus: milestoneStarSVG(16), reward:'🏆', expense:'🛍️' };
+    const typeIcon  = { payout: faIcon('money-bill-wave'), weekly: faIcon('calendar-day'), chore: faIcon('circle-check'),
+                        manual: faIcon('coins'), bonus: milestoneStarSVG(16), reward: faIcon('trophy'), expense: faIcon('bag-shopping') };
     const treeStageIdx = getTreeStage(kid.balance);
     const treeThresh   = loadTreeThresholds();
     const threshArr    = [treeThresh.t1, treeThresh.t2, treeThresh.t3, treeThresh.t4];
@@ -4228,7 +4237,7 @@ function vKid() {
                 <div style="flex-shrink:0;width:128px;height:128px;background:#fef3c7;border-radius:14px;display:flex;align-items:center;justify-content:center;opacity:0.7">${choreIcon(chore, 88)}</div>
                 <div class="flex-1 min-w-0">
                   <p style="font-family:var(--font-family);font-weight:800;color:#92400e">${esc(chore?.name) || 'Deleted chore'}</p>
-                  <p style="font-family:var(--font-family);font-size:12px;color:#b45309;margin-top:2px">Waiting for parent ⏳</p>
+                  <p style="font-family:var(--font-family);font-size:12px;color:#b45309;margin-top:2px">Waiting for parent ${faIcon('hourglass-half')}</p>
                   <p style="font-family:var(--font-family);font-weight:800;color:var(--color-warning);margin-top:4px">${chore?.oneOff || !isCycleMode() ? `+ ${R(chore?.value)}` : `${choreWeight(chore || {})}× weighting`}</p>
                 </div>
               </div>`;
@@ -4310,7 +4319,7 @@ function vKid() {
                       <div style="flex-shrink:0;width:64px;height:64px;background:#fef3c7;border-radius:14px;display:flex;align-items:center;justify-content:center;opacity:0.7;color:#b45309">${uiIcon('trophy', 36, 2)}</div>
                       <div class="flex-1 min-w-0">
                         <p style="font-family:var(--font-family);font-weight:800;color:#92400e">${esc(r.name)}</p>
-                        <p style="font-family:var(--font-family);font-size:12px;color:#b45309;margin-top:2px">Waiting for parent ⏳</p>
+                        <p style="font-family:var(--font-family);font-size:12px;color:#b45309;margin-top:2px">Waiting for parent ${faIcon('hourglass-half')}</p>
                         <p style="font-family:var(--font-family);font-weight:800;color:var(--color-warning);margin-top:4px">+ ${R(r.value)}</p>
                       </div>
                     </div>`;
@@ -4344,7 +4353,7 @@ function vKid() {
             : txns.map(t => `
               <div class="card flex items-center gap-2" style="padding:8px 12px">
                 <div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:${t.amount>0?ac.bg:'var(--color-coral-bg)'}">
-                  ${typeIcon[t.type] || '💰'}
+                  ${typeIcon[t.type] || faIcon('coins')}
                 </div>
                 <div class="flex-1 min-w-0">
                   <p style="font-family:var(--font-family);font-weight:600;color:var(--color-text-primary);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.description)}</p>
@@ -4433,7 +4442,7 @@ function renderModal() {
         // A photo waiting to upload, or the one already saved for this chore.
         const photoURL = S.chorePhotoPreview || (S.chorePhotoPath ? choreImgURL[S.chorePhotoPath] : null);
         const usingPhoto = !!photoURL;
-        const selIconName = usingPhoto ? 'Your own photo' : (CHORE_ICON_NAMES[selIconNum] || (selIcon || '⭐'));
+        const selIconName = usingPhoto ? 'Your own photo' : (CHORE_ICON_NAMES[selIconNum] || CHORE_ICON_NAMES[37]);
         const photoRow = `
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Your Own Photo</p>
         <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">
@@ -4482,7 +4491,7 @@ function renderModal() {
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
           <button onclick="setAllKids()" type="button"
             style="padding:6px 12px;border-radius:10px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedKids==='all'?'var(--color-green-600)':'var(--color-border)'};background:${S.selectedKids==='all'?'var(--color-green-100)':'white'};color:${S.selectedKids==='all'?'var(--color-green-700)':'#6b7280'};cursor:pointer">
-            👨‍👩‍👧‍👦 All kids
+            ${faIcon('children')} All kids
           </button>
           ${db.kids.map(k => {
             const sel = Array.isArray(S.selectedKids) && S.selectedKids.includes(k.id);
@@ -4496,15 +4505,15 @@ function renderModal() {
         <div style="display:flex;gap:6px;margin-bottom:12px">
           <button onclick="setSchedule('daily')" type="button"
             style="flex:1;padding:8px 4px;border-radius:12px;font-size:12px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedSchedule==='daily'?'var(--color-green-600)':'var(--color-border)'};background:${S.selectedSchedule==='daily'?'var(--color-green-100)':'white'};color:${S.selectedSchedule==='daily'?'var(--color-green-700)':'#6b7280'};cursor:pointer">
-            📅 Daily
+            ${faIcon('calendar-day')} Daily
           </button>
           <button onclick="setSchedule('weekly')" type="button"
             style="flex:1;padding:8px 4px;border-radius:12px;font-size:12px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedSchedule==='weekly'?'var(--color-green-600)':'var(--color-border)'};background:${S.selectedSchedule==='weekly'?'var(--color-green-100)':'white'};color:${S.selectedSchedule==='weekly'?'var(--color-green-700)':'#6b7280'};cursor:pointer">
-            📆 Specific days
+            ${faIcon('calendar-days')} Specific days
           </button>
           <button onclick="setSchedule('per_kid')" type="button"
             style="flex:1;padding:8px 4px;border-radius:12px;font-size:12px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedSchedule==='per_kid'?'var(--color-green-600)':'var(--color-border)'};background:${S.selectedSchedule==='per_kid'?'var(--color-green-100)':'white'};color:${S.selectedSchedule==='per_kid'?'var(--color-green-700)':'#6b7280'};cursor:pointer">
-            🔄 Per kid
+            ${faIcon('arrows-rotate')} Per kid
           </button>
         </div>
         ${S.selectedSchedule === 'weekly' ? `
@@ -4603,7 +4612,7 @@ function renderModal() {
         const hasPin = hasParentPin;
         body = `
         <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Parent PIN</h3>
-        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:14px;margin-bottom:16px">${hasPin ? '🔐 A PIN is currently set.' : '⚠️ No PIN set — anyone can access the parent dashboard.'}</p>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:14px;margin-bottom:16px">${hasPin ? faIcon('lock') + ' A PIN is currently set.' : faIcon('triangle-exclamation') + ' No PIN set — anyone can access the parent dashboard.'}</p>
         <input id="pp-pin" placeholder="New 4-digit PIN" maxlength="4" inputmode="numeric" class="mb-4">
         <div style="display:flex;gap:8px">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
@@ -4661,7 +4670,7 @@ function renderModal() {
                 const allSel = S.selectedKids === 'all';
                 return `<button onclick="setAllKids()" type="button"
                   style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${allSel ? 'var(--color-green-600)' : 'var(--color-border)'};background:${allSel ? 'var(--color-green-100)' : 'white'};color:${allSel ? 'var(--color-green-700)' : '#6b7280'};cursor:pointer">
-                  👨‍👩‍👧‍👦 All kids
+                  ${faIcon('children')} All kids
                 </button>` +
                 db.kids.map(k => {
                   const sel = Array.isArray(S.selectedKids) && S.selectedKids.includes(k.id);
@@ -4707,7 +4716,7 @@ function renderModal() {
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
           <button onclick="setAllKids()" type="button"
             style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedKids === 'all' ? 'var(--color-green-600)' : 'var(--color-border)'};background:${S.selectedKids === 'all' ? 'var(--color-green-100)' : 'white'};color:${S.selectedKids === 'all' ? 'var(--color-green-700)' : '#6b7280'};cursor:pointer">
-            👨‍👩‍👧‍👦 All kids
+            ${faIcon('children')} All kids
           </button>
           ${kidBtns}
         </div>
@@ -4740,7 +4749,7 @@ function renderModal() {
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
           <button onclick="setAllKids()" type="button"
             style="padding:8px 14px;border-radius:12px;font-size:13px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedKids === 'all' ? 'var(--color-green-600)' : 'var(--color-border)'};background:${S.selectedKids === 'all' ? 'var(--color-green-100)' : 'white'};color:${S.selectedKids === 'all' ? 'var(--color-green-700)' : '#6b7280'};cursor:pointer">
-            👨‍👩‍👧‍👦 All kids
+            ${faIcon('children')} All kids
           </button>
           ${kidBtns}
         </div>
@@ -4798,19 +4807,19 @@ async function addKid() {
     const date_of_birth = document.getElementById('k-dob').value;
     const emoji     = S.selectedEmoji || '1';
     const color_key = S.selectedColor || 'blue';
-    if (!name)                 return toast('⚠️ Please enter a name.');
-    if (!/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits (e.g. 1234).');
-    if (!date_of_birth)        return toast('⚠️ Please enter a date of birth.');
+    if (!name)                 return toast('Please enter a name.', 'warn');
+    if (!/^\d{4}$/.test(pin)) return toast('PIN must be exactly 4 digits (e.g. 1234).', 'warn');
+    if (!date_of_birth)        return toast('Please enter a date of birth.', 'warn');
     const cycleFields = readCycleAmountFields();
     const id = uid();
     const { error } = await sb.from('kids').insert({ id, user_id: currentUser.id, name, emoji, color_key, date_of_birth, balance: 0, ...cycleFields });
-    if (error) return toast('❌ Could not save. Check your connection.');
+    if (error) return toast('Could not save. Check your connection.', 'error');
     const { error: pinError } = await sb.rpc('set_kid_pin', { p_kid_id: id, p_new_pin: pin });
-    if (pinError) return toast('❌ Kid saved, but PIN could not be set.');
+    if (pinError) return toast('Kid saved, but PIN could not be set.', 'error');
     cache.kids.push({ id, name, emoji, color_key, date_of_birth, balance: 0, ...cycleFields });
     trackLoops('child_added', { childrenCount: cache.kids.length });
     if (window.posthog) posthog.capture('child_added', { childrenCount: cache.kids.length });
-    closeModal(); toast(`${name} added! 🎉`);
+    closeModal(); toast(`${name} added!`, 'success');
 }
 // Reads the cycle-amount modal fields when in per-cycle mode; {} otherwise so
 // the insert/update below leaves those columns untouched in per-chore mode.
@@ -4831,15 +4840,15 @@ async function saveKid(id) {
     const date_of_birth = document.getElementById('k-dob').value;
     const emoji     = S.selectedEmoji || '1';
     const color_key = S.selectedColor || 'blue';
-    if (!name)                 return toast('⚠️ Please enter a name.');
-    if (pin && !/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits (e.g. 1234).');
-    if (!date_of_birth)        return toast('⚠️ Please enter a date of birth.');
+    if (!name)                 return toast('Please enter a name.', 'warn');
+    if (pin && !/^\d{4}$/.test(pin)) return toast('PIN must be exactly 4 digits (e.g. 1234).', 'warn');
+    if (!date_of_birth)        return toast('Please enter a date of birth.', 'warn');
     const cycleFields = readCycleAmountFields();
     const { error } = await sb.from('kids').update({ name, emoji, color_key, date_of_birth, ...cycleFields }).eq('id', id).eq('user_id', currentUser.id);
-    if (error) return toast('❌ Could not save.');
+    if (error) return toast('Could not save.', 'error');
     if (pin) {
         const { error: pinError } = await sb.rpc('set_kid_pin', { p_kid_id: id, p_new_pin: pin });
-        if (pinError) return toast('❌ Saved, but PIN could not be updated.');
+        if (pinError) return toast('Saved, but PIN could not be updated.', 'error');
     }
     const k = cache.kids.find(x => x.id === id);
     if (k) { k.name = name; k.emoji = emoji; k.color_key = color_key; k.date_of_birth = date_of_birth; Object.assign(k, cycleFields); }
@@ -4851,7 +4860,7 @@ function deleteKid(id) {
 }
 async function doDeleteKid(id) {
     const { error } = await sb.from('kids').delete().eq('id', id).eq('user_id', currentUser.id);
-    if (error) return toast('❌ Could not delete.');
+    if (error) return toast('Could not delete.', 'error');
     cache.kids         = cache.kids.filter(x => x.id !== id);
     cache.completions  = cache.completions.filter(x => x.kidId !== id);
     cache.transactions = cache.transactions.filter(x => x.kidId !== id);
@@ -4864,21 +4873,21 @@ async function addChore() {
     const val        = parseFloat(document.getElementById('c-val')?.value) || 0;
     const weight     = S.selectedWeight || 1;
     const assignedTo = S.selectedKids;
-    const emoji      = S.selectedEmoji || '⭐';
+    const emoji      = S.selectedEmoji || '37';
     const schedule   = S.selectedSchedule || 'daily';
     const days       = schedule === 'per_kid' ? choreRotaPayload(DB.load().kids)
                      : schedule === 'weekly'  ? [...S.selectedDays]
                      : [];
-    if (!name) return toast('⚠️ Please enter a chore name.');
-    if (schedule === 'weekly' && days.length === 0) return toast('⚠️ Please select at least one day.');
-    if (schedule === 'per_kid' && Object.keys(days).length === 0) return toast('⚠️ Please give at least one kid a day.');
-    if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('⚠️ Please select at least one kid.');
+    if (!name) return toast('Please enter a chore name.', 'warn');
+    if (schedule === 'weekly' && days.length === 0) return toast('Please select at least one day.', 'warn');
+    if (schedule === 'per_kid' && Object.keys(days).length === 0) return toast('Please give at least one kid a day.', 'warn');
+    if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('Please select at least one kid.', 'warn');
     const id = uid();
     const now = new Date().toISOString();
     let imagePath = null;
     if (S.chorePhotoBlob) {
         imagePath = await uploadChorePhoto(id);
-        if (!imagePath) return toast('❌ Could not upload the photo. Check your connection.');
+        if (!imagePath) return toast('Could not upload the photo. Check your connection.', 'error');
     }
     // A chore with a photo still carries an illustration underneath it, shown
     // only if the photo ever fails to load. "Custom" is the honest stand-in;
@@ -4887,7 +4896,7 @@ async function addChore() {
     const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: desc, value: val, weight, assigned_to: assignedTo, emoji: icon, image_path: imagePath, schedule, days, created_at: now, schedule_updated_at: now });
     // The row is what makes the photo reachable, so a failed insert has to take
     // the just-uploaded file with it rather than leaving it orphaned in the bucket.
-    if (error) { await removeChorePhoto(imagePath); return toast('❌ Could not save. Check your connection.'); }
+    if (error) { await removeChorePhoto(imagePath); return toast('Could not save. Check your connection.', 'error'); }
     cache.chores.push({ id, name, description: desc, value: val, weight, assignedTo, emoji: icon, image_path: imagePath, schedule, days, created_at: now, schedule_updated_at: now });
     trackLoops(cache.chores.length === 1 ? 'first_chore_created' : null, { choreCount: cache.chores.length });
     if (window.posthog) posthog.capture('chore_created', { choreCount: cache.chores.length });
@@ -4903,15 +4912,15 @@ async function saveChore(id) {
     const val        = parseFloat(document.getElementById('c-val')?.value) || 0;
     const weight     = S.selectedWeight || 1;
     const assignedTo = S.selectedKids;
-    const emoji      = S.selectedEmoji || '⭐';
+    const emoji      = S.selectedEmoji || '37';
     const schedule   = S.selectedSchedule || 'daily';
     const days       = schedule === 'per_kid' ? choreRotaPayload(DB.load().kids)
                      : schedule === 'weekly'  ? [...S.selectedDays]
                      : [];
-    if (!name) return toast('⚠️ Please enter a chore name.');
-    if (schedule === 'weekly' && days.length === 0) return toast('⚠️ Please select at least one day.');
-    if (schedule === 'per_kid' && Object.keys(days).length === 0) return toast('⚠️ Please give at least one kid a day.');
-    if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('⚠️ Please select at least one kid.');
+    if (!name) return toast('Please enter a chore name.', 'warn');
+    if (schedule === 'weekly' && days.length === 0) return toast('Please select at least one day.', 'warn');
+    if (schedule === 'per_kid' && Object.keys(days).length === 0) return toast('Please give at least one kid a day.', 'warn');
+    if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('Please select at least one kid.', 'warn');
     const c = cache.chores.find(x => x.id === id);
     const scheduleChanged = c && (c.schedule !== schedule || JSON.stringify(c.days || []) !== JSON.stringify(days));
     const oldPath = c ? (c.image_path || null) : null;
@@ -4919,7 +4928,7 @@ async function saveChore(id) {
     let imagePath = S.chorePhotoPath || null;
     if (S.chorePhotoBlob) {
         imagePath = await uploadChorePhoto(id);
-        if (!imagePath) return toast('❌ Could not upload the photo. Check your connection.');
+        if (!imagePath) return toast('Could not upload the photo. Check your connection.', 'error');
     }
     // See addChore: the illustration is the fallback if the photo won't load.
     const icon = imagePath ? '37' : emoji;
@@ -4930,7 +4939,7 @@ async function saveChore(id) {
     const { error } = await sb.from('chores').update(update).eq('id', id).eq('user_id', currentUser.id);
     if (error) {
         if (imagePath !== oldPath) await removeChorePhoto(imagePath);
-        return toast('❌ Could not save.');
+        return toast('Could not save.', 'error');
     }
     // Only now that the row points elsewhere is the old file safe to drop.
     if (oldPath && oldPath !== imagePath) await removeChorePhoto(oldPath);
@@ -4954,8 +4963,8 @@ async function saveManualAdjustment(kidId) {
     const amount = parseFloat(document.getElementById('ma-amount').value) || 0;
     const desc   = document.getElementById('ma-desc').value.trim();
     const isAdd  = (S.modal.data.adjustType || 'add') === 'add';
-    if (amount <= 0) return toast('⚠️ Please enter a valid amount.');
-    if (!desc)       return toast('⚠️ Please enter a reason.');
+    if (amount <= 0) return toast('Please enter a valid amount.', 'warn');
+    if (!desc)       return toast('Please enter a reason.', 'warn');
     const kid = cache.kids.find(x => x.id === kidId);
     if (!kid) return;
     const delta      = isAdd ? amount : -amount;
@@ -4963,7 +4972,7 @@ async function saveManualAdjustment(kidId) {
     const id         = uid();
     const createdAt  = new Date().toISOString();
     const { error } = await sb.from('kids').update({ balance: newBalance }).eq('id', kidId).eq('user_id', currentUser.id);
-    if (error) return toast('❌ Could not save. Check your connection.');
+    if (error) return toast('Could not save. Check your connection.', 'error');
     await sb.from('transactions').insert({ id, user_id: currentUser.id, kid_id: kidId, amount: delta, type: 'manual', description: desc, created_at: createdAt });
     kid.balance = newBalance;
     cache.transactions.push({ id, kidId, amount: delta, type: 'manual', description: desc, createdAt });
@@ -4985,25 +4994,25 @@ async function addQuickTask() {
     const val       = parseFloat(document.getElementById('qt-val').value) || 0;
     const days      = Math.max(1, parseInt(document.getElementById('qt-days').value) || 1);
     const assignedTo = S.selectedKids;
-    if (!name) return toast('⚠️ Please enter a task name.');
-    if (!assignedTo || (Array.isArray(assignedTo) && assignedTo.length === 0)) return toast('⚠️ Please select at least one kid.');
+    if (!name) return toast('Please enter a task name.', 'warn');
+    if (!assignedTo || (Array.isArray(assignedTo) && assignedTo.length === 0)) return toast('Please select at least one kid.', 'warn');
     const expiry = new Date();
     expiry.setDate(expiry.getDate() + (days - 1));
     const expiresOn = toLocalDateStr(expiry);
     const id = uid();
     const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: '', value: val, assigned_to: assignedTo, emoji: '37', schedule: 'daily', days: [], one_off: true, expires_on: expiresOn });
-    if (error) return toast('❌ Could not save. Check your connection.');
+    if (error) return toast('Could not save. Check your connection.', 'error');
     cache.chores.push({ id, name, description: '', value: val, assignedTo, emoji: '37', schedule: 'daily', days: [], oneOff: true, expiresOn });
     trackLoops(cache.chores.length === 1 ? 'first_chore_created' : null, { choreCount: cache.chores.length });
     if (window.posthog) posthog.capture('chore_created', { choreCount: cache.chores.length });
-    closeModal(); toast('Quick task assigned! 🎯');
+    closeModal(); toast('Quick task assigned!', 'task');
 }
 async function doDeleteChore(id) {
     // Archived, not hard-deleted: a hard delete would make cycleWeightTotals
     // recompute every already-elapsed day of the current cycle without this
     // chore, silently changing a kid's percentage and payout after the fact.
     const { error } = await sb.from('chores').update({ archived: true }).eq('id', id).eq('user_id', currentUser.id);
-    if (error) return toast('❌ Could not delete.');
+    if (error) return toast('Could not delete.', 'error');
     const c = cache.chores.find(x => x.id === id);
     if (c) c.archived = true;
     closeModal(); render();
@@ -5023,9 +5032,9 @@ async function saveBonusMilestone(editId) {
     const threshold = parseFloat(document.getElementById('bm-threshold').value) || 0;
     const bonusAmt  = parseFloat(document.getElementById('bm-bonus').value) || 0;
     const assignedTo = S.selectedKids;
-    if (threshold <= 0) return toast('⚠️ Please enter a balance milestone.');
-    if (bonusAmt  <= 0) return toast('⚠️ Please enter a bonus amount.');
-    if (!assignedTo || (Array.isArray(assignedTo) && assignedTo.length === 0)) return toast('⚠️ Please select at least one kid.');
+    if (threshold <= 0) return toast('Please enter a balance milestone.', 'warn');
+    if (bonusAmt  <= 0) return toast('Please enter a bonus amount.', 'warn');
+    if (!assignedTo || (Array.isArray(assignedTo) && assignedTo.length === 0)) return toast('Please select at least one kid.', 'warn');
     if (editId && editId !== 'null') {
         const m = cache.bonusMilestones.find(x => x.id === editId);
         if (!m) return;
@@ -5035,7 +5044,7 @@ async function saveBonusMilestone(editId) {
     } else {
         const id = uid(); const createdAt = new Date().toISOString();
         const { error } = await sb.from('bonus_milestones').insert({ id, user_id: currentUser.id, name, threshold, bonus_amount: bonusAmt, assigned_to: assignedTo, claimed_by: [], created_at: createdAt });
-        if (error) return toast('❌ ' + (error.message || 'Could not save.'));
+        if (error) return toast((error.message || 'Could not save.'), 'error');
         cache.bonusMilestones.push({ id, name, threshold, bonusAmount: bonusAmt, assignedTo, claimedBy: [], createdAt });
         trackLoops(cache.bonusMilestones.length === 1 ? 'savings_goal_created' : null, { hasSavingsGoal: true });
         closeModal(); toast('Milestone added!', milestoneStarSVG(16));
@@ -5054,7 +5063,7 @@ async function deleteBonusMilestone(id) {
 }
 async function doDeleteBonusMilestone(id) {
     const { error } = await sb.from('bonus_milestones').delete().eq('id', id).eq('user_id', currentUser.id);
-    if (error) return toast('❌ Could not delete.');
+    if (error) return toast('Could not delete.', 'error');
     cache.bonusMilestones = cache.bonusMilestones.filter(x => x.id !== id);
     closeModal(); render();
 }
@@ -5067,9 +5076,9 @@ async function saveReward(editId) {
     const description  = document.getElementById('rw-desc').value.trim();
     const value        = parseFloat(document.getElementById('rw-val').value) || 0;
     const assignedTo   = S.selectedKids;
-    if (!name)  return toast('⚠️ Please enter a goal.');
-    if (value <= 0) return toast('⚠️ Please enter a reward amount.');
-    if (!assignedTo || (Array.isArray(assignedTo) && assignedTo.length === 0)) return toast('⚠️ Please select at least one kid.');
+    if (!name)  return toast('Please enter a goal.', 'warn');
+    if (value <= 0) return toast('Please enter a reward amount.', 'warn');
+    if (!assignedTo || (Array.isArray(assignedTo) && assignedTo.length === 0)) return toast('Please select at least one kid.', 'warn');
     if (editId && editId !== 'null') {
         const r = cache.rewards.find(x => x.id === editId);
         if (!r) return;
@@ -5079,9 +5088,9 @@ async function saveReward(editId) {
     } else {
         const id = uid(); const createdAt = new Date().toISOString();
         const { error } = await sb.from('rewards').insert({ id, user_id: currentUser.id, name, description, value, assigned_to: assignedTo, archived: false, created_at: createdAt });
-        if (error) return toast('❌ ' + (error.message || 'Could not save.'));
+        if (error) return toast((error.message || 'Could not save.'), 'error');
         cache.rewards.push({ id, name, description, value, assignedTo, archived: false, createdAt });
-        closeModal(); toast('Reward added! 🏆');
+        closeModal(); toast('Reward added!', 'reward');
     }
 }
 function deleteReward(id) {
@@ -5089,7 +5098,7 @@ function deleteReward(id) {
 }
 async function doDeleteReward(id) {
     const { error } = await sb.from('rewards').delete().eq('id', id).eq('user_id', currentUser.id);
-    if (error) return toast('❌ Could not delete.');
+    if (error) return toast('Could not delete.', 'error');
     cache.rewards = cache.rewards.filter(x => x.id !== id);
     closeModal(); render();
 }
@@ -5119,7 +5128,7 @@ async function checkBonusMilestones(kidId, newBalance) {
         await sb.from('kids').update({ balance: finalBalance }).eq('id', kidId).eq('user_id', currentUser.id);
         kid.balance = finalBalance;
         await sb.from('transactions').insert(txInserts);
-        toast(`🎉 ${kid.name} earned ${eligible.length > 1 ? eligible.length + ' bonuses' : 'a bonus'}: +${R(bonusTotal)}!`);
+        toast(`${kid.name} earned ${eligible.length > 1 ? eligible.length + ' bonuses' : 'a bonus'}: +${R(bonusTotal)}!`, 'success');
         render();
     }
 }
@@ -5156,7 +5165,7 @@ async function approveChore(cid) {
     const approvedCount = cache.completions.filter(c => c.approved).length;
     trackLoops(approvedCount === 1 ? 'first_chore_approved' : null, { hasApprovedChore: true });
     if (window.posthog) posthog.capture('chore_approved');
-    toast(paysOut ? `✓ Approved! ${R(chore?.value)} added to ${kid?.name}.` : `✓ Approved! Counts toward ${kid?.name}'s cycle progress.`);
+    toast(paysOut ? `Approved! ${R(chore?.value)} added to ${kid?.name}.` : `Approved! Counts toward ${kid?.name}'s cycle progress.`, 'success');
     render();
 }
 async function approveAllForKid(kidId) {
@@ -5194,7 +5203,7 @@ async function approveAllForKid(kidId) {
     const approvedCountAll = cache.completions.filter(c => c.approved).length;
     trackLoops(approvedCountAll === wonComps.length ? 'first_chore_approved' : null, { hasApprovedChore: true });
     if (window.posthog) wonComps.forEach(() => posthog.capture('chore_approved'));
-    toast(isCycleMode() ? `✓ All approved! Counts toward ${kid.name}'s cycle progress${totalAdded > 0 ? ` (plus ${R(totalAdded)} from quick chores)` : ''}.` : `✓ All approved! ${R(totalAdded)} added to ${kid.name}.`);
+    toast(isCycleMode() ? `All approved! Counts toward ${kid.name}'s cycle progress${totalAdded > 0 ? ` (plus ${R(totalAdded)} from quick chores)` : ''}.` : `All approved! ${R(totalAdded)} added to ${kid.name}.`, 'success');
     render();
 }
 async function rejectChore(cid) {
@@ -5238,20 +5247,20 @@ async function markDone(choreId, evt) {
     if (error) {
         cache.completions = cache.completions.filter(c => c.id !== id);
         render();
-        return toast('❌ Could not save. Check your connection.');
+        return toast('Could not save. Check your connection.', 'error');
     }
     trackLoops(cache.completions.length === 1 ? 'first_chore_completed' : null, null);
     if (window.posthog) posthog.capture('chore_completed');
-    toast('Marked as done! Waiting for parent to approve. ⏳');
+    toast('Marked as done! Waiting for parent to approve.', 'waiting');
 }
 async function markRewardDone(rewardId, evt) {
     celebrateDone(evt?.currentTarget);
     const id = uid();
     const claimedAt = new Date().toISOString();
     const { error } = await sb.from('reward_completions').insert({ id, user_id: currentUser.id, reward_id: rewardId, kid_id: S.kidId, claimed_at: claimedAt, approved: false, rejected: false });
-    if (error) return toast('❌ Could not save. Check your connection.');
+    if (error) return toast('Could not save. Check your connection.', 'error');
     cache.rewardCompletions.push({ id, rewardId, kidId: S.kidId, claimedAt, approved: false, rejected: false });
-    toast('Marked as done! Waiting for parent to approve. ⏳');
+    toast('Marked as done! Waiting for parent to approve.', 'waiting');
 }
 async function approveReward(cid) {
     const comp   = cache.rewardCompletions.find(x => x.id === cid);
@@ -5271,7 +5280,7 @@ async function approveReward(cid) {
         cache.transactions.push({ id: txId, kidId: kid.id, amount: reward.value, type: 'reward', description: reward.name, createdAt: txCreatedAt });
         await checkBonusMilestones(kid.id, newBalance);
     }
-    toast(`✓ Approved! ${R(reward?.value)} added to ${kid?.name}.`);
+    toast(`Approved! ${R(reward?.value)} added to ${kid?.name}.`, 'success');
     render();
 }
 async function rejectReward(cid) {
@@ -5282,11 +5291,11 @@ async function rejectReward(cid) {
 }
 async function saveTreeThresholdsFromUI() {
     const vals = ['t1','t2','t3','t4'].map(k => parseFloat(document.getElementById('thresh-'+k)?.value));
-    if (vals.some(v => isNaN(v) || v <= 0)) return toast('⚠️ All thresholds must be positive numbers.');
+    if (vals.some(v => isNaN(v) || v <= 0)) return toast('All thresholds must be positive numbers.', 'warn');
     if (vals[0] >= vals[1] || vals[1] >= vals[2] || vals[2] >= vals[3])
-        return toast('⚠️ Each threshold must be higher than the previous one.');
+        return toast('Each threshold must be higher than the previous one.', 'warn');
     const ok = await saveTreeThresholds({ t1: vals[0], t2: vals[1], t3: vals[2], t4: vals[3] });
-    if (ok) { render(); toast('🌱 Tree thresholds saved!'); }
+    if (ok) { render(); toast('Tree thresholds saved!', 'tree'); }
 }
 async function resetTreeThresholds() {
     const ok = await saveTreeThresholds({ ...DEFAULT_TREE_THRESHOLDS });
@@ -5331,12 +5340,12 @@ async function openManageSubscription() {
         // url — which one it is was decided server-side from the account.
         const url = body?.url || body?.urls?.general?.overview;
         if (!res.ok || !url) {
-            toast('❌ ' + (body?.error || 'Could not open subscription management.'));
+            toast((body?.error || 'Could not open subscription management.'), 'error');
             return;
         }
         window.open(url, '_blank');
     } catch (e) {
-        toast('❌ Could not open subscription management.');
+        toast('Could not open subscription management.', 'error');
     } finally {
         render();
     }
@@ -5416,15 +5425,15 @@ function saveCurrency(code) {
 
 async function saveParentPin() {
     const pin = document.getElementById('pp-pin').value.trim();
-    if (!/^\d{4}$/.test(pin)) return toast('⚠️ PIN must be exactly 4 digits.');
+    if (!/^\d{4}$/.test(pin)) return toast('PIN must be exactly 4 digits.', 'warn');
     const { error } = await sb.rpc('set_parent_pin', { p_new_pin: pin });
-    if (error) return toast('❌ Could not save PIN.');
+    if (error) return toast('Could not save PIN.', 'error');
     hasParentPin = true;
-    closeModal(); toast('Parent PIN saved! 🔐');
+    closeModal(); toast('Parent PIN saved!', 'pin');
 }
 async function removeParentPin() {
     const { error } = await sb.rpc('remove_parent_pin');
-    if (error) return toast('❌ Could not remove PIN.');
+    if (error) return toast('Could not remove PIN.', 'error');
     hasParentPin = false;
     closeModal(); toast('Parent PIN removed.');
 }
