@@ -173,13 +173,15 @@ module.exports = async (req, res) => {
       // A scheduled (end-of-period) cancellation carries the real access-end
       // date in scheduled_change; an immediate one falls back to the current
       // billing period's end (which Paddle can null out on immediate cancels).
-      const accessEndsAt = formatDate(
+      const accessEndsAtRaw =
         (sub.scheduled_change && sub.scheduled_change.action === 'cancel' && sub.scheduled_change.effective_at)
-        || (sub.current_billing_period ? sub.current_billing_period.ends_at : null)
-      );
+        || (sub.current_billing_period ? sub.current_billing_period.ends_at : null);
+      const accessEndsAt = formatDate(accessEndsAtRaw);
       const billingInterval = billingIntervalLabel(sub.billing_cycle && sub.billing_cycle.interval);
-      const nextBillingDate = formatDate(sub.next_billed_at);
+      const nextBillingDateRaw = sub.next_billed_at;
+      const nextBillingDate = formatDate(nextBillingDateRaw);
       const nextChargeAmount = extractChargeAmount(sub);
+      const trialStartedAtRaw = event.occurred_at || new Date().toISOString();
 
       // Prefer the code stored at sign-up: it's set whether or not checkout was
       // ever completed, where Paddle's custom_data only exists once it was.
@@ -198,17 +200,23 @@ module.exports = async (req, res) => {
         firstName,
         lifecycleStage: newStatus === 'trialing' ? 'trial' : newStatus === 'active' ? 'paid' : newStatus === 'canceled' ? 'cancelled' : undefined,
         subscriptionStatus: newStatus || undefined,
-        trialStartedAt: (previousStatus === null && newStatus === 'trialing') ? formatDate(event.occurred_at || new Date().toISOString()) : undefined,
-        trialEndsAt: newStatus === 'trialing' ? accessEndsAt : undefined,
+        // trialStartedAt/trialEndsAt/nextBillingDate/accessEndsAt are "Date"
+        // type properties in Loops, which reject anything but ISO 8601 (or a
+        // unix-ms timestamp) with a 400 — and that 400 fails this whole
+        // request, silently dropping subscriptionStatus/lifecycleStage/etc
+        // along with it. formatDate()'s "7 September 2026" is for email body
+        // text, not this call; pass the raw ISO source instead.
+        trialStartedAt: (previousStatus === null && newStatus === 'trialing') ? trialStartedAtRaw : undefined,
+        trialEndsAt: newStatus === 'trialing' ? accessEndsAtRaw : undefined,
         billingInterval: billingInterval || undefined,
         nextChargeAmount: nextChargeAmount || undefined,
         currency: sub.currency_code || undefined,
-        nextBillingDate: nextBillingDate || undefined,
+        nextBillingDate: nextBillingDateRaw || undefined,
         // True as soon as Paddle records a scheduled (end-of-period) cancellation,
         // not only once the subscription has actually finished canceling —
         // this is what the conversion-reminder Workflow's exit filter checks.
         cancelScheduled: newStatus === 'canceled' || Boolean(sub.scheduled_change && sub.scheduled_change.action === 'cancel'),
-        accessEndsAt: newStatus === 'canceled' ? accessEndsAt : undefined,
+        accessEndsAt: newStatus === 'canceled' ? accessEndsAtRaw : undefined,
         appUrl: 'https://www.sproutearnsave.com/app/',
       });
 

@@ -174,6 +174,7 @@ async function startTrialFromCardSetup(supabaseAdmin, data) {
   const email = applied.user.email;
   const firstName = ((applied.metadata.name || '').split(' ')[0]) || 'there';
   const trialEndsAt = formatDate(startDate);
+  const trialStartedAtRaw = new Date().toISOString();
   const interval = billingIntervalLabel(billingCycle === 'yearly' ? 'annually' : 'monthly');
   const nextChargeAmount = randToAmount(billingCycle === 'yearly' ? 59000 : 5900, 'ZAR');
 
@@ -189,12 +190,18 @@ async function startTrialFromCardSetup(supabaseAdmin, data) {
     firstName,
     lifecycleStage: 'trial',
     subscriptionStatus: 'trialing',
-    trialStartedAt: formatDate(new Date().toISOString()),
-    trialEndsAt,
+    // trialStartedAt/trialEndsAt/nextBillingDate are "Date" type properties in
+    // Loops, which reject anything but ISO 8601 (or a unix-ms timestamp) with
+    // a 400 — and that 400 fails this whole request, silently dropping
+    // subscriptionStatus/lifecycleStage/etc along with it. formatDate()'s
+    // "7 September 2026" is for email body text, not this call — pass the raw
+    // ISO source (startDate) instead of the formatted trialEndsAt display string.
+    trialStartedAt: trialStartedAtRaw,
+    trialEndsAt: startDate,
     billingInterval: interval,
     nextChargeAmount,
     currency: 'ZAR',
-    nextBillingDate: trialEndsAt,
+    nextBillingDate: startDate,
     cancelScheduled: false,
     appUrl: 'https://www.sproutearnsave.com/app/',
   });
@@ -407,7 +414,6 @@ async function handleCancellationScheduled(supabaseAdmin, data) {
   const userId = await findUserIdByCustomerCode(supabaseAdmin, customerCode);
   if (!userId) return;
 
-  const accessEndsAt = formatDate(data.next_payment_date);
   const applied = await applySubscriptionState(supabaseAdmin, userId, {
     cancel_scheduled: true,
     current_period_ends_at: data.next_payment_date || null,
@@ -417,7 +423,9 @@ async function handleCancellationScheduled(supabaseAdmin, data) {
   await syncLoopsContact(applied.user.email, {
     firstName: ((applied.metadata.name || '').split(' ')[0]) || 'there',
     cancelScheduled: true,
-    accessEndsAt,
+    // accessEndsAt is a "Date" type property in Loops — see the note in
+    // startTrialFromCardSetup on why the formatted display string breaks this.
+    accessEndsAt: data.next_payment_date || undefined,
   });
 }
 
@@ -440,13 +448,16 @@ async function handleSubscriptionEnded(supabaseAdmin, data) {
 
   const email = applied.user.email;
   const firstName = ((applied.metadata.name || '').split(' ')[0]) || 'there';
-  const accessEndsAt = formatDate(data.next_payment_date || now);
+  const accessEndsAtRaw = data.next_payment_date || now;
+  const accessEndsAt = formatDate(accessEndsAtRaw);
 
   await recordReferralSignup(supabaseAdmin, {
     userId, email, rawCode: applied.metadata.referral_code, status: 'canceled', occurredAt: now,
   });
   await syncLoopsContact(email, {
-    firstName, lifecycleStage: 'cancelled', subscriptionStatus: 'canceled', cancelScheduled: true, accessEndsAt,
+    firstName, lifecycleStage: 'cancelled', subscriptionStatus: 'canceled', cancelScheduled: true,
+    // Date type property in Loops — see note in startTrialFromCardSetup.
+    accessEndsAt: accessEndsAtRaw,
   });
 
   // Which email depends on whether they ever paid us — the same split the
