@@ -208,6 +208,11 @@ module.exports = async (req, res) => {
         // text, not this call; pass the raw ISO source instead.
         trialStartedAt: (previousStatus === null && newStatus === 'trialing') ? trialStartedAtRaw : undefined,
         trialEndsAt: newStatus === 'trialing' ? accessEndsAtRaw : undefined,
+        // Email templates show {contact.trialEndsAtDisplay} rather than the
+        // Date-typed trialEndsAt above, since that one has to stay a raw ISO
+        // string for Loops to accept it and would render mid-email as
+        // "2026-09-07T09:23:30.560Z" otherwise.
+        trialEndsAtDisplay: newStatus === 'trialing' ? accessEndsAt : undefined,
         billingInterval: billingInterval || undefined,
         nextChargeAmount: nextChargeAmount || undefined,
         currency: sub.currency_code || undefined,

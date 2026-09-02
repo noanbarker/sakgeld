@@ -198,6 +198,11 @@ async function startTrialFromCardSetup(supabaseAdmin, data) {
     // ISO source (startDate) instead of the formatted trialEndsAt display string.
     trialStartedAt: trialStartedAtRaw,
     trialEndsAt: startDate,
+    // Email templates show {contact.trialEndsAtDisplay} rather than the
+    // Date-typed trialEndsAt above, since that one has to stay a raw ISO
+    // string for Loops to accept it and would render mid-email as
+    // "2026-09-07T09:23:30.560Z" otherwise.
+    trialEndsAtDisplay: trialEndsAt,
     billingInterval: interval,
     nextChargeAmount,
     currency: 'ZAR',
