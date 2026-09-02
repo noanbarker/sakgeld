@@ -51,6 +51,21 @@ def gradient(size):
     return strip.resize((size, size))
 
 
+def feet_centre(art):
+    """The x the mascot actually looks centred on.
+
+    He waves, and the raised arm reaches further from his body than anything on
+    the other side. Centring on the artwork's bounding box therefore shoves him
+    off to one side of the icon, arm balanced but body visibly adrift. The eye
+    reads a standing figure's axis from where it meets the ground, so take the
+    middle of his feet and centre on that instead.
+    """
+    w, h = art.size
+    band = art.getchannel("A").point(lambda p: 255 if p > 8 else 0)
+    box = band.crop((0, int(h * 0.88), w, h)).getbbox()
+    return (box[0] + box[2]) / 2 if box else w / 2
+
+
 def main():
     try:
         from PIL import Image
@@ -65,13 +80,19 @@ def main():
     box = src.getchannel("A").point(lambda p: 255 if p > 8 else 0).getbbox()
     art = src.crop(box)
 
+    cx = feet_centre(art)
+    # Once he is centred on his feet, the side his arm is on needs the most
+    # room. Size him to that half rather than to his width, or the wave would
+    # be the thing that hangs over the edge.
+    half = max(cx, art.width - cx)
+
     for path, size in TARGETS:
         canvas = gradient(size)
         room = size * (1 - 2 * PAD)
-        scale = min(room / art.width, room / art.height)
+        scale = min(room / (2 * half), room / art.height)
         w, h = round(art.width * scale), round(art.height * scale)
         mascot = art.resize((w, h), Image.LANCZOS)
-        canvas.paste(mascot, ((size - w) // 2, (size - h) // 2), mascot)
+        canvas.paste(mascot, (round(size / 2 - cx * scale), (size - h) // 2), mascot)
         canvas.save(path, optimize=True)
         print(f"  {path.relative_to(ROOT)}  {size}x{size}  "
               f"{path.stat().st_size // 1024} KB")
