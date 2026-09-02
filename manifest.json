@@ -2,7 +2,7 @@
   "name": "Sprout - Chores & Pocket Money",
   "short_name": "Sprout",
   "description": "A parent-controlled chore, allowance and savings tracker for the whole family.",
-  "start_url": "/app/index.html",
+  "start_url": "/app/index.html?mode=signin",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#16a34a",

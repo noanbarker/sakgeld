@@ -25,7 +25,7 @@
 time, ignoring the manifest's start_url. Someone who added Sprout from a marketing
 page would otherwise tap their icon every morning and land on the sales pitch. Only
 fires for a shortcut launch, so ordinary browsing is untouched. */
-(function(){try{var standalone=navigator.standalone===true||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches);if(standalone&&location.pathname.indexOf('/app/')!==0){location.replace('/app/index.html');}}catch(e){}})();</script>
+(function(){try{var standalone=navigator.standalone===true||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches);if(standalone&&location.pathname.indexOf('/app/')!==0){location.replace('/app/index.html?mode=signin');}}catch(e){}})();</script>
 <meta name="theme-color" content="#16a34a">
 <style>/* cyrillic-ext */
 @font-face {
