@@ -187,7 +187,14 @@ def main():
                     help="H.264 quality, lower is better and bigger (default: 26)")
     ap.add_argument("--keep-screens", action="store_true",
                     help="leave the captured PNGs in .walkthrough-build/ for inspection")
+    ap.add_argument("--out", metavar="DIR",
+                    help="write somewhere other than images/marketing/walkthrough, "
+                         "so a rebuild can be reviewed before it replaces the live clips")
     args = ap.parse_args()
+
+    global OUT_DIR
+    if args.out:
+        OUT_DIR = Path(args.out).expanduser().resolve()
 
     ffmpeg = preflight()
     from PIL import Image
@@ -224,7 +231,11 @@ def main():
                     shutil.copy(p, STAGING / ("keep-" + p.name))
             print()
 
-        print(f"written to {OUT_DIR.relative_to(ROOT)}")
+        try:
+            where = OUT_DIR.relative_to(ROOT)
+        except ValueError:
+            where = OUT_DIR
+        print(f"written to {where}")
         if args.keep_screens:
             print(f"screens kept in {STAGING.relative_to(ROOT)}")
     finally:

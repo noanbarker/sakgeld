@@ -55,8 +55,8 @@
       : { bed: 5, pets: 10, laundry: 15, plants: 8, liam: 320, zoe: 860, milestone: 500, bonus: 50, milestoneName: 'First R500 saved' };
 
     const kids = [
-      { id: 'k1', user_id: 'demo-user', name: 'Liam', emoji: '🐻', balance: M.liam, created_at: iso('2026-01-04'), color_key: 'blue', date_of_birth: '2016-03-14' },
-      { id: 'k2', user_id: 'demo-user', name: 'Zoe', emoji: '🦊', balance: M.zoe, created_at: iso('2026-01-04'), color_key: 'coral', date_of_birth: '2018-07-02' }
+      { id: 'k1', user_id: 'demo-user', name: 'Liam', emoji: '13', balance: M.liam, created_at: iso('2026-01-04'), color_key: 'blue', date_of_birth: '2016-03-14' },
+      { id: 'k2', user_id: 'demo-user', name: 'Zoe', emoji: '12', balance: M.zoe, created_at: iso('2026-01-04'), color_key: 'coral', date_of_birth: '2018-07-02' }
     ];
     const chores = [
       { id: 'c1', name: 'Make Bed', description: 'Make your bed every morning', value: M.bed, weight: 1, assignedTo: 'all', emoji: '1', schedule: 'daily', days: [], created_at: iso('2026-01-05') },
@@ -105,7 +105,7 @@
     if (scene === '1') {
       cache.kids = [kids[0]];
       S.view = 'parent'; S.tab = 'kids';
-      openModal('add-kid', { name: 'Zoe', pin: '1234', date_of_birth: '2018-07-02', emoji: '🦊', color_key: 'coral' });
+      openModal('add-kid', { name: 'Zoe', pin: '1234', date_of_birth: '2018-07-02', emoji: '12', color_key: 'coral' });
     } else if (scene === '2') {
       S.view = 'parent'; S.tab = 'chores';
       openModal('add-chore', { name: 'Make Bed', description: 'Make your bed every morning', value: M.bed, emoji: '1', assignedTo: 'all', schedule: 'daily' });
@@ -138,14 +138,17 @@
 
     killChrome();
 
-    const want = scene === '1' ? '🦊' : null;
+    // Scene 1 rests on the avatar picker, whose grid scrolls inside the modal.
+    // Avatars are pictures rather than characters, so the selected one is found
+    // by the aria-pressed the app puts on it, not by matching button text.
+    const wantAvatar = scene === '1';
     // Scroll only once every image has settled. Chore icons load lazily, and
     // applying a scroll offset while they are still arriving shifts the layout
     // underneath it — which made scene 4 land a few pixels off from run to run.
     imagesSettled(() => {
       killChrome();
-      if (want) {
-        const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === want);
+      if (wantAvatar) {
+        const btn = document.querySelector('button[aria-pressed="true"][aria-label]');
         const box = scroller(btn);
         if (btn && box) box.scrollTop = Math.max(0, btn.offsetTop - box.offsetTop - box.clientHeight / 2 + btn.offsetHeight / 2);
       }
