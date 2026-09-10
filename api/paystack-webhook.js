@@ -9,6 +9,7 @@ const {
   sendLoopsEvent,
   recordReferralSignup,
   sendMetaCAPIEvent,
+  purgeDateFrom,
 } = require('../lib/billing-notifications');
 // Product analytics: the trial→paid→cancelled moments happen here, not in a
 // browser, so they're reported to PostHog from the server (see lib/posthog.js).
@@ -193,6 +194,10 @@ async function startTrialFromCardSetup(supabaseAdmin, data) {
     firstName,
     lifecycleStage: 'trial',
     subscriptionStatus: 'trialing',
+    // Explicit zeros for a first trial — the rescue Workflows filter on
+    // "equals 0", which a never-written property doesn't satisfy. See the same
+    // note in api/paddle-webhook.js. A returning family keeps its real counts.
+    ...(applied.previousStatus === null ? { childrenCount: 0, choreCount: 0, hasCompletedChore: false, hasApprovedChore: false } : {}),
     // trialStartedAt/trialEndsAt/nextBillingDate are "Date" type properties in
     // Loops, which reject anything but ISO 8601 (or a unix-ms timestamp) with
     // a 400 — and that 400 fails this whole request, silently dropping
@@ -441,9 +446,18 @@ async function handleFailedCharge(supabaseAdmin, data) {
   const email = applied.user.email;
   const firstName = ((applied.metadata.name || '').split(' ')[0]) || 'there';
   await syncLoopsContact(email, { firstName, subscriptionStatus: 'past_due', lifecycleStage: 'payment_issue' });
+  // Loops only accepts contact properties that already exist in the workspace,
+  // and event properties are written onto the contact too — so this carries
+  // nothing the emails don't use (no free-text failure reason).
   await sendLoopsEvent(email, 'payment_failed', {
     firstName,
-    reason: (data.most_recent_invoice && data.most_recent_invoice.description) || data.description || '',
+    // The "card didn't go through" email tells the parent how long they have.
+    // Same arithmetic as api/paystack-retry-failed.js: retries on days 1, 3
+    // and 7, and the subscription is cancelled after 10. Named *Display
+    // because sendLoopsEvent also writes event properties onto the contact,
+    // and accessEndsAt is a Date-typed contact property that rejects this
+    // human-readable form with a 400 — which would drop the whole event.
+    accessEndsAtDisplay: formatDate(new Date(Date.now() + 10 * 86400000).toISOString()),
   });
   await trackSubscriptionChange({
     userId,
@@ -531,6 +545,9 @@ async function handleSubscriptionEnded(supabaseAdmin, data) {
   } else if (applied.previousStatus) {
     await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionCancelled, email, { firstName, accessEndsAt });
   }
+  // Drives the win-back Workflow: one event for both kinds of cancellation,
+  // carrying the day api/purge-canceled-accounts.js will wipe their data.
+  await sendLoopsEvent(email, 'account_cancelled', { firstName, wasPaying: applied.previousStatus !== 'trialing', deletionDate: purgeDateFrom(now) });
   await trackSubscriptionChange({
     userId,
     userMetadata: applied.metadata,

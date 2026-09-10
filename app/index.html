@@ -5320,7 +5320,8 @@ async function markDone(choreId, evt) {
         render();
         return toast('Could not save. Check your connection.', 'error');
     }
-    trackLoops(cache.completions.length === 1 ? 'first_chore_completed' : null, null);
+    // hasCompletedChore gates the day-2 "let them mark one done" email in Loops.
+    trackLoops(cache.completions.length === 1 ? 'first_chore_completed' : null, { hasCompletedChore: true });
     track('chore_completed');
     toast('Marked as done! Waiting for parent to approve.', 'waiting');
 }

@@ -12,6 +12,7 @@ const {
   sendLoopsEvent,
   recordReferralSignup,
   sendMetaCAPIEvent,
+  purgeDateFrom,
 } = require('../lib/billing-notifications');
 // Product analytics: the trial→paid→cancelled moments happen here, not in a
 // browser, so they're reported to PostHog from the server (see lib/posthog.js).
@@ -221,10 +222,18 @@ module.exports = async (req, res) => {
       // Keep the Loops contact's properties current on every subscription
       // event, not just the ones that trigger an email — the marketing
       // Workflows' branch/exit filters read these live.
+      const isFreshTrial = previousStatus === null && newStatus === 'trialing';
       await syncLoopsContact(email, {
         firstName,
         lifecycleStage: newStatus === 'trialing' ? 'trial' : newStatus === 'active' ? 'paid' : newStatus === 'canceled' ? 'cancelled' : undefined,
         subscriptionStatus: newStatus || undefined,
+        // A brand-new trial starts with explicit zeros. The onboarding and rescue
+        // Workflows filter on "children count equals 0" / "chore count equals 0",
+        // and a property that was never written doesn't match either — so
+        // without these, the parent who never adds a child is exactly the one
+        // the rescue emails would skip. Only on a first trial: a returning
+        // family keeps the counts api/loops-track.js has already synced.
+        ...(isFreshTrial ? { childrenCount: 0, choreCount: 0, hasCompletedChore: false, hasApprovedChore: false } : {}),
         // trialStartedAt/trialEndsAt/nextBillingDate/accessEndsAt are "Date"
         // type properties in Loops, which reject anything but ISO 8601 (or a
         // unix-ms timestamp) with a 400 — and that 400 fails this whole
@@ -261,6 +270,7 @@ module.exports = async (req, res) => {
         } else if (previousStatus === 'trialing' && newStatus === 'canceled') {
           await sendLoopsEmail(LOOPS_TEMPLATE.trialCancelled, email, { firstName, accessEndsAt });
           await sendLoopsEvent(email, 'trial_cancelled', { firstName });
+          await sendLoopsEvent(email, 'account_cancelled', { firstName, wasPaying: false, deletionDate: purgeDateFrom(event.occurred_at) });
         } else if (previousStatus === 'trialing' && newStatus === 'active') {
           await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionActivated, email, { firstName, billingInterval, nextBillingDate });
           await sendLoopsEvent(email, 'subscription_activated', { firstName, billingInterval, nextBillingDate });
@@ -270,6 +280,9 @@ module.exports = async (req, res) => {
           await sendMetaCAPIEvent({ eventName: 'Subscribe', eventId: `subscription_paid_${userId}`, email, userId, value: extractChargeValue(sub), currency: sub.currency_code });
         } else if (previousStatus && previousStatus !== 'trialing' && newStatus === 'canceled') {
           await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionCancelled, email, { firstName, accessEndsAt });
+          // Drives the win-back Workflow: one event for both kinds of cancellation,
+          // carrying the day api/purge-canceled-accounts.js will wipe their data.
+          await sendLoopsEvent(email, 'account_cancelled', { firstName, wasPaying: true, deletionDate: purgeDateFrom(event.occurred_at) });
         }
       }
     }

@@ -135,7 +135,10 @@ module.exports = async (req, res) => {
         await sendLoopsEvent(user.email, 'payment_retry_failed', {
           firstName,
           attempt: done + 1,
-          accessEndsAt: formatDate(new Date(new Date(meta.payment_failed_at).getTime() + GIVE_UP_AFTER_DAYS * 86400000).toISOString()),
+          // *Display, not accessEndsAt: event properties are also written onto
+          // the Loops contact, where accessEndsAt is a Date-typed property that
+          // rejects "20 September 2026" with a 400 and drops the whole event.
+          accessEndsAtDisplay: formatDate(new Date(new Date(meta.payment_failed_at).getTime() + GIVE_UP_AFTER_DAYS * 86400000).toISOString()),
         });
       }
     }
