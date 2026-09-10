@@ -10,6 +10,9 @@ const {
   recordReferralSignup,
   sendMetaCAPIEvent,
 } = require('../lib/billing-notifications');
+// Product analytics: the trial→paid→cancelled moments happen here, not in a
+// browser, so they're reported to PostHog from the server (see lib/posthog.js).
+const { trackSubscriptionChange } = require('../lib/posthog');
 
 // South African subscription rail. The rest of the world is billed by Paddle
 // (api/paddle-webhook.js) and nothing here touches those customers.
@@ -219,6 +222,21 @@ async function startTrialFromCardSetup(supabaseAdmin, data) {
     // copies into one conversion instead of double-counting it.
     await sendMetaCAPIEvent({ eventName: 'StartTrial', eventId: `trial_started_${userId}`, email, userId });
   }
+
+  await trackSubscriptionChange({
+    userId,
+    userMetadata: applied.metadata,
+    previousStatus: applied.previousStatus,
+    newStatus: 'trialing',
+    provider: 'paystack',
+    email,
+    billingInterval: billingCycle,
+    currency: 'ZAR',
+    amount: billingCycle === 'yearly' ? 590 : 59,
+    cancelScheduled: false,
+    cancelWasScheduled: Boolean(applied.metadata.cancel_scheduled),
+    occurredAt: trialStartedAtRaw,
+  });
 }
 
 // A subscription charge went through — either the first one at the end of the
@@ -268,6 +286,24 @@ async function handleSubscriptionCharge(supabaseAdmin, data) {
       currency: data.currency || 'ZAR',
     });
   }
+
+  await trackSubscriptionChange({
+    userId,
+    userMetadata: applied.metadata,
+    previousStatus: applied.previousStatus,
+    newStatus: 'active',
+    provider: 'paystack',
+    email,
+    billingInterval: data.plan && data.plan.interval,
+    currency: data.currency || 'ZAR',
+    amount: data.amount ? data.amount / 100 : undefined,
+    cancelScheduled: false,
+    cancelWasScheduled: Boolean(applied.metadata.cancel_scheduled),
+    occurredAt: data.paid_at,
+    // A charge on an already-active subscription is the monthly/annual renewal —
+    // the status doesn't change, but the revenue is worth a row of its own.
+    extraEvent: applied.previousStatus === 'active' ? 'subscription_renewed' : undefined,
+  });
 }
 
 // Paystack identifies customers by their own code, so we look the family up by
@@ -409,6 +445,17 @@ async function handleFailedCharge(supabaseAdmin, data) {
     firstName,
     reason: (data.most_recent_invoice && data.most_recent_invoice.description) || data.description || '',
   });
+  await trackSubscriptionChange({
+    userId,
+    userMetadata: applied.metadata,
+    previousStatus: applied.previousStatus,
+    newStatus: 'past_due',
+    provider: 'paystack',
+    email,
+    currency: 'ZAR',
+    cancelScheduled: Boolean(applied.metadata.cancel_scheduled),
+    cancelWasScheduled: Boolean(applied.metadata.cancel_scheduled),
+  });
 }
 
 // The parent cancelled: the subscription stays active until the date it would
@@ -431,6 +478,17 @@ async function handleCancellationScheduled(supabaseAdmin, data) {
     // accessEndsAt is a "Date" type property in Loops — see the note in
     // startTrialFromCardSetup on why the formatted display string breaks this.
     accessEndsAt: data.next_payment_date || undefined,
+  });
+  await trackSubscriptionChange({
+    userId,
+    userMetadata: applied.metadata,
+    previousStatus: applied.previousStatus,
+    newStatus: applied.previousStatus,
+    provider: 'paystack',
+    email: applied.user.email,
+    currency: 'ZAR',
+    cancelScheduled: true,
+    cancelWasScheduled: Boolean(applied.metadata.cancel_scheduled),
   });
 }
 
@@ -473,4 +531,16 @@ async function handleSubscriptionEnded(supabaseAdmin, data) {
   } else if (applied.previousStatus) {
     await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionCancelled, email, { firstName, accessEndsAt });
   }
+  await trackSubscriptionChange({
+    userId,
+    userMetadata: applied.metadata,
+    previousStatus: applied.previousStatus,
+    newStatus: 'canceled',
+    provider: 'paystack',
+    email,
+    currency: 'ZAR',
+    cancelScheduled: true,
+    cancelWasScheduled: Boolean(applied.metadata.cancel_scheduled),
+    occurredAt: now,
+  });
 }

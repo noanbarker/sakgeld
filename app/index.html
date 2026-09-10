@@ -545,6 +545,45 @@ function getStoredUTM() {
     } catch (e) { return {}; }
 }
 
+// ─── PRODUCT ANALYTICS (PostHog) ─────────────────────────────────
+// js/posthog.js loads PostHog on every page (cookieless until the visitor
+// accepts cookies, see that file). Everything the app reports goes through
+// here so a missing or blocked analytics script can never break the app.
+// The lifecycle events that happen on the billing servers (trial_started,
+// subscription_activated, payment_failed, …) are sent by the webhooks in
+// api/ instead — see lib/posthog.js.
+// js/posthog.js is a deferred script, so the first screen can render before it
+// has run. Anything reported before then waits here and is flushed the moment
+// that script announces itself — otherwise the first screen_viewed of every
+// visit would be lost, which is precisely the one the signup funnel starts from.
+const pendingTrack = [];
+function track(event, props) {
+    try {
+        if (window.posthog && posthog.capture) posthog.capture(event, props || {});
+        else pendingTrack.push([event, props || {}]);
+    } catch (e) {}
+}
+document.addEventListener('sproutanalyticsready', () => {
+    while (pendingTrack.length) { const [e, p] = pendingTrack.shift(); track(e, p); }
+});
+// The facts about an account worth filtering dashboards by: plan, status, where
+// they came from. Copied from Supabase user_metadata onto the PostHog person
+// on every sign-in so cohorts like "paying, yearly, from school X" just work.
+function personPropsFrom(user) {
+    const m = (user && user.user_metadata) || {};
+    const props = { email: user.email };
+    ['subscription_status', 'billing_cycle', 'signup_geo', 'country', 'payment_provider', 'referral_code', 'onboarding_complete', 'cancel_scheduled']
+        .forEach(k => { if (m[k] !== undefined && m[k] !== null && m[k] !== '') props[k] = m[k]; });
+    return props;
+}
+function personPropsOnceFrom(user) {
+    const m = (user && user.user_metadata) || {};
+    const once = { signed_up_at: user.created_at };
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'referral_code', 'signup_geo', 'country']
+        .forEach(k => { if (m[k]) once[k] = m[k]; });
+    return once;
+}
+
 // Partner referral codes — a school's code, arriving from a poster, a QR, or
 // the /join/ short link. Codes are letters and digits only, so normalising here
 // means one typed by hand into the signup form matches one that arrived by link
@@ -594,7 +633,11 @@ Paddle.Initialize({
                 toast('Almost there! Confirming your subscription…', 'success');
                 refreshUserAfterCheckout();
             } else {
-                if (window.posthog) posthog.capture('trial_started', { billing_cycle: S.billingCycle || 'monthly', ...getStoredUTM() });
+                // 'checkout_completed', not 'trial_started': the trial only truly exists
+                // once Paddle's webhook confirms it, and that's where trial_started is
+                // sent to PostHog from (api/paddle-webhook.js). This is the browser-side
+                // step before it, so the funnel can show checkouts that never confirmed.
+                track('checkout_completed', { billing_cycle: S.billingCycle || 'monthly', provider: 'paddle', ...getStoredUTM() });
                 // Same event_id the server sends via Conversions API for this same
                 // trial start (see api/paddle-webhook.js) — Meta uses matching
                 // event_id + event_name to merge the two into one counted conversion.
@@ -618,7 +661,7 @@ function handlePaystackReturn() {
     params.delete('checkout');
     const query = params.toString();
     window.history.replaceState({}, '', window.location.pathname + (query ? '?' + query : ''));
-    if (window.posthog) posthog.capture('trial_started', { billing_cycle: S.billingCycle || 'monthly', ...getStoredUTM() });
+    track('checkout_completed', { billing_cycle: S.billingCycle || 'monthly', provider: 'paystack', ...getStoredUTM() });
     if (typeof fbq === 'function' && pendingTrialUserId) fbq('track', 'StartTrial', {}, { eventID: 'trial_started_' + pendingTrialUserId });
     if (typeof gtag === 'function') gtag('event', 'trial_started');
     if (currentUser) {
@@ -660,7 +703,7 @@ function resumeCheckout() {
 // which is kept purely for our own Supabase analytics (see doSignUp).
 function openTrialCheckout({ email, geo, userId, billingCycle, referralCode }) {
     const isZA = geo === 'ZA';
-    if (window.posthog) posthog.capture('checkout_started', { billing_cycle: billingCycle, geo, ...getStoredUTM() });
+    track('checkout_started', { billing_cycle: billingCycle, geo, provider: isZA ? 'paystack' : 'paddle', has_referral_code: Boolean(referralCode), ...getStoredUTM() });
     if (typeof fbq === 'function') fbq('track', 'InitiateCheckout');
     pendingTrialUserId = userId;
     if (isZA) { openPaystackCheckout({ userId, billingCycle }); return; }
@@ -781,6 +824,15 @@ async function loadCache() {
         cycleHistory: (chRes.data || []).map(h => ({ ...h, kidId: h.kid_id, periodType: h.period_type, startDate: h.start_date, endDate: h.end_date, weightCompleted: h.weight_completed, weightAssigned: h.weight_assigned, amountCeiling: h.amount_ceiling, amountPaid: h.amount_paid, createdAt: h.created_at })),
     };
     await signChoreImages();
+    // Family size on the person, so retention can be cut by "1 kid vs 3 kids" or
+    // "set up 5+ chores" without joining anything.
+    try {
+        if (window.posthog && posthog.setPersonProperties) posthog.setPersonProperties({
+            kids_count: cache.kids.length,
+            chores_count: cache.chores.filter(c => !c.archived).length,
+            has_parent_pin: hasParentPin,
+        });
+    } catch (e) {}
 }
 
 async function initApp() {
@@ -795,7 +847,12 @@ async function initApp() {
         // to the real person as soon as they're known, so acquisition source isn't
         // lost. Safe to call repeatedly — PostHog no-ops if already identified as this id.
         if (currentUser && window.posthog) {
-            posthog.identify(currentUser.id, { email: currentUser.email });
+            try { posthog.identify(currentUser.id, personPropsFrom(currentUser), personPropsOnceFrom(currentUser)); } catch (e) {}
+        }
+        // A shared family tablet: the next parent to sign in must start as a new
+        // person, not be merged into the previous one's history.
+        if (event === 'SIGNED_OUT' && window.posthog) {
+            try { posthog.reset(); } catch (e) {}
         }
         if (event === 'PASSWORD_RECOVERY') {
             const intent = localStorage.getItem('sprout_recovery_intent');
@@ -832,7 +889,7 @@ async function initApp() {
     handlePaystackReturn();
 }
 
-async function signOut() { await sb.auth.signOut(); }
+async function signOut() { track('signed_out'); await sb.auth.signOut(); }
 function toggleHistory() { S.historyOpen = !S.historyOpen; render(); }
 
 // ─── STATE ───────────────────────────────────────────────────────
@@ -1465,7 +1522,7 @@ const TOUR_STEPS = [
     { id: 'done' }
 ];
 function goToFaqFromTour() { S.tourStep = -1; setTab('faq'); }
-function startTour() { S.tourStep = 0; render(); }
+function startTour() { track('tour_started'); S.tourStep = 0; render(); }
 function tourGoTo(i) {
     S.tourStep = i;
     const step = TOUR_STEPS[i];
@@ -1480,6 +1537,7 @@ function tourBack() {
     tourGoTo(S.tourStep - 1);
 }
 function endTour() {
+    track('tour_ended', { completed: S.tourStep >= TOUR_STEPS.length - 1, step: S.tourStep });
     S.tourStep = -1;
     setTab('overview');
 }
@@ -2456,6 +2514,7 @@ function showReferralField() {
 }
 function setBillingCycle(cycle) {
     S.signupDraft = captureSignupDraft();
+    if (cycle !== S.billingCycle) track('billing_cycle_selected', { billing_cycle: cycle });
     S.billingCycle = cycle;
     render();
 }
@@ -2495,6 +2554,7 @@ async function doSignIn() {
     if (!email || !pass) { if (errEl) errEl.textContent = 'Please enter email and password.'; return; }
     if (errEl) errEl.textContent = 'Signing in…';
     const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (error) track('signin_failed', { reason: error.message });
     if (error && errEl) errEl.textContent = error.message;
 }
 async function doSignUp() {
@@ -2511,6 +2571,7 @@ async function doSignUp() {
     if (!name || !email || !pass || !country) { if (errEl) errEl.textContent = 'Please fill in all fields.'; return; }
     if (errEl) errEl.textContent = 'Creating account…';
     const geo = getGeoPref();
+    track('signup_submitted', { billing_cycle: billingCycle, geo, country, has_referral_code: Boolean(referralCode), ...getStoredUTM() });
     const { data, error } = await sb.auth.signUp({
         email, password: pass,
         // `country` is only ever kept for analytics — it never decides pricing or tax.
@@ -2520,13 +2581,14 @@ async function doSignUp() {
         // subscription to attach it to.
         options: { data: { name, country, billing_cycle: billingCycle, signup_geo: geo, ...(referralCode ? { referral_code: referralCode } : {}), ...getStoredUTM() } }
     });
-    if (error) { if (errEl) errEl.textContent = error.message; return; }
+    if (error) { track('signup_failed', { reason: error.message }); if (errEl) errEl.textContent = error.message; return; }
     // Supabase never errors for an already-registered email — it silently returns
     // a fake user instead, to stop attackers probing which emails exist. The one
     // reliable tell is an empty identities array; a real new signup always has one.
     // Catching it here stops us ever sending Paddle a Supabase user id that
     // doesn't actually exist.
     if (!data?.user?.identities?.length) {
+        track('signup_duplicate_email');
         S.signupDraft = captureSignupDraft();
         S.authMode = 'signin';
         render();
@@ -2601,6 +2663,7 @@ const ONBOARD_STEPS = ['currency', 'allowance-mode', 'kid', 'chores', 'bonus', '
 function onboardNext() { S.onboardStep = Math.min(S.onboardStep + 1, ONBOARD_STEPS.length - 1); render(); }
 function onboardBack() { S.onboardStep = Math.max(S.onboardStep - 1, 0); render(); }
 async function finishOnboarding() {
+    track('onboarding_completed', { kids_count: cache.kids.length, chores_count: cache.chores.length });
     const { data } = await sb.auth.updateUser({ data: { onboarding_complete: true } });
     if (data?.user) currentUser = data.user;
     go('home');
@@ -3521,6 +3584,7 @@ async function runDistribution(kidId) {
     await sb.from('kids').update({ last_distribution_at: createdAt }).eq('id', kidId).eq('user_id', currentUser.id);
     k.last_distribution_at = createdAt;
     cache.distributions.push({ id, kidId, amount: owed, createdAt });
+    track('payout_recorded', { amount: owed });
     toast(`${R(owed)} marked as distributed to ${k.name}.`);
     render();
 }
@@ -3991,10 +4055,12 @@ async function checkPin() {
     const kidId = S.pinKidId;
     const { data: ok, error } = await sb.rpc('verify_kid_pin', { p_kid_id: kidId, p_guess: S.pin });
     if (!error && ok) {
+        track('kid_mode_entered');
         S.kidId = kidId; S.pin = ''; go('kid');
         writeMissedChores(kidId);
         startCelebration(kidId);
     } else {
+        track('kid_pin_failed');
         if (navigator.vibrate) navigator.vibrate([40,40,40]);
         const el = document.getElementById('pin-err');
         if (el) el.textContent = 'Wrong PIN. Try again.';
@@ -4819,7 +4885,7 @@ async function addKid() {
     if (pinError) return toast('Kid saved, but PIN could not be set.', 'error');
     cache.kids.push({ id, name, emoji, color_key, date_of_birth, balance: 0, ...cycleFields });
     trackLoops('child_added', { childrenCount: cache.kids.length });
-    if (window.posthog) posthog.capture('child_added', { childrenCount: cache.kids.length });
+    track('child_added', { kids_count: cache.kids.length });
     closeModal(); toast(`${name} added!`, 'success');
 }
 // Reads the cycle-amount modal fields when in per-cycle mode; {} otherwise so
@@ -4900,7 +4966,7 @@ async function addChore() {
     if (error) { await removeChorePhoto(imagePath); return toast('Could not save. Check your connection.', 'error'); }
     cache.chores.push({ id, name, description: desc, value: val, weight, assignedTo, emoji: icon, image_path: imagePath, schedule, days, created_at: now, schedule_updated_at: now });
     trackLoops(cache.chores.length === 1 ? 'first_chore_created' : null, { choreCount: cache.chores.length });
-    if (window.posthog) posthog.capture('chore_created', { choreCount: cache.chores.length });
+    track('chore_created', { chores_count: cache.chores.length, schedule, has_photo: Boolean(imagePath), mode: isCycleMode() ? 'cycle' : 'per_chore' });
     closeModal(); toast('Chore added!');
 }
 function editChore(id) {
@@ -5005,7 +5071,7 @@ async function addQuickTask() {
     if (error) return toast('Could not save. Check your connection.', 'error');
     cache.chores.push({ id, name, description: '', value: val, assignedTo, emoji: '37', schedule: 'daily', days: [], oneOff: true, expiresOn });
     trackLoops(cache.chores.length === 1 ? 'first_chore_created' : null, { choreCount: cache.chores.length });
-    if (window.posthog) posthog.capture('chore_created', { choreCount: cache.chores.length });
+    track('chore_created', { chores_count: cache.chores.length, schedule: 'one_off', mode: isCycleMode() ? 'cycle' : 'per_chore' });
     closeModal(); toast('Quick task assigned!', 'task');
 }
 async function doDeleteChore(id) {
@@ -5016,6 +5082,7 @@ async function doDeleteChore(id) {
     if (error) return toast('Could not delete.', 'error');
     const c = cache.chores.find(x => x.id === id);
     if (c) c.archived = true;
+    track('chore_deleted');
     closeModal(); render();
 }
 
@@ -5048,6 +5115,7 @@ async function saveBonusMilestone(editId) {
         if (error) return toast((error.message || 'Could not save.'), 'error');
         cache.bonusMilestones.push({ id, name, threshold, bonusAmount: bonusAmt, assignedTo, claimedBy: [], createdAt });
         trackLoops(cache.bonusMilestones.length === 1 ? 'savings_goal_created' : null, { hasSavingsGoal: true });
+        track('savings_goal_created', { goals_count: cache.bonusMilestones.length, threshold, bonus_amount: bonusAmt });
         closeModal(); toast('Milestone added!', milestoneStarSVG(16));
         // Award immediately to any kid who already has enough saved, rather than
         // leaving it dangling until their next unrelated transaction happens to
@@ -5091,6 +5159,7 @@ async function saveReward(editId) {
         const { error } = await sb.from('rewards').insert({ id, user_id: currentUser.id, name, description, value, assigned_to: assignedTo, archived: false, created_at: createdAt });
         if (error) return toast((error.message || 'Could not save.'), 'error');
         cache.rewards.push({ id, name, description, value, assignedTo, archived: false, createdAt });
+        track('reward_created', { rewards_count: cache.rewards.length, amount: value });
         closeModal(); toast('Reward added!', 'reward');
     }
 }
@@ -5165,7 +5234,7 @@ async function approveChore(cid) {
     }
     const approvedCount = cache.completions.filter(c => c.approved).length;
     trackLoops(approvedCount === 1 ? 'first_chore_approved' : null, { hasApprovedChore: true });
-    if (window.posthog) posthog.capture('chore_approved');
+    track('chore_approved', { pays_out: paysOut, mode: isCycleMode() ? 'cycle' : 'per_chore' });
     toast(paysOut ? `Approved! ${R(chore?.value)} added to ${kid?.name}.` : `Approved! Counts toward ${kid?.name}'s cycle progress.`, 'success');
     render();
 }
@@ -5203,11 +5272,12 @@ async function approveAllForKid(kidId) {
     }
     const approvedCountAll = cache.completions.filter(c => c.approved).length;
     trackLoops(approvedCountAll === wonComps.length ? 'first_chore_approved' : null, { hasApprovedChore: true });
-    if (window.posthog) wonComps.forEach(() => posthog.capture('chore_approved'));
+    wonComps.forEach(() => track('chore_approved', { bulk: true, mode: isCycleMode() ? 'cycle' : 'per_chore' }));
     toast(isCycleMode() ? `All approved! Counts toward ${kid.name}'s cycle progress${totalAdded > 0 ? ` (plus ${R(totalAdded)} from quick chores)` : ''}.` : `All approved! ${R(totalAdded)} added to ${kid.name}.`, 'success');
     render();
 }
 async function rejectChore(cid) {
+    track('chore_rejected');
     await sb.from('completions').update({ rejected: true }).eq('id', cid).eq('user_id', currentUser.id);
     const c = cache.completions.find(x => x.id === cid);
     if (c) c.rejected = true;
@@ -5251,7 +5321,7 @@ async function markDone(choreId, evt) {
         return toast('Could not save. Check your connection.', 'error');
     }
     trackLoops(cache.completions.length === 1 ? 'first_chore_completed' : null, null);
-    if (window.posthog) posthog.capture('chore_completed');
+    track('chore_completed');
     toast('Marked as done! Waiting for parent to approve.', 'waiting');
 }
 async function markRewardDone(rewardId, evt) {
@@ -5261,6 +5331,7 @@ async function markRewardDone(rewardId, evt) {
     const { error } = await sb.from('reward_completions').insert({ id, user_id: currentUser.id, reward_id: rewardId, kid_id: S.kidId, claimed_at: claimedAt, approved: false, rejected: false });
     if (error) return toast('Could not save. Check your connection.', 'error');
     cache.rewardCompletions.push({ id, rewardId, kidId: S.kidId, claimedAt, approved: false, rejected: false });
+    track('reward_claimed');
     toast('Marked as done! Waiting for parent to approve.', 'waiting');
 }
 async function approveReward(cid) {
@@ -5281,6 +5352,7 @@ async function approveReward(cid) {
         cache.transactions.push({ id: txId, kidId: kid.id, amount: reward.value, type: 'reward', description: reward.name, createdAt: txCreatedAt });
         await checkBonusMilestones(kid.id, newBalance);
     }
+    track('reward_approved', { amount: reward?.value });
     toast(`Approved! ${R(reward?.value)} added to ${kid?.name}.`, 'success');
     render();
 }
@@ -5344,6 +5416,7 @@ async function openManageSubscription() {
             toast((body?.error || 'Could not open subscription management.'), 'error');
             return;
         }
+        track('manage_subscription_opened');
         window.open(url, '_blank');
     } catch (e) {
         toast('Could not open subscription management.', 'error');
@@ -5416,6 +5489,7 @@ async function confirmSwitchToPerChore() {
     toast('Switched to amount per chore. Check your chores — each one needs its own amount before it pays out.');
 }
 function saveCurrency(code) {
+    track('currency_changed', { currency: code });
     localStorage.setItem('sprout_currency', code);
     render();
     toast('Currency updated!');
@@ -5430,6 +5504,7 @@ async function saveParentPin() {
     const { error } = await sb.rpc('set_parent_pin', { p_new_pin: pin });
     if (error) return toast('Could not save PIN.', 'error');
     hasParentPin = true;
+    track('parent_pin_set');
     closeModal(); toast('Parent PIN saved!', 'pin');
 }
 async function removeParentPin() {
@@ -5440,7 +5515,30 @@ async function removeParentPin() {
 }
 
 // ─── RENDER ──────────────────────────────────────────────────────
+// The app is one page, so PostHog's automatic pageview only ever sees "/app/".
+// This reports each distinct screen as it first appears (and again when the
+// parent moves to another), which is what the signup and setup funnels are
+// built from: signup → onboarding:kid → parent:overview → kid.
+let lastScreenTracked = null;
+function trackScreen() {
+    let screen;
+    if (S.authMode === 'reset') screen = 'reset-password';
+    else if (S.authMode === 'reset-pin') screen = 'reset-parent-pin';
+    else if (!currentUser) screen = S.authMode === 'signin' ? 'signin' : 'signup';
+    else {
+        const subStatus = currentUser.user_metadata?.subscription_status;
+        if (subStatus !== 'trialing' && subStatus !== 'active') screen = 'subscription-gate';
+        else if (S.view === 'parent') screen = 'parent:' + S.tab;
+        else if (S.view === 'parent-onboarding') screen = 'onboarding:' + (ONBOARD_STEPS[S.onboardStep] || S.onboardStep);
+        else screen = S.view || 'home';
+    }
+    if (screen === lastScreenTracked) return;
+    lastScreenTracked = screen;
+    track('screen_viewed', { screen, subscription_status: currentUser?.user_metadata?.subscription_status || 'signed_out' });
+}
+
 function render() {
+    trackScreen();
     document.title = currentUser ? 'Sprout' : 'Sign In or Start Your Free Trial | Sprout';
     const toastHtml = S.toast
         ? `<div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:6px;background:#1e293b;color:white;font-family:var(--font-family);font-size:14px;font-weight:600;padding:10px 20px;border-radius:var(--radius-full);box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:99;max-width:320px;text-align:center">${S.toastIcon || ''}${esc(S.toast)}</div>`
@@ -5491,6 +5589,6 @@ initApp();
 <script defer src="/js/cookie-consent.js?v=2"></script>
 <script defer src="/js/analytics.js?v=1"></script>
 <script defer src="/js/meta-pixel.js?v=1"></script>
-<script defer src="/js/posthog.js?v=1"></script>
+<script defer src="/js/posthog.js?v=2"></script>
 </body>
 </html>

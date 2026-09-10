@@ -420,11 +420,14 @@ async function sendContactMessage() {
   var result = await ctSb.from('contact_messages').insert({ name: name, email: email, topic: topic, message: message });
 
   if (result.error) {
+    if (window.sproutTrack) window.sproutTrack('contact_form_failed', { topic: topic });
     btn.disabled = false;
     btn.textContent = 'Send message';
     ctShowError('Something went wrong. Please try again, or email us directly at hello@sproutearnsave.com.');
     return;
   }
+  // Only the topic, never the message or who sent it — that stays in Supabase.
+  if (window.sproutTrack) window.sproutTrack('contact_form_submitted', { topic: topic });
 
   document.getElementById('ct-form-wrap').style.display = 'none';
   document.getElementById('ct-success').style.display = 'block';
@@ -458,5 +461,6 @@ async function sendContactMessage() {
 <script defer src="/js/cookie-consent.js?v=2"></script>
 <script defer src="/js/analytics.js?v=1"></script>
 <script defer src="/js/meta-pixel.js?v=1"></script>
-<script defer src="/js/posthog.js?v=1"></script>
+<script defer src="/js/posthog.js?v=2"></script>
+<script defer src="/js/site-events.js?v=1"></script>
 </body></html>

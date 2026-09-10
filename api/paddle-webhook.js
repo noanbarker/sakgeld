@@ -13,6 +13,9 @@ const {
   recordReferralSignup,
   sendMetaCAPIEvent,
 } = require('../lib/billing-notifications');
+// Product analytics: the trial→paid→cancelled moments happen here, not in a
+// browser, so they're reported to PostHog from the server (see lib/posthog.js).
+const { trackSubscriptionChange } = require('../lib/posthog');
 
 // Generous replay-protection window: Paddle's own examples use 5 seconds, but
 // that's tight enough to reject legitimate deliveries under normal network/
@@ -158,6 +161,9 @@ module.exports = async (req, res) => {
           current_period_ends_at: sub.current_billing_period ? sub.current_billing_period.ends_at : null,
           next_billed_at: sub.next_billed_at || null,
           canceled_at: sub.status === 'canceled' ? (event.occurred_at || new Date().toISOString()) : null,
+          // Remembered so the next event can tell a newly scheduled cancellation
+          // from one already known about (the Paystack rail stores the same flag).
+          cancel_scheduled: Boolean(sub.scheduled_change && sub.scheduled_change.action === 'cancel'),
         },
       });
       if (error) {
@@ -182,6 +188,25 @@ module.exports = async (req, res) => {
       const nextBillingDate = formatDate(nextBillingDateRaw);
       const nextChargeAmount = extractChargeAmount(sub);
       const trialStartedAtRaw = event.occurred_at || new Date().toISOString();
+      const cancelScheduled = newStatus === 'canceled' || Boolean(sub.scheduled_change && sub.scheduled_change.action === 'cancel');
+
+      // PostHog sees every lifecycle transition (trial_started, subscription_activated,
+      // payment_failed, subscription_cancelled, …) under the same user id the app
+      // identifies with, so the signup→paid funnel and churn charts are complete.
+      await trackSubscriptionChange({
+        userId,
+        userMetadata: existing.user.user_metadata,
+        previousStatus,
+        newStatus,
+        provider: 'paddle',
+        email,
+        billingInterval: sub.billing_cycle && sub.billing_cycle.interval,
+        currency: sub.currency_code,
+        amount: extractChargeValue(sub),
+        cancelScheduled,
+        cancelWasScheduled: Boolean(existing.user.user_metadata.cancel_scheduled),
+        occurredAt: event.occurred_at,
+      });
 
       // Prefer the code stored at sign-up: it's set whether or not checkout was
       // ever completed, where Paddle's custom_data only exists once it was.
@@ -220,7 +245,7 @@ module.exports = async (req, res) => {
         // True as soon as Paddle records a scheduled (end-of-period) cancellation,
         // not only once the subscription has actually finished canceling —
         // this is what the conversion-reminder Workflow's exit filter checks.
-        cancelScheduled: newStatus === 'canceled' || Boolean(sub.scheduled_change && sub.scheduled_change.action === 'cancel'),
+        cancelScheduled,
         accessEndsAt: newStatus === 'canceled' ? accessEndsAtRaw : undefined,
         appUrl: 'https://www.sproutearnsave.com/app/',
       });
