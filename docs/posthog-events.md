@@ -85,6 +85,9 @@ person's `subscription_status`, `lifecycle_stage`, `billing_interval`,
 | `payout_recorded` | Parent marked money as handed over. | `amount` |
 | `kid_mode_entered` / `kid_pin_failed` | Kid PIN screen. | |
 | `parent_pin_set`, `currency_changed`, `manage_subscription_opened`, `signed_out` | Settings. | |
+| `push_enabled` / `push_disabled` / `push_permission_denied` / `push_enable_failed` | Push notifications toggled in Settings. | `standalone`, `ios`, `reason` |
+| `push_notification_opened` | Parent tapped a push notification and landed in the app. | |
+| `push_notification_sent` (server) | A kid's completion or reward claim triggered a push. | `kind`, `devices`, `pending_total` |
 
 ### Person properties (filter or group any chart by these)
 

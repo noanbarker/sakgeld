@@ -584,6 +584,144 @@ function personPropsOnceFrom(user) {
     return once;
 }
 
+// ─── PUSH NOTIFICATIONS ──────────────────────────────────────────
+// A parent can have their phone buzz the moment a kid marks a chore done,
+// without an email in between. sw.js receives and shows the notification,
+// api/push-send.js sends it, and the device registrations live in Supabase
+// (push_subscriptions). On iPhone this only works once Sprout has been added
+// to the home screen (iOS 16.4+), so the settings screen explains that.
+//
+// Public half of the VAPID key pair (the private half is a Vercel secret).
+// Rotating the pair means changing this too, and every parent re-enabling.
+const PUSH_PUBLIC_KEY = 'BBYzUqhqLl1X8oIdtF7YDwoKy32piPVw1P640YNpPgHzk9wCXnKOcGk0fDXLDYOTlZE4ovVgkK7jjUno3tMXoJs';
+
+function isStandaloneApp() {
+    try { return navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); } catch (e) { return false; }
+}
+function isIOSDevice() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+// Push needs all three: a service worker, the Push API, and notifications.
+// Safari on iPhone only exposes them inside a home-screen web app.
+function pushSupported() {
+    return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = window.atob(base64);
+    return Uint8Array.from([...raw].map(ch => ch.charCodeAt(0)));
+}
+
+let pushSubscribed = false; // this device, this browser
+async function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return null;
+    try { return await navigator.serviceWorker.register('/sw.js'); } catch (e) { return null; }
+}
+// Keeps the stored registration for this device current. Push services can
+// quietly rotate the endpoint, and a row that goes stale is a parent who
+// silently stops getting notified.
+async function syncPushSubscription() {
+    if (!pushSupported() || !currentUser) return;
+    try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        pushSubscribed = Boolean(sub) && Notification.permission === 'granted';
+        if (sub && pushSubscribed) await savePushSubscription(sub);
+    } catch (e) { pushSubscribed = false; }
+}
+async function savePushSubscription(sub) {
+    const json = sub.toJSON();
+    if (!json || !json.endpoint || !json.keys) return;
+    await sb.from('push_subscriptions').upsert({
+        user_id: currentUser.id,
+        endpoint: json.endpoint,
+        p256dh: json.keys.p256dh,
+        auth: json.keys.auth,
+        user_agent: navigator.userAgent.slice(0, 200),
+        last_seen_at: new Date().toISOString(),
+    }, { onConflict: 'endpoint' });
+}
+// Must run directly from the tap on the button: iPhones (and increasingly
+// other browsers) refuse the permission prompt unless it's the immediate
+// result of a user gesture, so nothing may be awaited before requestPermission.
+function enablePush() {
+    if (!pushSupported()) { toast('Notifications are not available in this browser.', 'warn'); return; }
+    Notification.requestPermission().then(async (permission) => {
+        if (permission !== 'granted') {
+            track('push_permission_denied');
+            toast(permission === 'denied' ? 'Notifications are blocked for Sprout in your browser settings.' : 'Notifications were not enabled.', 'warn');
+            render();
+            return;
+        }
+        try {
+            const reg = (await navigator.serviceWorker.getRegistration('/')) || (await registerServiceWorker());
+            await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(PUSH_PUBLIC_KEY) });
+            await savePushSubscription(sub);
+            pushSubscribed = true;
+            track('push_enabled', { standalone: isStandaloneApp(), ios: isIOSDevice() });
+            toast('Notifications on. We\'ll tell you when there\'s something to approve.', 'success');
+        } catch (e) {
+            track('push_enable_failed', { reason: String(e && e.message || e).slice(0, 120) });
+            toast('Could not turn on notifications. Please try again.', 'error');
+        }
+        render();
+    });
+}
+async function disablePush() {
+    try {
+        const reg = await navigator.serviceWorker.getRegistration('/');
+        const sub = reg && await reg.pushManager.getSubscription();
+        if (sub) {
+            await sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+            await sub.unsubscribe();
+        }
+    } catch (e) {}
+    pushSubscribed = false;
+    track('push_disabled');
+    toast('Notifications off for this device.');
+    render();
+}
+// Tells the server "something just happened", and the server decides what the
+// notification says (it counts what's waiting). Fire-and-forget: a kid's
+// chore must never fail to save because a notification couldn't be sent.
+function notifyParentPush(kind, kidId, itemName) {
+    const kid = cache.kids.find(k => k.id === kidId);
+    sb.auth.getSession().then(({ data }) => {
+        const session = data && data.session;
+        if (!session) return;
+        fetch('/api/push-send', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kind, kidName: kid ? kid.name : '', itemName: itemName || '' }),
+        }).catch(() => {});
+    }).catch(() => {});
+}
+// The number on the home-screen icon, for installed apps that support it.
+function updateAppBadge() {
+    if (!navigator.setAppBadge || !currentUser) return;
+    const pending = cache.completions.filter(c => !c.approved && !c.rejected && !c.missed).length
+        + (cache.rewardCompletions || []).filter(c => !c.approved && !c.rejected).length;
+    try { (pending > 0 ? navigator.setAppBadge(pending) : navigator.clearAppBadge()).catch(() => {}); } catch (e) {}
+}
+// A tap on a notification opens /app/?open=approvals. Once the parent is
+// signed in, take them straight to the parent dashboard (through the parent
+// PIN if one is set) instead of leaving them on the kid-picker.
+let openApprovalsRequested = new URLSearchParams(window.location.search).get('open') === 'approvals';
+function maybeOpenApprovals() {
+    if (!openApprovalsRequested || !currentUser) return;
+    openApprovalsRequested = false;
+    try {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('open');
+        const query = params.toString();
+        window.history.replaceState({}, '', window.location.pathname + (query ? '?' + query : ''));
+    } catch (e) {}
+    track('push_notification_opened');
+    goParent();
+}
+
 // Partner referral codes — a school's code, arriving from a poster, a QR, or
 // the /join/ short link. Codes are letters and digits only, so normalising here
 // means one typed by hand into the signup form matches one that arrived by link
@@ -872,6 +1010,8 @@ async function initApp() {
             // process the same cycle a second time.
             if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
                 await checkCycleCloseOut();
+                syncPushSubscription();
+                maybeOpenApprovals();
             }
         }
         else { cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [] }; S.view = 'home'; }
@@ -887,6 +1027,8 @@ async function initApp() {
     }
     render();
     handlePaystackReturn();
+    registerServiceWorker().then(() => { syncPushSubscription(); });
+    maybeOpenApprovals();
 }
 
 async function signOut() { track('signed_out'); await sb.auth.signOut(); }
@@ -3859,6 +4001,7 @@ function pSettings() {
         { id: 'currency', title: 'Currency / Value Display', subtitle: 'Choose how values are displayed' },
         { id: 'tree',     title: 'Tree Growth Stages',       subtitle: 'Set the balance thresholds for each tree stage' },
         { id: 'pin',      title: 'Parent PIN',               subtitle: hasParentPin ? 'A PIN is currently set' : 'No PIN set' },
+        { id: 'notifications', title: 'Notifications',       subtitle: pushSubscribed ? 'On for this device' : 'Get told when a chore needs approving' },
     ];
     const chevron = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex-shrink:0"><path d="M7 5l4 4-4 4" stroke="var(--color-text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -3954,6 +4097,42 @@ function pSettings() {
               ${CURRENCIES.map(c => `<option value="${c.code}" ${c.code === currCode ? 'selected' : ''}>${c.name}</option>`).join('')}
             </select>
             <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:12px">Preview: <span style="font-weight:800;color:var(--color-text-primary)">${R(25)}</span></p>
+          </div>
+        </div>`;
+    }
+
+    if (S.settingsSection === 'notifications') {
+        const supported = pushSupported();
+        const blocked = supported && Notification.permission === 'denied';
+        const iosNeedsInstall = isIOSDevice() && !isStandaloneApp();
+        let body;
+        if (iosNeedsInstall) {
+            body = `
+            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">On iPhone and iPad, notifications only work once Sprout is on your home screen. It takes ten seconds:</p>
+            <ol style="font-family:var(--font-family);font-size:13px;color:var(--color-text-primary);padding-left:20px;line-height:1.7;margin-bottom:12px">
+              <li>Tap the <strong>Share</strong> button at the bottom of Safari.</li>
+              <li>Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
+              <li>Open Sprout from the new icon and come back to this screen.</li>
+            </ol>`;
+        } else if (!supported) {
+            body = `<p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary)">This browser doesn't support notifications. Chrome on Android, or Sprout added to an iPhone home screen, both do.</p>`;
+        } else if (blocked) {
+            body = `<p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary)">Notifications are blocked for Sprout. Allow them in your browser or phone settings, then come back here.</p>`;
+        } else if (pushSubscribed) {
+            body = `
+            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">This device gets a notification whenever a child marks a chore done or claims a reward. Turn it on separately on each phone or computer you use.</p>
+            <button onclick="disablePush()" class="btn-outline" style="width:auto;padding:10px 28px">Turn off on this device</button>`;
+        } else {
+            body = `
+            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">Get a notification the moment a child marks a chore done or claims a reward, so nothing sits waiting for days. Nothing goes to email.</p>
+            <button onclick="enablePush()" class="btn-primary" style="width:auto;padding:10px 28px">Turn on notifications</button>`;
+        }
+        return `
+        <div style="max-width:600px">
+          ${backBtn}
+          <div class="card">
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Notifications</p>
+            ${body}
           </div>
         </div>`;
     }
@@ -5323,6 +5502,7 @@ async function markDone(choreId, evt) {
     // hasCompletedChore gates the day-2 "let them mark one done" email in Loops.
     trackLoops(cache.completions.length === 1 ? 'first_chore_completed' : null, { hasCompletedChore: true });
     track('chore_completed');
+    notifyParentPush('chore', S.kidId, (cache.chores.find(c => c.id === choreId) || {}).name || '');
     toast('Marked as done! Waiting for parent to approve.', 'waiting');
 }
 async function markRewardDone(rewardId, evt) {
@@ -5333,6 +5513,7 @@ async function markRewardDone(rewardId, evt) {
     if (error) return toast('Could not save. Check your connection.', 'error');
     cache.rewardCompletions.push({ id, rewardId, kidId: S.kidId, claimedAt, approved: false, rejected: false });
     track('reward_claimed');
+    notifyParentPush('reward', S.kidId, (cache.rewards.find(r => r.id === rewardId) || {}).name || '');
     toast('Marked as done! Waiting for parent to approve.', 'waiting');
 }
 async function approveReward(cid) {
@@ -5582,6 +5763,7 @@ function render() {
     }
     if (S.view === 'parent' && S.tourStep >= 0) positionTourSpotlight();
     S.tabAnim = null;
+    updateAppBadge();
 }
 
 initApp();
