@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    {
+      "source": "/instagram",
+      "destination": "/app/index.html?utm_source=instagram&utm_medium=organic_social&utm_campaign=sa_launch&utm_content=bio_link",
+      "permanent": false
+    }
+  ],
   "crons": [
     {
       "path": "/api/purge-canceled-accounts",
