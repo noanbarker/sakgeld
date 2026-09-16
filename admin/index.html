@@ -46,6 +46,8 @@
   header h1 { font-size: 22px; margin: 0; display: flex; align-items: center; gap: 10px; }
   header h1 span { font-weight: 500; color: var(--text-3); font-size: 14px; }
   .meta { color: var(--text-3); font-size: 13px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .meta label { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); cursor: pointer; }
+  .flag.internal { background: color-mix(in srgb, var(--trialing) 12%, transparent); border-color: var(--trialing); }
   button, .btn { font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   button:disabled { opacity: .6; cursor: default; }
@@ -142,6 +144,7 @@
     <h1>🌱 Sprout Admin <span>live database</span></h1>
     <div class="meta">
       <span id="generated"></span>
+      <label id="internalToggle" class="hidden"><input type="checkbox" id="showInternal"> Include test accounts (<span id="internalCount"></span>)</label>
       <button id="refresh">Refresh</button>
       <button id="exportCsv">Export users CSV</button>
       <button id="signout">Sign out</button>
@@ -255,6 +258,11 @@
 
   let data = null;
   let sortKey = 'signed_up_at', sortAsc = false;
+  // Test accounts (ADMIN_DASHBOARD_INTERNAL_EMAILS on the server) are tagged
+  // internal and left out of every number unless the header checkbox is on.
+  const showInternal = () => $('#showInternal').checked;
+  const visibleUsers = () => data.users.filter(u => showInternal() || !u.internal);
+  const totals = () => (showInternal() ? data.totals_all : data.totals);
 
   // ---------- auth gate ----------
   function getKey() { try { return sessionStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
@@ -302,8 +310,10 @@
 
   // ---------- renderers ----------
   function render() {
-    const users = data.users;
+    const users = visibleUsers();
     $('#generated').textContent = 'Updated ' + fmtDateTime(data.generated_at);
+    $('#internalToggle').classList.toggle('hidden', !data.internal_count);
+    $('#internalCount').textContent = data.internal_count;
     renderKpis(users);
     renderDonut(users);
     renderSignups(users);
@@ -319,7 +329,7 @@
     const signups7 = users.filter(u => daysAgo(u.signed_up_at) < 7).length;
     const signups30 = users.filter(u => daysAgo(u.signed_up_at) < 30).length;
     const active7 = users.filter(u => daysAgo(u.last_activity_at) !== null && daysAgo(u.last_activity_at) < 7).length;
-    const t = data.totals;
+    const t = totals();
     const tiles = [
       ['Total sign-ups', users.length, `${signups7} this week · ${signups30} last 30 days`, ''],
       ['Active (paying)', by('active'), `${m.paying} counted in MRR` + (m.excluded ? ` · ${m.excluded} without billing record` : ''), 'active'],
@@ -426,7 +436,7 @@
     bars('#byCycle', tally(users.filter(u => u.status === 'active' || u.status === 'trialing'), u => u.billing_cycle), k => ({ monthly: 'Monthly', yearly: 'Yearly' })[k] || k);
     bars('#bySource', tally(users, u => u.utm_source || 'direct / unknown'), k => k);
     bars('#referrals', data.referral_codes.map(c => [`${c.code} — ${c.partner_name}${c.active ? '' : ' (off)'} · ${c.paid} paid`, c.signups]), k => k);
-    const t = data.totals;
+    const t = totals();
     bars('#engagement', [['Children', t.kids], ['Active chores', t.chores_active], ['Chores done (7d)', t.completions_7d], ['Chores done (30d)', t.completions_30d], ['Awaiting approval', t.pending_approvals], ['Push enabled', t.push_subscriptions]], k => k);
   }
 
@@ -451,7 +461,7 @@
 
   function renderMessages() {
     const wrap = $('#messages'); wrap.replaceChildren();
-    $('#msgCount').textContent = `${data.totals.contact_messages} total, latest ${Math.min(10, data.contact_messages.length)}`;
+    $('#msgCount').textContent = `${totals().contact_messages} total, latest ${Math.min(10, data.contact_messages.length)}`;
     if (!data.contact_messages.length) { wrap.append(el('div', { class: 'msg note' }, 'No contact-form messages yet.')); return; }
     for (const m of data.contact_messages) {
       wrap.append(el('div', { class: 'msg' }, el('div', {}, el('span', { class: 'who' }, `${m.name} · ${m.email}`), el('span', { class: 'dim' }, ` ${m.topic || ''} · ${fmtDateTime(m.created_at)}`)), el('div', { class: 'body' }, m.message)));
@@ -477,19 +487,21 @@
     if (u.referral_code) n.push('ref: ' + u.referral_code);
     if (u.utm_source) n.push('via ' + u.utm_source);
     if (u.banned) n.push('banned');
+    if (u.internal) n.push('test account');
     return n;
   }
   function filteredUsers() {
     const q = $('#search').value.trim().toLowerCase();
     const s = $('#statusFilter').value;
-    let rows = data.users.filter(u => (!s || u.status === s) && (!q || [u.name, u.email, u.country, u.provider, u.utm_source, u.referral_code].some(v => v && String(v).toLowerCase().includes(q))));
+    let rows = visibleUsers().filter(u => (!s || u.status === s) && (!q || [u.name, u.email, u.country, u.provider, u.utm_source, u.referral_code].some(v => v && String(v).toLowerCase().includes(q))));
     rows.sort((a, b) => { const x = sortValue(a, sortKey), y = sortValue(b, sortKey); const c = x < y ? -1 : x > y ? 1 : 0; return sortAsc ? c : -c; });
     return rows;
   }
   function renderTable() {
     const rows = filteredUsers();
-    $('#userCount').textContent = `${data.users.length} accounts`;
-    $('#filteredCount').textContent = rows.length === data.users.length ? '' : `${rows.length} shown`;
+    const all = visibleUsers();
+    $('#userCount').textContent = `${all.length} accounts` + (data.internal_count && !showInternal() ? ` (${data.internal_count} test accounts hidden)` : '');
+    $('#filteredCount').textContent = rows.length === all.length ? '' : `${rows.length} shown`;
     for (const th of document.querySelectorAll('#users th')) { th.classList.toggle('sorted', th.dataset.k === sortKey); th.classList.toggle('asc', th.dataset.k === sortKey && sortAsc); }
     const tbody = $('#users tbody'); tbody.replaceChildren();
     for (const u of rows) {
@@ -507,12 +519,13 @@
         el('td', { class: 'num' }, u.kids),
         el('td', { class: 'num' }, u.chores),
         el('td', { class: 'num' }, u.completions_7d),
-        el('td', {}, ...notesFor(u).map(n => el('span', { class: 'flag' }, n))),
+        el('td', {}, ...notesFor(u).map(n => el('span', { class: 'flag' + (n === 'test account' ? ' internal' : '') }, n))),
       );
       tbody.append(tr);
     }
   }
   $('#search').addEventListener('input', renderTable);
+  $('#showInternal').addEventListener('change', render);
   $('#statusFilter').addEventListener('change', renderTable);
   document.querySelector('#users thead').addEventListener('click', e => {
     const th = e.target.closest('th'); if (!th) return;

@@ -62,9 +62,16 @@ function countBy(rows, key) {
   return counts;
 }
 
+// Test accounts and family helping with design skew every number, so they're
+// tagged `internal` and the page hides them unless asked. Comma-separated
+// emails in ADMIN_DASHBOARD_INTERNAL_EMAILS; case doesn't matter.
+function internalEmailSet(value) {
+  return new Set(String(value || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
+}
+
 // Pure: turns raw rows into the shape the page renders. Kept separate from the
 // handler so it can be run against a saved snapshot without any credentials.
-function buildDashboard(raw, now = new Date()) {
+function buildDashboard(raw, now = new Date(), internalEmails = new Set()) {
   const nowMs = now.getTime();
   const sevenDaysAgo = nowMs - 7 * 24 * 60 * 60 * 1000;
   const thirtyDaysAgo = nowMs - 30 * 24 * 60 * 60 * 1000;
@@ -106,10 +113,12 @@ function buildDashboard(raw, now = new Date()) {
     // understates how recently a family used the app. Anything they've done in
     // the app (a chore ticked, a child added) counts as activity too.
     const lastActivity = maxDate(user.last_sign_in_at, lastDataActivity);
+    const email = user.email || meta.email || null;
     return {
       id: user.id,
       name: meta.name || null,
-      email: user.email || meta.email || null,
+      email,
+      internal: Boolean(email && internalEmails.has(email.toLowerCase())),
       country: meta.country || null,
       signup_geo: meta.signup_geo || null,
       signed_up_at: user.created_at || null,
@@ -164,24 +173,35 @@ function buildDashboard(raw, now = new Date()) {
     .map(m => ({ name: m.name, email: m.email, topic: m.topic, message: m.message, created_at: m.created_at }));
 
   const completedAt = c => (c.completed_at ? new Date(c.completed_at).getTime() : NaN);
+  const internalIds = new Set(users.filter(u => u.internal).map(u => u.id));
+  const totalsFor = keep => {
+    const k = kids.filter(r => keep(r.user_id));
+    const ch = chores.filter(r => keep(r.user_id));
+    const co = completions.filter(r => keep(r.user_id));
+    return {
+      kids: k.length,
+      chores_active: ch.filter(c => !c.archived).length,
+      chores_total: ch.length,
+      completions: co.length,
+      completions_7d: co.filter(c => completedAt(c) >= sevenDaysAgo).length,
+      completions_30d: co.filter(c => completedAt(c) >= thirtyDaysAgo).length,
+      approved: co.filter(c => c.approved).length,
+      pending_approvals: co.filter(c => !c.approved && !c.rejected && !c.missed).length,
+      transactions: transactions.filter(r => keep(r.user_id)).length,
+      push_subscriptions: pushSubscriptions.filter(r => keep(r.user_id)).length,
+      contact_messages: (raw.contact_messages || []).length,
+    };
+  };
   return {
     generated_at: now.toISOString(),
     users,
+    internal_count: internalIds.size,
     referral_codes: referralCodes,
     contact_messages: contactMessages,
-    totals: {
-      kids: kids.length,
-      chores_active: chores.filter(c => !c.archived).length,
-      chores_total: chores.length,
-      completions: completions.length,
-      completions_7d: completions.filter(c => completedAt(c) >= sevenDaysAgo).length,
-      completions_30d: completions.filter(c => completedAt(c) >= thirtyDaysAgo).length,
-      approved: completions.filter(c => c.approved).length,
-      pending_approvals: completions.filter(c => !c.approved && !c.rejected && !c.missed).length,
-      transactions: transactions.length,
-      push_subscriptions: pushSubscriptions.length,
-      contact_messages: (raw.contact_messages || []).length,
-    },
+    // Two sets of totals so the page's "include test accounts" toggle can
+    // switch without another round trip.
+    totals: totalsFor(id => !internalIds.has(id)),
+    totals_all: totalsFor(() => true),
   };
 }
 
@@ -226,7 +246,7 @@ module.exports = async (req, res) => {
       referral_signups: referralSignups,
       contact_messages: contactMessages,
       push_subscriptions: pushSubscriptions,
-    });
+    }, new Date(), internalEmailSet(process.env.ADMIN_DASHBOARD_INTERNAL_EMAILS));
     res.setHeader('Cache-Control', 'no-store');
     res.status(200).json(dashboard);
   } catch (err) {
