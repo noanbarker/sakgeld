@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Sprout Admin</title>
+<link rel="icon" href="/favicon.png">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f6f4;
+    --surface: #ffffff;
+    --border: #e3e8e4;
+    --text: #0f1a13;
+    --text-2: #4f5d55;
+    --text-3: #7d8a83;
+    --accent: #16a34a;
+    --accent-soft: #dcfce7;
+    --active: #008300;
+    --trialing: #2a78d6;
+    --canceled: #e34948;
+    --none: #8a8a85;
+    --warn-bg: #fff7e6;
+    --warn-border: #f2cf83;
+    --bar: #16a34a;
+    --grid: #e9ede9;
+    --tip-bg: #0f1a13;
+    --tip-text: #ffffff;
+    --shadow: 0 1px 2px rgba(15,26,19,.06), 0 4px 16px rgba(15,26,19,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #121513; --surface: #1b1f1c; --border: #2b322d; --text: #f2f5f2; --text-2: #b6c0b9; --text-3: #7f8a83;
+      --accent: #34c46a; --accent-soft: #163d25; --active: #3aa83a; --trialing: #3987e5; --canceled: #e66767; --none: #9a9a94;
+      --warn-bg: #2b2415; --warn-border: #6b5520; --bar: #34c46a; --grid: #262c28; --tip-bg: #f2f5f2; --tip-text: #121513;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  header h1 { font-size: 22px; margin: 0; display: flex; align-items: center; gap: 10px; }
+  header h1 span { font-weight: 500; color: var(--text-3); font-size: 14px; }
+  .meta { color: var(--text-3); font-size: 13px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  button, .btn { font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .6; cursor: default; }
+  input, select { font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+  h2 { font-size: 15px; font-weight: 600; margin: 28px 0 10px; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
+  h2 small { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--text-3); margin-left: 8px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); }
+  .card h3 { font-size: 14px; margin: 0 0 12px; font-weight: 600; }
+  .card h3 small { font-weight: 400; color: var(--text-3); }
+  .grid { display: grid; gap: 12px; }
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .kpi { padding: 14px 16px; }
+  .kpi .label { font-size: 12px; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; }
+  .kpi .value { font-size: 30px; font-weight: 700; line-height: 1.15; margin-top: 4px; letter-spacing: -.01em; }
+  .kpi .sub { font-size: 12px; color: var(--text-2); margin-top: 4px; }
+  .kpi.active .value { color: var(--active); }
+  .kpi.trialing .value { color: var(--trialing); }
+  .kpi.canceled .value { color: var(--canceled); }
+  .charts { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .three { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .donut-wrap { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+  .donut-wrap svg { flex: 0 0 auto; }
+  .legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+  .legend li { display: flex; align-items: center; gap: 8px; }
+  .legend .sw { width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto; }
+  .legend b { min-width: 28px; text-align: right; }
+  .legend .pct { color: var(--text-3); font-size: 13px; }
+  .bars { display: grid; gap: 8px; font-size: 13px; }
+  .bars .row { display: grid; grid-template-columns: 110px 1fr 40px; gap: 10px; align-items: center; }
+  .bars .track { height: 12px; background: var(--grid); border-radius: 4px; overflow: hidden; }
+  .bars .fill { height: 100%; background: var(--bar); border-radius: 0 4px 4px 0; }
+  .bars .n { text-align: right; font-variant-numeric: tabular-nums; }
+  .bars .lbl { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bars.wide .row { grid-template-columns: minmax(0, 1fr) 80px 40px; }
+  .chart { position: relative; }
+  .chart svg { width: 100%; height: auto; display: block; }
+  .chart .tip { position: absolute; pointer-events: none; background: var(--tip-bg); color: var(--tip-text); font-size: 12px; padding: 6px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -110%); opacity: 0; transition: opacity .1s; }
+  .chart .tip.on { opacity: 1; }
+  .attn { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .attn .card { border-left: 4px solid var(--warn-border); }
+  .attn .card.ok { border-left-color: var(--active); }
+  .attn ul { list-style: none; margin: 0; padding: 0; font-size: 14px; display: grid; gap: 6px; }
+  .attn li { display: flex; justify-content: space-between; gap: 10px; }
+  .attn li span:last-child { color: var(--text-3); font-size: 13px; white-space: nowrap; }
+  .attn .empty { color: var(--text-3); font-size: 13px; }
+  .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .toolbar input[type=search] { flex: 1 1 220px; }
+  .toolbar .count { color: var(--text-3); font-size: 13px; margin-left: auto; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 900px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; white-space: nowrap; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--surface); }
+  th.sorted::after { content: " ↓"; }
+  th.sorted.asc::after { content: " ↑"; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td .dim { color: var(--text-3); font-size: 12px; display: block; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid transparent; }
+  .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .pill.active { color: var(--active); background: color-mix(in srgb, var(--active) 12%, transparent); }
+  .pill.trialing { color: var(--trialing); background: color-mix(in srgb, var(--trialing) 12%, transparent); }
+  .pill.canceled { color: var(--canceled); background: color-mix(in srgb, var(--canceled) 12%, transparent); }
+  .pill.none { color: var(--none); background: color-mix(in srgb, var(--none) 14%, transparent); }
+  .pill.past_due, .pill.paused { color: #b45309; background: color-mix(in srgb, #b45309 12%, transparent); }
+  .flag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--text-2); margin-right: 4px; }
+  .note { font-size: 12px; color: var(--text-3); margin-top: 8px; }
+  #gate { max-width: 380px; margin: 80px auto; }
+  #gate h1 { font-size: 20px; margin: 0 0 6px; }
+  #gate p { color: var(--text-2); font-size: 14px; margin: 0 0 14px; }
+  #gate form { display: grid; gap: 10px; }
+  #gate .err { color: var(--canceled); font-size: 13px; min-height: 18px; }
+  .hidden { display: none !important; }
+  .msg { padding: 12px; font-size: 14px; }
+  .msg + .msg { border-top: 1px solid var(--border); }
+  .msg .who { font-weight: 600; }
+  .msg .body { color: var(--text-2); white-space: pre-wrap; }
+  @media (max-width: 640px) { .kpi .value { font-size: 24px; } header h1 { font-size: 18px; } }
+</style>
+</head>
+<body>
+
+<div id="gate" class="card hidden">
+  <h1>Sprout Admin</h1>
+  <p>Enter the dashboard key to see live user and billing data.</p>
+  <form id="gateForm">
+    <input id="keyInput" type="password" autocomplete="current-password" placeholder="Dashboard key" required>
+    <button class="primary" type="submit">Open dashboard</button>
+    <div class="err" id="gateErr"></div>
+  </form>
+</div>
+
+<div id="app" class="wrap hidden">
+  <header>
+    <h1>🌱 Sprout Admin <span>live database</span></h1>
+    <div class="meta">
+      <span id="generated"></span>
+      <button id="refresh">Refresh</button>
+      <button id="exportCsv">Export users CSV</button>
+      <button id="signout">Sign out</button>
+    </div>
+  </header>
+
+  <div id="loading" class="note">Loading live data…</div>
+  <div id="content" class="hidden">
+
+    <div class="grid kpis" id="kpis"></div>
+
+    <h2>Subscriptions</h2>
+    <div class="grid charts">
+      <div class="card">
+        <h3>Users by status <small>every account in the database</small></h3>
+        <div class="donut-wrap">
+          <div class="chart" id="donut"></div>
+          <ul class="legend" id="donutLegend"></ul>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Sign-ups per week <small>last 12 weeks</small></h3>
+        <div class="chart" id="signups"></div>
+      </div>
+    </div>
+
+    <h2>Where families come from</h2>
+    <div class="grid three">
+      <div class="card"><h3>Country</h3><div class="bars" id="byCountry"></div></div>
+      <div class="card"><h3>Payment rail</h3><div class="bars" id="byProvider"></div><div class="note">Paystack bills South Africa, Paddle the rest of the world.</div></div>
+      <div class="card"><h3>Billing cycle</h3><div class="bars" id="byCycle"></div></div>
+      <div class="card"><h3>Traffic source <small>utm_source at sign-up</small></h3><div class="bars" id="bySource"></div></div>
+      <div class="card"><h3>Referral partners</h3><div class="bars wide" id="referrals"></div></div>
+      <div class="card"><h3>Engagement</h3><div class="bars" id="engagement"></div></div>
+    </div>
+
+    <h2>Needs attention</h2>
+    <div class="attn" id="attention"></div>
+
+    <h2>Contact messages <small id="msgCount"></small></h2>
+    <div class="card" id="messages" style="padding:0"></div>
+
+    <h2>All users <small id="userCount"></small></h2>
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Search name, email, country…">
+      <select id="statusFilter">
+        <option value="">All statuses</option>
+        <option value="active">Active</option>
+        <option value="trialing">Trialing</option>
+        <option value="canceled">Canceled</option>
+        <option value="none">No subscription</option>
+      </select>
+      <span class="count" id="filteredCount"></span>
+    </div>
+    <div class="tablewrap">
+      <table id="users">
+        <thead><tr>
+          <th data-k="name">Name</th>
+          <th data-k="email">Email</th>
+          <th data-k="country">Country</th>
+          <th data-k="signed_up_at">Signed up</th>
+          <th data-k="last_activity_at">Last activity</th>
+          <th data-k="status">Status</th>
+          <th data-k="plan">Plan</th>
+          <th data-k="next_date">Next date</th>
+          <th data-k="kids" class="num">Kids</th>
+          <th data-k="chores" class="num">Chores</th>
+          <th data-k="completions_7d" class="num">Done 7d</th>
+          <th data-k="notes">Notes</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="note">Last activity is the latest of: last sign-in, a chore ticked, a transaction, a chore or child added. Dates are shown in South African time.</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const KEY_STORE = 'sprout_admin_key';
+  const TZ = 'Africa/Johannesburg';
+  // Sprout's list prices. MRR is an estimate from these, not from the
+  // gateways' own ledgers: South African families pay Rand, everyone else Dollars.
+  const PRICES = { ZA: { monthly: 59, yearly: 590, cur: 'R' }, ROW: { monthly: 4.5, yearly: 45, cur: '$' } };
+  const STATUS_LABEL = { active: 'Active', trialing: 'Trialing', canceled: 'Canceled', none: 'No subscription', past_due: 'Past due', paused: 'Paused' };
+  const STATUS_COLOR = { active: 'var(--active)', trialing: 'var(--trialing)', canceled: 'var(--canceled)', none: 'var(--none)', past_due: '#b45309', paused: '#b45309' };
+
+  const $ = s => document.querySelector(s);
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'class') n.className = v; else if (k === 'style') n.style.cssText = v; else n.setAttribute(k, v);
+    }
+    for (const k of kids) n.append(k instanceof Node ? k : document.createTextNode(String(k)));
+    return n;
+  };
+  const svgEl = (tag, attrs = {}) => {
+    const n = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    return n;
+  };
+  const fmtDate = iso => iso ? new Intl.DateTimeFormat('en-ZA', { timeZone: TZ, day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso)) : '—';
+  const fmtDateTime = iso => iso ? new Intl.DateTimeFormat('en-ZA', { timeZone: TZ, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso)) : '—';
+  const daysAgo = iso => iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null;
+  const daysUntil = iso => iso ? Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000) : null;
+  const ago = iso => { const d = daysAgo(iso); return d === null ? 'never' : d === 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`; };
+  const money = (cur, n) => cur + (Number.isInteger(n) ? n.toLocaleString('en-ZA') : n.toFixed(2));
+  const displayName = u => u.name || (u.email ? u.email.split('@')[0] : '(no name)');
+  const pct = (n, t) => t ? Math.round(100 * n / t) + '%' : '0%';
+
+  let data = null;
+  let sortKey = 'signed_up_at', sortAsc = false;
+
+  // ---------- auth gate ----------
+  function getKey() { try { return sessionStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
+  function setKey(k) { try { k ? sessionStorage.setItem(KEY_STORE, k) : sessionStorage.removeItem(KEY_STORE); } catch (e) { /* private mode */ } }
+  function showGate(msg) {
+    $('#gate').classList.remove('hidden'); $('#app').classList.add('hidden');
+    $('#gateErr').textContent = msg || ''; $('#keyInput').focus();
+  }
+  $('#gateForm').addEventListener('submit', e => { e.preventDefault(); setKey($('#keyInput').value.trim()); $('#keyInput').value = ''; load(); });
+  $('#signout').addEventListener('click', () => { setKey(''); data = null; showGate(); });
+  $('#refresh').addEventListener('click', load);
+
+  async function load() {
+    const key = getKey();
+    if (!key) return showGate();
+    $('#gate').classList.add('hidden'); $('#app').classList.remove('hidden');
+    $('#loading').classList.remove('hidden'); $('#refresh').disabled = true;
+    try {
+      const res = await fetch('/api/admin-dashboard', { headers: { Authorization: 'Bearer ' + key }, cache: 'no-store' });
+      if (res.status === 401) { setKey(''); return showGate('That key was not accepted.'); }
+      if (!res.ok) { const body = await res.json().catch(() => ({})); throw new Error(body.error || ('Server returned ' + res.status)); }
+      data = await res.json();
+      render();
+      $('#content').classList.remove('hidden');
+    } catch (err) {
+      $('#loading').textContent = 'Could not load: ' + err.message;
+      return;
+    } finally { $('#refresh').disabled = false; }
+    $('#loading').classList.add('hidden');
+  }
+
+  // ---------- derived numbers ----------
+  function mrr(users) {
+    const out = { R: 0, $: 0, paying: 0, excluded: 0 };
+    for (const u of users) {
+      if (u.status !== 'active') continue;
+      if (!u.billing_cycle || !u.provider) { out.excluded++; continue; }
+      const p = PRICES[u.country === 'ZA' ? 'ZA' : 'ROW'];
+      out[p.cur] += u.billing_cycle === 'yearly' ? p.yearly / 12 : p.monthly;
+      out.paying++;
+    }
+    return out;
+  }
+  const trialEnd = u => u.next_billed_at || u.current_period_ends_at;
+
+  // ---------- renderers ----------
+  function render() {
+    const users = data.users;
+    $('#generated').textContent = 'Updated ' + fmtDateTime(data.generated_at);
+    renderKpis(users);
+    renderDonut(users);
+    renderSignups(users);
+    renderBreakdowns(users);
+    renderAttention(users);
+    renderMessages();
+    renderTable();
+  }
+
+  function renderKpis(users) {
+    const by = s => users.filter(u => u.status === s).length;
+    const m = mrr(users);
+    const signups7 = users.filter(u => daysAgo(u.signed_up_at) < 7).length;
+    const signups30 = users.filter(u => daysAgo(u.signed_up_at) < 30).length;
+    const active7 = users.filter(u => daysAgo(u.last_activity_at) !== null && daysAgo(u.last_activity_at) < 7).length;
+    const t = data.totals;
+    const tiles = [
+      ['Total sign-ups', users.length, `${signups7} this week · ${signups30} last 30 days`, ''],
+      ['Active (paying)', by('active'), `${m.paying} counted in MRR` + (m.excluded ? ` · ${m.excluded} without billing record` : ''), 'active'],
+      ['Trialing', by('trialing'), `${users.filter(u => u.status === 'trialing' && daysUntil(trialEnd(u)) <= 7).length} end within 7 days`, 'trialing'],
+      ['Canceled', by('canceled'), `${users.filter(u => u.cancel_scheduled && u.status !== 'canceled').length} more scheduled to cancel`, 'canceled'],
+      ['No subscription', by('none'), 'signed up, never started a trial', ''],
+      ['Est. MRR (ZA)', money('R', Math.round(m.R)), 'from list prices, yearly ÷ 12', ''],
+      ['Est. MRR (ROW)', money('$', Math.round(m.$ * 100) / 100), 'Paddle, Dollar plans', ''],
+      ['Families active 7d', active7, `${t.completions_7d} chores done this week`, ''],
+    ];
+    const wrap = $('#kpis'); wrap.replaceChildren();
+    for (const [label, value, sub, cls] of tiles) {
+      wrap.append(el('div', { class: 'card kpi ' + cls }, el('div', { class: 'label' }, label), el('div', { class: 'value' }, value), el('div', { class: 'sub' }, sub)));
+    }
+  }
+
+  function renderDonut(users) {
+    const order = ['active', 'trialing', 'canceled', 'none', 'past_due', 'paused'];
+    const counts = new Map();
+    for (const u of users) counts.set(u.status, (counts.get(u.status) || 0) + 1);
+    const slices = order.filter(s => counts.get(s)).map(s => ({ s, n: counts.get(s) }));
+    for (const [s, n] of counts) if (!order.includes(s)) slices.push({ s, n });
+    const total = users.length;
+    const size = 170, r = 64, cx = size / 2, cy = size / 2, C = 2 * Math.PI * r, gap = 2;
+    const svg = svgEl('svg', { viewBox: `0 0 ${size} ${size}`, width: size, height: size, role: 'img', 'aria-label': 'Users by subscription status' });
+    let offset = 0;
+    const wrap = $('#donut'); wrap.replaceChildren(svg);
+    const tip = el('div', { class: 'tip' }); wrap.append(tip);
+    for (const { s, n } of slices) {
+      const len = C * n / total;
+      const arc = svgEl('circle', { cx, cy, r, fill: 'none', stroke: STATUS_COLOR[s] || 'var(--none)', 'stroke-width': 22,
+        'stroke-dasharray': `${Math.max(0, len - (slices.length > 1 ? gap : 0))} ${C}`, 'stroke-dashoffset': -offset, transform: `rotate(-90 ${cx} ${cy})` });
+      arc.style.cursor = 'default';
+      arc.addEventListener('pointerenter', () => { tip.textContent = `${STATUS_LABEL[s] || s}: ${n} (${pct(n, total)})`; tip.classList.add('on'); });
+      arc.addEventListener('pointermove', e => { const b = wrap.getBoundingClientRect(); tip.style.left = (e.clientX - b.left) + 'px'; tip.style.top = (e.clientY - b.top - 6) + 'px'; });
+      arc.addEventListener('pointerleave', () => tip.classList.remove('on'));
+      svg.append(arc);
+      offset += len;
+    }
+    const t1 = svgEl('text', { x: cx, y: cy - 2, 'text-anchor': 'middle', 'font-size': 28, 'font-weight': 700, fill: 'currentColor' }); t1.textContent = total;
+    const t2 = svgEl('text', { x: cx, y: cy + 18, 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--text-3)' }); t2.textContent = 'accounts';
+    svg.append(t1, t2);
+    const legend = $('#donutLegend'); legend.replaceChildren();
+    for (const { s, n } of slices) {
+      legend.append(el('li', {}, el('span', { class: 'sw', style: 'background:' + (STATUS_COLOR[s] || 'var(--none)') }), el('b', {}, n), el('span', {}, STATUS_LABEL[s] || s), el('span', { class: 'pct' }, pct(n, total))));
+    }
+  }
+
+  function renderSignups(users) {
+    // Monday-start weeks, most recent 12, in SAST.
+    const weeks = [];
+    const now = new Date();
+    const sast = new Date(now.toLocaleString('en-US', { timeZone: TZ }));
+    const monday = new Date(sast); monday.setHours(0, 0, 0, 0); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    for (let i = 11; i >= 0; i--) { const d = new Date(monday); d.setDate(d.getDate() - 7 * i); weeks.push({ start: d, n: 0 }); }
+    for (const u of users) {
+      const d = new Date(new Date(u.signed_up_at).toLocaleString('en-US', { timeZone: TZ }));
+      for (let i = weeks.length - 1; i >= 0; i--) { if (d >= weeks[i].start) { weeks[i].n++; break; } }
+    }
+    const W = 520, H = 200, padL = 28, padB = 28, padT = 12, padR = 8;
+    const max = Math.max(1, ...weeks.map(w => w.n));
+    const innerW = W - padL - padR, innerH = H - padT - padB;
+    const bw = innerW / weeks.length;
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Sign-ups per week' });
+    const wrap = $('#signups'); wrap.replaceChildren(svg);
+    const tip = el('div', { class: 'tip' }); wrap.append(tip);
+    const ticks = max <= 4 ? max : 4;
+    for (let i = 0; i <= ticks; i++) {
+      const v = Math.round(max * i / ticks), y = padT + innerH - innerH * v / max;
+      svg.append(svgEl('line', { x1: padL, x2: W - padR, y1: y, y2: y, stroke: 'var(--grid)', 'stroke-width': 1 }));
+      const t = svgEl('text', { x: padL - 6, y: y + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--text-3)' }); t.textContent = v; svg.append(t);
+    }
+    weeks.forEach((w, i) => {
+      const h = innerH * w.n / max, x = padL + i * bw + 4, y = padT + innerH - h;
+      const rect = svgEl('rect', { x, y: w.n ? y : padT + innerH - 1, width: Math.max(2, bw - 8), height: w.n ? h : 1, rx: 4, fill: w.n ? 'var(--bar)' : 'var(--grid)' });
+      const hit = svgEl('rect', { x: padL + i * bw, y: padT, width: bw, height: innerH, fill: 'transparent' });
+      const label = w.start.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
+      hit.addEventListener('pointerenter', () => { tip.textContent = `Week of ${label}: ${w.n} sign-up${w.n === 1 ? '' : 's'}`; tip.classList.add('on'); rect.style.opacity = .8; });
+      hit.addEventListener('pointermove', e => { const b = wrap.getBoundingClientRect(); tip.style.left = (e.clientX - b.left) + 'px'; tip.style.top = (e.clientY - b.top - 6) + 'px'; });
+      hit.addEventListener('pointerleave', () => { tip.classList.remove('on'); rect.style.opacity = 1; });
+      svg.append(rect, hit);
+      if (i % 2 === 1 || weeks.length <= 8) { const t = svgEl('text', { x: padL + i * bw + bw / 2, y: H - 8, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--text-3)' }); t.textContent = label; svg.append(t); }
+      if (w.n) { const t = svgEl('text', { x: padL + i * bw + bw / 2, y: y - 4, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--text-2)' }); t.textContent = w.n; svg.append(t); }
+    });
+  }
+
+  function bars(target, rows, labelFn) {
+    const wrap = $(target); wrap.replaceChildren();
+    if (!rows.length) { wrap.append(el('div', { class: 'note' }, 'Nothing yet.')); return; }
+    const max = Math.max(1, ...rows.map(r => r[1]));
+    for (const [k, n] of rows) {
+      wrap.append(el('div', { class: 'row' }, el('span', { class: 'lbl', title: labelFn(k) }, labelFn(k)), el('div', { class: 'track' }, el('div', { class: 'fill', style: `width:${100 * n / max}%` })), el('span', { class: 'n' }, n)));
+    }
+  }
+  function tally(users, fn) {
+    const m = new Map();
+    for (const u of users) { const k = fn(u) || '(unknown)'; m.set(k, (m.get(k) || 0) + 1); }
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }
+  const COUNTRY = new Intl.DisplayNames(['en'], { type: 'region' });
+  function renderBreakdowns(users) {
+    bars('#byCountry', tally(users, u => u.country), k => { try { return k === '(unknown)' ? k : COUNTRY.of(k); } catch (e) { return k; } });
+    bars('#byProvider', tally(users.filter(u => u.status !== 'none'), u => u.provider || 'none'), k => ({ paystack: 'Paystack', paddle: 'Paddle', none: 'No gateway record' })[k] || k);
+    bars('#byCycle', tally(users.filter(u => u.status === 'active' || u.status === 'trialing'), u => u.billing_cycle), k => ({ monthly: 'Monthly', yearly: 'Yearly' })[k] || k);
+    bars('#bySource', tally(users, u => u.utm_source || 'direct / unknown'), k => k);
+    bars('#referrals', data.referral_codes.map(c => [`${c.code} — ${c.partner_name}${c.active ? '' : ' (off)'} · ${c.paid} paid`, c.signups]), k => k);
+    const t = data.totals;
+    bars('#engagement', [['Children', t.kids], ['Active chores', t.chores_active], ['Chores done (7d)', t.completions_7d], ['Chores done (30d)', t.completions_30d], ['Awaiting approval', t.pending_approvals], ['Push enabled', t.push_subscriptions]], k => k);
+  }
+
+  function attentionCard(title, items, fmt, okText) {
+    const card = el('div', { class: 'card ' + (items.length ? '' : 'ok') });
+    card.append(el('h3', {}, `${title} `, el('small', {}, `(${items.length})`)));
+    if (!items.length) card.append(el('div', { class: 'empty' }, okText));
+    else { const ul = el('ul'); for (const u of items) { const [l, r] = fmt(u); ul.append(el('li', {}, el('span', {}, l), el('span', {}, r))); } card.append(ul); }
+    return card;
+  }
+  function renderAttention(users) {
+    const wrap = $('#attention'); wrap.replaceChildren();
+    const trials = users.filter(u => u.status === 'trialing' && trialEnd(u)).sort((a, b) => new Date(trialEnd(a)) - new Date(trialEnd(b)));
+    wrap.append(attentionCard('Trials ending soon', trials.filter(u => daysUntil(trialEnd(u)) <= 7), u => [displayName(u) + (u.kids ? '' : ' · no children yet'), `${fmtDate(trialEnd(u))} (${daysUntil(trialEnd(u))}d)`], 'No trials end in the next 7 days.'));
+    wrap.append(attentionCard('Payment failed', users.filter(u => u.payment_failed_at), u => [displayName(u), `${ago(u.payment_failed_at)} · ${u.payment_retry_count} retr${u.payment_retry_count === 1 ? 'y' : 'ies'}`], 'No failed payments outstanding.'));
+    wrap.append(attentionCard('Cancellation scheduled', users.filter(u => u.cancel_scheduled && u.status !== 'canceled'), u => [displayName(u), 'access ends ' + fmtDate(u.current_period_ends_at)], 'Nobody is scheduled to cancel.'));
+    wrap.append(attentionCard('Signed up, never verified email', users.filter(u => !u.email_verified && daysAgo(u.signed_up_at) >= 1), u => [displayName(u), 'signed up ' + ago(u.signed_up_at)], 'Everyone has verified their email.'));
+    wrap.append(attentionCard('Paying or trialing, no children added', users.filter(u => (u.status === 'active' || u.status === 'trialing') && u.kids === 0), u => [displayName(u), STATUS_LABEL[u.status] + ' · ' + ago(u.signed_up_at)], 'Every subscriber has set up at least one child.'));
+    wrap.append(attentionCard('Subscribers quiet for 14+ days', users.filter(u => u.status === 'active' && daysAgo(u.last_activity_at) >= 14), u => [displayName(u), 'last seen ' + ago(u.last_activity_at)], 'All paying families have been active in the last two weeks.'));
+    wrap.append(attentionCard('Canceled, data purge pending', users.filter(u => u.status === 'canceled' && u.canceled_at), u => [displayName(u), `purge ${fmtDate(new Date(new Date(u.canceled_at).getTime() + 60 * 86400000).toISOString())}`], 'No canceled accounts waiting to be purged.'));
+  }
+
+  function renderMessages() {
+    const wrap = $('#messages'); wrap.replaceChildren();
+    $('#msgCount').textContent = `${data.totals.contact_messages} total, latest ${Math.min(10, data.contact_messages.length)}`;
+    if (!data.contact_messages.length) { wrap.append(el('div', { class: 'msg note' }, 'No contact-form messages yet.')); return; }
+    for (const m of data.contact_messages) {
+      wrap.append(el('div', { class: 'msg' }, el('div', {}, el('span', { class: 'who' }, `${m.name} · ${m.email}`), el('span', { class: 'dim' }, ` ${m.topic || ''} · ${fmtDateTime(m.created_at)}`)), el('div', { class: 'body' }, m.message)));
+    }
+  }
+
+  // ---------- users table ----------
+  const sortValue = (u, k) => {
+    if (k === 'plan') return `${u.provider || ''} ${u.billing_cycle || ''}`;
+    if (k === 'next_date') return trialEnd(u) || '';
+    if (k === 'name') return displayName(u).toLowerCase();
+    if (k === 'notes') return notesFor(u).length;
+    return u[k] ?? '';
+  };
+  function notesFor(u) {
+    const n = [];
+    if (u.cancel_scheduled && u.status !== 'canceled') n.push('cancel scheduled');
+    if (u.payment_failed_at) n.push('payment failed');
+    if (!u.email_verified) n.push('email unverified');
+    if (!u.onboarding_complete && u.status !== 'none') n.push('onboarding incomplete');
+    if (u.pending_approvals) n.push(`${u.pending_approvals} awaiting approval`);
+    if (u.push_enabled) n.push('push on');
+    if (u.referral_code) n.push('ref: ' + u.referral_code);
+    if (u.utm_source) n.push('via ' + u.utm_source);
+    if (u.banned) n.push('banned');
+    return n;
+  }
+  function filteredUsers() {
+    const q = $('#search').value.trim().toLowerCase();
+    const s = $('#statusFilter').value;
+    let rows = data.users.filter(u => (!s || u.status === s) && (!q || [u.name, u.email, u.country, u.provider, u.utm_source, u.referral_code].some(v => v && String(v).toLowerCase().includes(q))));
+    rows.sort((a, b) => { const x = sortValue(a, sortKey), y = sortValue(b, sortKey); const c = x < y ? -1 : x > y ? 1 : 0; return sortAsc ? c : -c; });
+    return rows;
+  }
+  function renderTable() {
+    const rows = filteredUsers();
+    $('#userCount').textContent = `${data.users.length} accounts`;
+    $('#filteredCount').textContent = rows.length === data.users.length ? '' : `${rows.length} shown`;
+    for (const th of document.querySelectorAll('#users th')) { th.classList.toggle('sorted', th.dataset.k === sortKey); th.classList.toggle('asc', th.dataset.k === sortKey && sortAsc); }
+    const tbody = $('#users tbody'); tbody.replaceChildren();
+    for (const u of rows) {
+      const next = trialEnd(u);
+      const nextLabel = u.status === 'trialing' ? 'trial ends' : u.status === 'active' ? 'next bill' : '';
+      const tr = el('tr', {},
+        el('td', {}, displayName(u)),
+        el('td', {}, u.email || '—'),
+        el('td', {}, u.country || '—', u.signup_geo && u.signup_geo !== (u.country === 'ZA' ? 'ZA' : 'ROW') ? el('span', { class: 'dim' }, 'geo ' + u.signup_geo) : ''),
+        el('td', {}, fmtDate(u.signed_up_at), el('span', { class: 'dim' }, ago(u.signed_up_at))),
+        el('td', {}, fmtDate(u.last_activity_at), el('span', { class: 'dim' }, ago(u.last_activity_at))),
+        el('td', {}, el('span', { class: 'pill ' + u.status }, STATUS_LABEL[u.status] || u.status)),
+        el('td', {}, u.provider ? ({ paystack: 'Paystack', paddle: 'Paddle' })[u.provider] || u.provider : '—', el('span', { class: 'dim' }, u.billing_cycle || '')),
+        el('td', {}, next && nextLabel ? fmtDate(next) : '—', el('span', { class: 'dim' }, next && nextLabel ? nextLabel : '')),
+        el('td', { class: 'num' }, u.kids),
+        el('td', { class: 'num' }, u.chores),
+        el('td', { class: 'num' }, u.completions_7d),
+        el('td', {}, ...notesFor(u).map(n => el('span', { class: 'flag' }, n))),
+      );
+      tbody.append(tr);
+    }
+  }
+  $('#search').addEventListener('input', renderTable);
+  $('#statusFilter').addEventListener('change', renderTable);
+  document.querySelector('#users thead').addEventListener('click', e => {
+    const th = e.target.closest('th'); if (!th) return;
+    if (sortKey === th.dataset.k) sortAsc = !sortAsc; else { sortKey = th.dataset.k; sortAsc = !['signed_up_at', 'last_activity_at', 'kids', 'chores', 'completions_7d', 'notes'].includes(sortKey); }
+    renderTable();
+  });
+  $('#exportCsv').addEventListener('click', () => {
+    if (!data) return;
+    const cols = ['name', 'email', 'country', 'signed_up_at', 'last_activity_at', 'status', 'provider', 'billing_cycle', 'next_billed_at', 'current_period_ends_at', 'canceled_at', 'cancel_scheduled', 'payment_failed_at', 'email_verified', 'onboarding_complete', 'utm_source', 'referral_code', 'kids', 'chores', 'completions', 'completions_7d', 'pending_approvals', 'push_enabled'];
+    const esc = v => { const s = v === null || v === undefined ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const csv = [cols.join(','), ...filteredUsers().map(u => cols.map(c => esc(u[c])).join(','))].join('\n');
+    const a = el('a', { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: `sprout-users-${new Date().toISOString().slice(0, 10)}.csv` });
+    document.body.append(a); a.click(); a.remove();
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>
