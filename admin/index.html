@@ -455,7 +455,7 @@
     wrap.append(attentionCard('Cancellation scheduled', users.filter(u => u.cancel_scheduled && u.status !== 'canceled'), u => [displayName(u), 'access ends ' + fmtDate(u.current_period_ends_at)], 'Nobody is scheduled to cancel.'));
     wrap.append(attentionCard('Signed up, never verified email', users.filter(u => !u.email_verified && daysAgo(u.signed_up_at) >= 1), u => [displayName(u), 'signed up ' + ago(u.signed_up_at)], 'Everyone has verified their email.'));
     wrap.append(attentionCard('Paying or trialing, no children added', users.filter(u => (u.status === 'active' || u.status === 'trialing') && u.kids === 0), u => [displayName(u), STATUS_LABEL[u.status] + ' · ' + ago(u.signed_up_at)], 'Every subscriber has set up at least one child.'));
-    wrap.append(attentionCard('Subscribers quiet for 14+ days', users.filter(u => u.status === 'active' && daysAgo(u.last_activity_at) >= 14), u => [displayName(u), 'last seen ' + ago(u.last_activity_at)], 'All paying families have been active in the last two weeks.'));
+    wrap.append(attentionCard('Subscribers quiet for 5+ days', users.filter(u => u.status === 'active' && daysAgo(u.last_activity_at) >= 5), u => [displayName(u), 'last seen ' + ago(u.last_activity_at)], 'All paying families have been active in the last 5 days.'));
     wrap.append(attentionCard('Canceled, data purge pending', users.filter(u => u.status === 'canceled' && u.canceled_at), u => [displayName(u), `purge ${fmtDate(new Date(new Date(u.canceled_at).getTime() + 60 * 86400000).toISOString())}`], 'No canceled accounts waiting to be purged.'));
   }
 
