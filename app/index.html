@@ -2732,10 +2732,41 @@ async function doSignIn() {
     const pass  = document.getElementById('l-pass')?.value;
     const errEl = document.getElementById('l-err');
     if (!email || !pass) { if (errEl) errEl.textContent = 'Please enter email and password.'; return; }
-    if (errEl) errEl.textContent = 'Signing in…';
+    // Back to red: a successful "link sent" note turns this line green.
+    if (errEl) { errEl.style.color = '#f43f5e'; errEl.textContent = 'Signing in…'; }
     const { error } = await sb.auth.signInWithPassword({ email, password: pass });
     if (error) track('signin_failed', { reason: error.message });
-    if (error && errEl) errEl.textContent = error.message;
+    if (!error || !errEl) return;
+    // Supabase's own wording is "Email not confirmed", and that was the whole
+    // message: two of the first trials hit it, and the rescue email sends people
+    // straight here. Say what to do and let them ask for the link again.
+    if (error.code === 'email_not_confirmed' || /not confirmed/i.test(error.message)) {
+        S.unconfirmedEmail = email;
+        errEl.innerHTML = `One step first: confirm your email. We sent a link to <strong>${esc(email)}</strong> (check spam too). <button type="button" id="l-resend" onclick="resendConfirmation()" style="background:none;border:none;padding:0;cursor:pointer;color:#15803d;font-weight:700;font-family:var(--font-family);font-size:14px;text-decoration:underline">Send it again</button>`;
+        return;
+    }
+    errEl.textContent = error.message;
+}
+async function resendConfirmation() {
+    const email = S.unconfirmedEmail;
+    const errEl = document.getElementById('l-err');
+    if (!email || !errEl) return;
+    const btn = document.getElementById('l-resend');
+    if (btn) btn.disabled = true;
+    // Lands them in the app already signed in, where the subscription gate offers
+    // the card step. This exact URL is on Supabase's redirect allow-list; one that
+    // isn't gets silently swapped for the marketing homepage.
+    const { error } = await sb.auth.resend({ type: 'signup', email, options: { emailRedirectTo: 'https://www.sproutearnsave.com/app/index.html' } });
+    track('confirmation_resent', { ok: !error });
+    if (error) {
+        // Supabase allows one of these a minute per address.
+        errEl.textContent = /security purposes|rate limit/i.test(error.message)
+            ? 'We sent one a moment ago. Give it a minute, then try again.'
+            : error.message;
+        return;
+    }
+    errEl.style.color = '#15803d';
+    errEl.textContent = `Sent. Open the link in the email to ${email}, and you'll come straight back here signed in.`;
 }
 // True while a sign-up request is out. Enter in the password box and the button
 // both land in doSignUp, and a second request inside 60 seconds makes Supabase
@@ -2826,6 +2857,10 @@ async function submitSignUp({ name, email, pass, country, referralCode, billingC
     const userId = data?.user?.id;
     if (!userId) { if (errEl) errEl.textContent = 'Something went wrong creating your account.'; return; }
     if (errEl) errEl.textContent = '';
+    // Puts this parent in Loops as "signed up" so the rescue email can reach them
+    // if they leave at the card step (api/signup-track.js). Nothing here waits on
+    // it, and keepalive lets it finish even as Paystack's redirect takes over.
+    fetch('/api/signup-track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }), keepalive: true }).catch(() => {});
     const checkout = { email, geo, userId, billingCycle, referralCode };
     // Paddle opens as an overlay on our own page and says "due today: 0", so it
     // needs no warm-up. Paystack is a full redirect to a page headed "Pay ZAR

@@ -6,6 +6,26 @@ fires the trigger. Rebuilt September 2026. Loops workspace: https://app.loops.so
 Day 0 = the moment Paddle or Paystack confirms the trial (server-side
 `trial_started` event from the billing webhooks in `api/`).
 
+## Before the trial: sign-up rescue
+
+A parent is added to Loops the moment their account is created, with
+`lifecycleStage` = `signed_up` (`api/signup-track.js`, called from the sign-up
+form). Before this, anyone who left at the card page never reached Loops at all.
+
+Workflow `signup_rescue_v1`, trigger `account_created`, one time per contact:
+
+| When | Email | Only if |
+|---|---|---|
+| +1 day | You're one step from starting Sprout (South Africa: explains the R1 card check) | `lifecycleStage` is still `signed_up` and `currency` is `ZAR` |
+| +1 day | You're one step from starting Sprout (rest of world: no R1 line) | `lifecycleStage` is still `signed_up` and `currency` is not `ZAR` |
+
+Both billing webhooks set `lifecycleStage` to `trial` when a trial starts, so
+a parent who finishes checkout never gets it. The email goes to an address that
+may not be confirmed yet, which is why there is one email and no sequence. Its
+button opens the app's sign-in page; signing in before confirming now explains
+what to do and offers to resend the link (`resendConfirmation` in
+`app/index.html`), and the subscription gate then offers the card step.
+
 ## Trial journey (calendar-based, adaptive)
 
 Workflow `trial_onboarding_v2`, trigger `trial_started`. Every email after the

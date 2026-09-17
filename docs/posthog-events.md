@@ -44,6 +44,7 @@ trial → paid → cancelled funnel is complete regardless of the banner.
 | `signup_failed` | Supabase rejected it. | `reason` |
 | `signup_duplicate_email` | Email already has an account (sent to sign-in). | |
 | `signin_failed` | Wrong password etc. | `reason` |
+| `confirmation_resent` | Parent tried to sign in before confirming their email and asked for the link again. | `ok` |
 | `card_check_left` | South African parent chose "finish later" on the card-check explainer instead of continuing to Paystack. | |
 | `checkout_started` | Paddle overlay opened or Paystack redirect began. For South Africa this now fires when they press Continue on the card-check explainer, not straight after the form. | `billing_cycle`, `geo`, `provider`, `has_referral_code`, `utm_*` |
 | `checkout_completed` | Browser saw the checkout succeed (Paddle callback / Paystack return). The trial itself is confirmed by the server event below. | `billing_cycle`, `provider`, `utm_*` |
