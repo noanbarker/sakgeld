@@ -222,7 +222,10 @@ async function startTrialFromCardSetup(supabaseAdmin, data) {
   // Only fire when this is genuinely a new trial. A parent who cancelled and
   // came back would otherwise be counted as a fresh conversion twice.
   if (applied.previousStatus === null) {
-    await sendLoopsEvent(email, 'trial_started', { firstName, trialEndsAt, billingInterval: interval, nextChargeAmount });
+    // *Display, not trialEndsAt: sendLoopsEvent also writes these onto the
+    // Loops contact, where trialEndsAt is a Date-typed property that rejects
+    // "1 October 2026" with a 400 and drops the whole event.
+    await sendLoopsEvent(email, 'trial_started', { firstName, trialEndsAtDisplay: trialEndsAt, billingInterval: interval, nextChargeAmount });
     // Same event_id the browser sends via the Pixel, so Meta merges the two
     // copies into one conversion instead of double-counting it.
     await sendMetaCAPIEvent({ eventName: 'StartTrial', eventId: `trial_started_${userId}`, email, userId });
@@ -282,7 +285,8 @@ async function handleSubscriptionCharge(supabaseAdmin, data) {
   // so this fires from the server only — no browser copy to de-duplicate.
   if (applied.previousStatus === 'trialing') {
     await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionActivated, email, { firstName, billingInterval: interval, nextBillingDate });
-    await sendLoopsEvent(email, 'subscription_activated', { firstName, billingInterval: interval, nextBillingDate });
+    // Same trap: nextBillingDate is Date-typed on the contact.
+    await sendLoopsEvent(email, 'subscription_activated', { firstName, billingInterval: interval, nextBillingDateDisplay: nextBillingDate });
     await sendMetaCAPIEvent({
       eventName: 'Subscribe',
       eventId: `subscription_paid_${userId}`,

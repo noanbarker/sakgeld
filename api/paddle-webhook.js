@@ -263,7 +263,11 @@ module.exports = async (req, res) => {
       // delivery (they don't guarantee exactly-once) doesn't resend the email.
       if (newStatus && newStatus !== previousStatus) {
         if (previousStatus === null && newStatus === 'trialing') {
-          await sendLoopsEvent(email, 'trial_started', { firstName, trialEndsAt: accessEndsAt, billingInterval, nextChargeAmount });
+          // *Display, not trialEndsAt: sendLoopsEvent also writes these onto the
+          // Loops contact, where trialEndsAt is a Date-typed property that rejects
+          // "1 October 2026" with a 400 and drops the whole event — which left
+          // every trial_started workflow silent from 24 Aug to 17 Sep 2026.
+          await sendLoopsEvent(email, 'trial_started', { firstName, trialEndsAtDisplay: accessEndsAt, billingInterval, nextChargeAmount });
           // Same event_id as the client-side Pixel StartTrial call in app/index.html —
           // Meta merges the two into one conversion instead of double-counting it.
           await sendMetaCAPIEvent({ eventName: 'StartTrial', eventId: `trial_started_${userId}`, email, userId });
@@ -273,7 +277,8 @@ module.exports = async (req, res) => {
           await sendLoopsEvent(email, 'account_cancelled', { firstName, wasPaying: false, deletionDate: purgeDateFrom(event.occurred_at) });
         } else if (previousStatus === 'trialing' && newStatus === 'active') {
           await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionActivated, email, { firstName, billingInterval, nextBillingDate });
-          await sendLoopsEvent(email, 'subscription_activated', { firstName, billingInterval, nextBillingDate });
+          // Same trap: nextBillingDate is Date-typed on the contact.
+          await sendLoopsEvent(email, 'subscription_activated', { firstName, billingInterval, nextBillingDateDisplay: nextBillingDate });
           // No client-side pairing here — the trial converting to paid happens
           // automatically days later, with nobody necessarily on the site, so
           // this fires from the server only (no dedup event_id needed).
