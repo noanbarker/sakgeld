@@ -66,13 +66,38 @@
 
   posthog.init(API_KEY, config);
 
+  // The same tag names posthog-js itself picks up from a landing link, limited
+  // to the ones Sprout's links actually carry (utm_* from ads, email and push;
+  // the click ids Meta and Google add on their own).
+  function campaignTagsFromUrl() {
+    var tags = {};
+    try {
+      var params = new URLSearchParams(window.location.search);
+      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'gclid'].forEach(function (k) {
+        var v = params.get(k);
+        if (v) tags[k] = v;
+      });
+    } catch (e) { /* analytics must never break the page */ }
+    return tags;
+  }
+
   if (window.sproutConsent && consent !== 'accepted' && consent !== 'declined') {
     // Still undecided: the banner is on screen. Whatever they click is itself
     // worth measuring (a 20% accept rate means 80% of replay-able sessions are
     // never recorded), so each choice is captured as an event of its own.
     window.sproutConsent.onChange(function (value) {
       if (value === 'accepted') {
-        posthog.opt_in_capturing({ captureEventName: 'cookie_consent_accepted' });
+        // opt_in_capturing() wipes the cookieless state and starts a brand-new
+        // visit, and posthog-js won't read the campaign tags off the link a
+        // second time for the same URL (persistence.update_campaign_params
+        // returns early, and the reset doesn't clear what it compares against).
+        // Left alone, an ad click that accepts the banner turns into an untagged
+        // visit. So the tags ride along on the consent event, which is the first
+        // event of the new visit and therefore sets its source, and are then
+        // pinned to everything else sent during it.
+        var tags = campaignTagsFromUrl();
+        posthog.opt_in_capturing({ captureEventName: 'cookie_consent_accepted', captureProperties: tags });
+        if (Object.keys(tags).length) posthog.register_for_session(tags);
       } else if (value === 'declined') {
         posthog.capture('cookie_consent_declined');
         posthog.opt_out_capturing();
