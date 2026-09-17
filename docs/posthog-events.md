@@ -38,13 +38,14 @@ trial → paid → cancelled funnel is complete regardless of the banner.
 
 | Event | Fires when | Properties |
 |---|---|---|
-| `screen_viewed` | Each distinct screen as it appears. The app is one page, so this is its pageview. | `screen`: signup, signin, subscription-gate, onboarding:currency … onboarding:money, home, parent:overview … parent:settings, kid-pin, kid, parent-pin, reset-password |
+| `screen_viewed` | Each distinct screen as it appears. The app is one page, so this is its pageview. | `screen`: signup, card-check (South Africa only: the explainer shown between the form and Paystack), signin, subscription-gate, onboarding:currency … onboarding:money, home, parent:overview … parent:settings, kid-pin, kid, parent-pin, reset-password |
 | `billing_cycle_selected` | Monthly/yearly toggled on the signup form. | `billing_cycle` |
 | `signup_submitted` | Form passed validation and was sent to Supabase. | `billing_cycle`, `geo`, `country`, `has_referral_code`, `utm_*` |
 | `signup_failed` | Supabase rejected it. | `reason` |
 | `signup_duplicate_email` | Email already has an account (sent to sign-in). | |
 | `signin_failed` | Wrong password etc. | `reason` |
-| `checkout_started` | Paddle overlay opened or Paystack redirect began. | `billing_cycle`, `geo`, `provider`, `has_referral_code`, `utm_*` |
+| `card_check_left` | South African parent chose "finish later" on the card-check explainer instead of continuing to Paystack. | |
+| `checkout_started` | Paddle overlay opened or Paystack redirect began. For South Africa this now fires when they press Continue on the card-check explainer, not straight after the form. | `billing_cycle`, `geo`, `provider`, `has_referral_code`, `utm_*` |
 | `checkout_completed` | Browser saw the checkout succeed (Paddle callback / Paystack return). The trial itself is confirmed by the server event below. | `billing_cycle`, `provider`, `utm_*` |
 
 ### Billing lifecycle (server, from the webhooks)
@@ -100,7 +101,7 @@ person's `subscription_status`, `lifecycle_stage`, `billing_interval`,
 ## The questions the dashboards answer
 
 1. **Is the website working?** Visitors by source → CTA click rate by placement → signup page reached. Scroll depth and FAQ opens show what people read; dead clicks and replays show what confuses them.
-2. **Where does the signup funnel leak?** `screen_viewed: signup` → `signup_submitted` → `checkout_started` → `checkout_completed` → `trial_started` → `subscription_activated`, broken down by geo and by utm_source.
+2. **Where does the signup funnel leak?** `screen_viewed: signup` → `signup_submitted` → `screen_viewed: card-check` (ZA only) → `checkout_started` → `checkout_completed` → `trial_started` → `subscription_activated`, broken down by geo and by utm_source.
 3. **Do families actually set Sprout up?** Activation = `child_added` + `chore_created` + `chore_approved` within 7 days of `trial_started`. Onboarding step drop-off from `screen_viewed: onboarding:*`.
 4. **Do they keep using it?** Weekly retention on `chore_approved` (parents) and `chore_completed` (kids) after `trial_started`.
 5. **Are we making money?** Trial→paid rate, `payment_failed`, `trial_cancelled` vs `subscription_cancelled`, renewals.

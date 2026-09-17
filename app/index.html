@@ -805,6 +805,7 @@ Paddle.Initialize({
 function handlePaystackReturn() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout') !== 'paystack') return;
+    setCardCheck(null);
     // Clear it from the address bar so a refresh doesn't replay this.
     params.delete('checkout');
     const query = params.toString();
@@ -1046,7 +1047,11 @@ async function signOut() { track('signed_out'); await sb.auth.signOut(); }
 function toggleHistory() { S.historyOpen = !S.historyOpen; render(); }
 
 // ─── STATE ───────────────────────────────────────────────────────
+// Declared up here, not beside vCardCheck: S reads it while it's being built, and a
+// const further down the file would still be uninitialised at that moment.
+const CARD_CHECK_KEY = 'sprout_card_check';
 const S = {
+    cardCheck: loadCardCheck(), // South African sign-up waiting on the Paystack card step — see vCardCheck
     view: 'home',
     kidId: null,
     tab: 'overview',
@@ -2551,11 +2556,14 @@ function vSignupPage() {
                 </div>
 
                 <p id="l-err" style="color:#f43f5e;font-size:14px;margin:4px 0 12px;min-height:20px"></p>
-                <button id="l-submit" onclick="doSignUp()" class="btn-primary">Create Account</button>
-                <div style="display:flex;gap:6px;align-items:flex-start;font-family:var(--font-family);font-size:11.5px;color:var(--color-text-muted);margin-top:12px;line-height:1.5">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                  <span>Card required. Cancel before your trial ends and pay nothing.${pr.cardNote ? `<br>${pr.cardNote}` : ''}</span>
+                <!-- Above the button, at body size: four in five parents arriving from ads
+                     left at the card page, and a grey footnote under the button was the
+                     only warning they'd had that one was coming. -->
+                <div style="display:flex;gap:8px;align-items:flex-start;font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin:0 0 12px;line-height:1.5">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <span><strong style="color:var(--color-text-primary)">Next: add a card to start your trial.</strong> You pay nothing for 14 days, and nothing at all if you cancel before then.${pr.cardNote ? ` ${pr.cardNote}` : ''}</span>
                 </div>
+                <button id="l-submit" onclick="doSignUp()" class="btn-primary">Continue to free trial</button>
                 <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-muted);text-align:center;margin-top:16px">
                   Already have an account? <button type="button" onclick="setAuthMode('signin')" style="background:none;border:none;cursor:pointer;color:#15803d;font-weight:700;font-family:var(--font-family);font-size:13px;padding:0">Sign in</button>
                 </p>
@@ -2709,6 +2717,7 @@ function vSubscriptionGate() {
             <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:28px">${needsAttention
                 ? 'There’s an issue with your payment method or subscription. Please update your details to keep using Sprout.'
                 : 'Your account is set up, but your subscription was never completed. Finish checkout to start your 14-day free trial.'}</p>
+            ${!needsAttention && (currentUser?.user_metadata?.signup_geo || getGeoPref()) === 'ZA' ? cardCheckPoints(currentUser?.user_metadata?.billing_cycle) : ''}
             <button onclick="${needsAttention ? 'openManageSubscription()' : 'resumeCheckout()'}" class="btn-primary ${needsAttention ? 'manage-sub-btn' : ''}" style="margin-bottom:14px">${needsAttention ? 'Manage Subscription' : 'Continue to Checkout'}</button>
             <div>
               <button onclick="signOut()" style="font-family:var(--font-family);font-size:13px;font-weight:600;color:var(--color-text-muted);background:none;border:none;cursor:pointer">Sign out</button>
@@ -2817,7 +2826,99 @@ async function submitSignUp({ name, email, pass, country, referralCode, billingC
     const userId = data?.user?.id;
     if (!userId) { if (errEl) errEl.textContent = 'Something went wrong creating your account.'; return; }
     if (errEl) errEl.textContent = '';
-    await openTrialCheckout({ email, geo, userId, billingCycle, referralCode });
+    const checkout = { email, geo, userId, billingCycle, referralCode };
+    // Paddle opens as an overlay on our own page and says "due today: 0", so it
+    // needs no warm-up. Paystack is a full redirect to a page headed "Pay ZAR
+    // 1.00" — see vCardCheck for why that gets a screen of its own first.
+    if (geo === 'ZA') { setCardCheck(checkout); render(); return; }
+    await openTrialCheckout(checkout);
+}
+
+// ─── CARD CHECK EXPLAINER (South Africa) ─────────────────────────
+// Every one of the first eight South African sign-ups that never became a trial
+// showed up in Paystack as an abandoned R1 charge: they reached the card page and
+// left without trying a card. A parent who tapped an ad for a free trial lands,
+// ninety seconds later, on another company's page asking them to pay. This screen
+// sits between the two and says what that R1 is before they see it.
+//
+// Kept in sessionStorage as well as S so it survives a refresh, and so pressing
+// Back on Paystack's page returns here rather than to an empty sign-up form
+// (whose email would now be "already registered").
+function loadCardCheck() {
+    try {
+        // Coming back from Paystack means the card step is done — don't flash this
+        // screen for the moment before handlePaystackReturn takes over.
+        if (new URLSearchParams(window.location.search).get('checkout') === 'paystack') {
+            sessionStorage.removeItem(CARD_CHECK_KEY);
+            return null;
+        }
+        const saved = JSON.parse(sessionStorage.getItem(CARD_CHECK_KEY) || 'null');
+        return saved && saved.userId && saved.email ? saved : null;
+    } catch (e) { return null; }
+}
+function setCardCheck(checkout) {
+    S.cardCheck = checkout || null;
+    try {
+        if (checkout) sessionStorage.setItem(CARD_CHECK_KEY, JSON.stringify(checkout));
+        else sessionStorage.removeItem(CARD_CHECK_KEY);
+    } catch (e) { /* private mode: the screen still works, it just won't survive a refresh */ }
+}
+// The same four promises wherever a South African is about to be sent to
+// Paystack: here, and on the subscription gate for someone finishing later.
+function cardCheckPoints(billingCycle) {
+    const pr = SIGNUP_PRICING.ZA;
+    const after = billingCycle === 'yearly' ? `${pr.sym}${pr.yearly} a year` : `${pr.sym}${pr.monthly} a month`;
+    const tick = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px"><path d="M20 6 9 17l-5-5"/></svg>';
+    const points = [
+        `The next page shows a <strong>R1 charge</strong>. It only checks your card is real, and it's <strong>refunded straight away</strong>.`,
+        `You pay <strong>nothing for 14 days</strong>.`,
+        `Cancel during the trial and you're never charged.`,
+        `After the trial it's ${after}.`,
+    ];
+    return `<ul style="list-style:none;margin:0 0 22px;padding:0;display:grid;gap:12px;text-align:left">${points.map((p) => `
+        <li style="display:flex;gap:10px;align-items:flex-start;font-family:var(--font-family);font-size:14.5px;line-height:1.5;color:var(--color-text-secondary)">${tick}<span>${p}</span></li>`).join('')}</ul>`;
+}
+function vCardCheck() {
+    const c = S.cardCheck;
+    return `
+    <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
+      <div style="width:100%;max-width:440px">
+        <div class="pr-card" style="padding:44px 32px 36px;text-align:center">
+          <div class="pr-stripe"></div>
+          <div style="position:relative;z-index:1">
+            <div style="display:flex;justify-content:center;margin-bottom:16px"><picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:84px;width:auto;display:block"></picture></div>
+            <p style="font-family:var(--font-family);font-size:12.5px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-green-600);margin:0 0 6px">Account created · Step 2 of 2</p>
+            <h2 style="font-family:var(--font-family);font-size:23px;font-weight:900;color:#14532d;margin:0 0 8px">One last step: a quick card check</h2>
+            <p style="font-family:var(--font-family);font-size:14.5px;color:var(--color-text-secondary);margin:0 0 22px">Here's exactly what happens next, so nothing on the payment page surprises you.</p>
+            ${cardCheckPoints(c.billingCycle)}
+            <button id="cc-continue" onclick="continueCardCheck()" class="btn-primary" style="margin-bottom:12px">Continue to card check</button>
+            <div style="display:flex;gap:6px;align-items:flex-start;justify-content:center;font-family:var(--font-family);font-size:12.5px;line-height:1.5;color:var(--color-text-muted);margin-bottom:18px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:3px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span>Secure payment by Paystack. Sprout never sees your card number.</span>
+            </div>
+            <p style="font-family:var(--font-family);font-size:12.5px;color:var(--color-text-muted);margin:0 0 6px">Questions first? <a href="mailto:hello@sproutearnsave.com" style="color:#15803d;font-weight:700;text-decoration:none">hello@sproutearnsave.com</a></p>
+            <p style="font-family:var(--font-family);font-size:12.5px;color:var(--color-text-muted);margin:0">Rather finish later? <button type="button" onclick="leaveCardCheck()" style="background:none;border:none;cursor:pointer;color:#15803d;font-weight:700;font-family:var(--font-family);font-size:12.5px;padding:0">Sign in</button> any time to pick this up.</p>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+// Their account exists, so "later" means: confirm the email, sign in, and the
+// subscription gate offers this same card step again.
+function leaveCardCheck() {
+    track('card_check_left');
+    setCardCheck(null);
+    setAuthMode('signin');
+}
+async function continueCardCheck() {
+    if (!S.cardCheck) return;
+    const btn = document.getElementById('cc-continue');
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.textContent = 'Opening secure page…'; }
+    await openTrialCheckout(S.cardCheck);
+    // Still here means the redirect never fired (openPaystackCheckout has already
+    // toasted why) — hand the button back so they can try again.
+    const again = document.getElementById('cc-continue');
+    if (again) { again.disabled = false; again.style.opacity = ''; again.textContent = 'Continue to card check'; }
 }
 
 // ─── VIEWS ───────────────────────────────────────────────────────
@@ -5783,7 +5884,7 @@ function trackScreen() {
     let screen;
     if (S.authMode === 'reset') screen = 'reset-password';
     else if (S.authMode === 'reset-pin') screen = 'reset-parent-pin';
-    else if (!currentUser) screen = S.authMode === 'signin' ? 'signin' : 'signup';
+    else if (!currentUser) screen = S.authMode === 'signin' ? 'signin' : (S.cardCheck ? 'card-check' : 'signup');
     else {
         const subStatus = currentUser.user_metadata?.subscription_status;
         if (subStatus !== 'trialing' && subStatus !== 'active') screen = 'subscription-gate';
@@ -5811,7 +5912,9 @@ function render() {
         return;
     }
     if (!currentUser) {
-        document.getElementById('app').innerHTML = vLogin() + toastHtml;
+        // Choosing "Sign in" always wins, so nobody can get stuck on the card screen.
+        const showCardCheck = S.cardCheck && S.authMode !== 'signin';
+        document.getElementById('app').innerHTML = (showCardCheck ? vCardCheck() : vLogin()) + toastHtml;
         return;
     }
     const subStatus = currentUser.user_metadata?.subscription_status;
