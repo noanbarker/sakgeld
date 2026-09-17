@@ -2745,7 +2745,29 @@ async function doSignUp() {
     const referralCode = normaliseRefCode(document.getElementById('l-ref')?.value ?? getStoredRef());
     const billingCycle = S.billingCycle || 'monthly';
     const errEl = document.getElementById('l-err');
-    if (!name || !email || !pass || !country) { if (errEl) errEl.textContent = 'Please fill in all fields.'; return; }
+    // Name exactly what's still blank, mark those boxes red and put the cursor in
+    // the first one, so nobody has to hunt for the field they missed.
+    const missing = [
+        ['l-name', 'your name', name],
+        ['l-email', 'your email address', email],
+        ['l-pass', 'a password', pass],
+        ['l-country', 'your country', country],
+    ].filter(([, , value]) => !value);
+    ['l-name', 'l-email', 'l-pass', 'l-country'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const isMissing = missing.some(([mid]) => mid === id);
+        el.style.borderColor = isMissing ? '#f43f5e' : '';
+        // The red goes away the moment they fill the box in, not on the next submit.
+        if (isMissing) el.addEventListener(id === 'l-country' ? 'change' : 'input', () => { el.style.borderColor = ''; }, { once: true });
+    });
+    if (missing.length) {
+        const labels = missing.map(([, label]) => label);
+        const list = labels.length > 1 ? `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}` : labels[0];
+        if (errEl) errEl.textContent = `Still needed: ${list}.`;
+        document.getElementById(missing[0][0])?.focus();
+        return;
+    }
     if (pass.length < 6) { if (errEl) errEl.textContent = 'Password must be at least 6 characters.'; return; }
     signUpInFlight = true;
     setSignUpBusy(true);
