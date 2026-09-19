@@ -2857,6 +2857,15 @@ async function submitSignUp({ name, email, pass, country, referralCode, billingC
     const userId = data?.user?.id;
     if (!userId) { if (errEl) errEl.textContent = 'Something went wrong creating your account.'; return; }
     if (errEl) errEl.textContent = '';
+    // A new sign-up goes straight to the card step without a session, so the
+    // identify in onAuthStateChange doesn't run until their first sign-in, often
+    // days later or on another device. Without this the browser's signup_submitted
+    // and checkout_started sit on an anonymous person while the webhook's
+    // trial_started lands on the account id, and every funnel between them breaks.
+    // (Does nothing for a visitor who declined cookies; PostHog can't link those.)
+    if (window.posthog) {
+        try { posthog.identify(userId, personPropsFrom(data.user), personPropsOnceFrom(data.user)); } catch (e) {}
+    }
     // Puts this parent in Loops as "signed up" so the rescue email can reach them
     // if they leave at the card step (api/signup-track.js). Nothing here waits on
     // it, and keepalive lets it finish even as Paystack's redirect takes over.
