@@ -1,7 +1,7 @@
 # Loops lifecycle emails
 
 Plain-English map of every automated email, what triggers it, and which code
-fires the trigger. Rebuilt September 2026. Loops workspace: https://app.loops.so
+fires the trigger. Rebuilt September 2026; home-screen email added 22 September 2026. Loops workspace: https://app.loops.so
 
 Day 0 = the moment Paddle or Paystack confirms the trial (server-side
 `trial_started` event from the billing webhooks in `api/`).
@@ -36,6 +36,7 @@ welcome only sends while the account is still trialing and not cancelling.
 | 0 | Welcome to Sprout, your 14-day trial starts today | always |
 | 1 | Start small: choose 3 chores | chore count is 0 |
 | 2 | Tonight, let them mark one chore done | no chore completed yet |
+| 3 | Put Sprout on your home screen (takes 30 seconds) | trialing (deliberately no behaviour filter: every trial gets it) |
 | 5 | Make saving something they can actually see | trialing |
 
 Workflow `trial_conversion_v2`, trigger `trial_started`: day 7 "One week in,
