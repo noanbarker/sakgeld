@@ -300,7 +300,10 @@
     for (const u of users) {
       if (u.status !== 'active') continue;
       if (!u.billing_cycle || !u.provider) { out.excluded++; continue; }
-      const p = PRICES[u.country === 'ZA' ? 'ZA' : 'ROW'];
+      // signup_geo is what actually picked their price at checkout; the country
+      // dropdown is self-reported and can disagree (e.g. a VPN or someone abroad).
+      const geo = u.signup_geo || (u.provider === 'paystack' ? 'ZA' : u.country);
+      const p = PRICES[geo === 'ZA' ? 'ZA' : 'ROW'];
       out[p.cur] += u.billing_cycle === 'yearly' ? p.yearly / 12 : p.monthly;
       out.paying++;
     }
