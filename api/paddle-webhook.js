@@ -17,6 +17,8 @@ const {
 // Product analytics: the trial→paid→cancelled moments happen here, not in a
 // browser, so they're reported to PostHog from the server (see lib/posthog.js).
 const { trackSubscriptionChange } = require('../lib/posthog');
+// Meta StartTrial: shared event_id with the browser Pixel, plus match keys.
+const { sendStartTrialConversion } = require('../lib/meta-attribution');
 
 // Generous replay-protection window: Paddle's own examples use 5 seconds, but
 // that's tight enough to reject legitimate deliveries under normal network/
@@ -268,9 +270,9 @@ module.exports = async (req, res) => {
           // "1 October 2026" with a 400 and drops the whole event — which left
           // every trial_started workflow silent from 24 Aug to 17 Sep 2026.
           await sendLoopsEvent(email, 'trial_started', { firstName, trialEndsAtDisplay: accessEndsAt, billingInterval, nextChargeAmount });
-          // Same event_id as the client-side Pixel StartTrial call in app/index.html —
-          // Meta merges the two into one conversion instead of double-counting it.
-          await sendMetaCAPIEvent({ eventName: 'StartTrial', eventId: `trial_started_${userId}`, email, userId });
+          // Also what the status check in api/meta-attribution.js reports back to the browser, which then
+          // fires the Pixel copy under the same event_id (see lib/meta-attribution.js).
+          await sendStartTrialConversion(supabaseAdmin, { userId, email, trialRef: `paddle:${sub.id}` });
         } else if (previousStatus === 'trialing' && newStatus === 'canceled') {
           await sendLoopsEmail(LOOPS_TEMPLATE.trialCancelled, email, { firstName, accessEndsAt });
           await sendLoopsEvent(email, 'trial_cancelled', { firstName });

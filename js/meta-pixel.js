@@ -27,11 +27,20 @@
   if (!window.sproutConsent) return; // consent script missing — don't track without it
 
   var consent = window.sproutConsent.get();
+  // A declined visitor's Meta click id (kept by js/utm-capture.js) is never
+  // used, so it isn't kept either.
+  function forgetClickId() {
+    try { localStorage.removeItem('sprout_fbclid'); } catch (e) {}
+  }
+
   if (consent === 'accepted') {
     loadPixel();
-  } else if (consent !== 'declined') {
+  } else if (consent === 'declined') {
+    forgetClickId();
+  } else {
     window.sproutConsent.onChange(function (value) {
       if (value === 'accepted') loadPixel();
+      else if (value === 'declined') forgetClickId();
     });
   }
 })();

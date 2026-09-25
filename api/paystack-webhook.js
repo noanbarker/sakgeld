@@ -14,6 +14,8 @@ const {
 // Product analytics: the trial→paid→cancelled moments happen here, not in a
 // browser, so they're reported to PostHog from the server (see lib/posthog.js).
 const { trackSubscriptionChange } = require('../lib/posthog');
+// Meta StartTrial: shared event_id with the browser Pixel, plus match keys.
+const { sendStartTrialConversion } = require('../lib/meta-attribution');
 
 // South African subscription rail. The rest of the world is billed by Paddle
 // (api/paddle-webhook.js) and nothing here touches those customers.
@@ -226,9 +228,10 @@ async function startTrialFromCardSetup(supabaseAdmin, data) {
     // Loops contact, where trialEndsAt is a Date-typed property that rejects
     // "1 October 2026" with a 400 and drops the whole event.
     await sendLoopsEvent(email, 'trial_started', { firstName, trialEndsAtDisplay: trialEndsAt, billingInterval: interval, nextChargeAmount });
-    // Same event_id the browser sends via the Pixel, so Meta merges the two
-    // copies into one conversion instead of double-counting it.
-    await sendMetaCAPIEvent({ eventName: 'StartTrial', eventId: `trial_started_${userId}`, email, userId });
+    // Also what the status check in api/meta-attribution.js reports back to the browser, which then
+    // fires the Pixel copy under the same event_id (see lib/meta-attribution.js).
+    // The card-setup charge's reference identifies this one trial.
+    await sendStartTrialConversion(supabaseAdmin, { userId, email, trialRef: `paystack:${data.reference}` });
   }
 
   await trackSubscriptionChange({

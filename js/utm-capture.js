@@ -26,6 +26,27 @@
 })();
 
 /*
+ * Meta's click id. A Meta ad adds ?fbclid=... to the landing link, and Meta's
+ * Conversions API wants it back as `fbc` ("fb.1.<click time in ms>.<fbclid>")
+ * when a trial starts, often several pages and a Paystack redirect later.
+ *
+ * Kept here, with the time it was first seen, only on this device. The app
+ * sends it to our server (and so to Meta) only if the visitor accepts cookies
+ * (metaMatchKeys in app/index.html), and js/meta-pixel.js deletes it the moment
+ * they decline. A later visit with no fbclid leaves the original click alone;
+ * a new ad click replaces it.
+ */
+(function () {
+  var fbclid = new URLSearchParams(window.location.search).get('fbclid');
+  if (!fbclid || !/^[A-Za-z0-9_-]{1,500}$/.test(fbclid)) return;
+  try {
+    var saved = JSON.parse(localStorage.getItem('sprout_fbclid') || 'null');
+    if (saved && saved.v === fbclid) return; // same click reloaded: keep its original time
+    localStorage.setItem('sprout_fbclid', JSON.stringify({ v: fbclid, ts: Date.now() }));
+  } catch (e) {}
+})();
+
+/*
  * Partner referral codes reach us two ways:
  *
  *   /join/GREYCOLLEGE  — the printed short link. middleware.js banks the code in

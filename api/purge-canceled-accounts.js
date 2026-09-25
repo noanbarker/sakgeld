@@ -1,6 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 
 const GRACE_PERIOD_MS = 60 * 24 * 60 * 60 * 1000;
+const ATTRIBUTION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 // Deletion order matters: these reference kids/chores/rewards, so they have
 // to go first, before the tables they point to.
@@ -87,6 +88,21 @@ module.exports = async (req, res) => {
 
     if (data.users.length < 200) break;
     page++;
+  }
+
+  // Meta trial attempts (lib/meta-attribution.js) outlive their use within
+  // days: Meta only pairs browser and server copies for about 48 hours. A
+  // confirmed trial has already had its match keys wiped; an abandoned
+  // checkout still holds them (fbp, fbc, IP, browser). Both go after 30 days.
+  const attributionCutoff = new Date(Date.now() - ATTRIBUTION_RETENTION_MS).toISOString();
+  const [{ error: confirmedError }, { error: abandonedError }] = await Promise.all([
+    supabaseAdmin.from('meta_trial_attribution').delete()
+      .not('trial_confirmed_at', 'is', null).lt('trial_confirmed_at', attributionCutoff),
+    supabaseAdmin.from('meta_trial_attribution').delete()
+      .is('trial_confirmed_at', null).lt('issued_at', attributionCutoff),
+  ]);
+  if (confirmedError || abandonedError) {
+    console.error('Failed to delete old Meta trial attempts:', (confirmedError || abandonedError).message);
   }
 
   res.status(200).json({ purged });

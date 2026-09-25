@@ -533,12 +533,6 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
 
 let currentUser = null;
-// Set by openTrialCheckout, read by the Paddle eventCallback below — they're
-// separate closures, so this is how the trial-start event gets the same user
-// id both functions can independently turn into the same Meta event_id
-// (trial_started_<userId>), which is what lets Meta de-duplicate the Pixel
-// and Conversions API copies of the same conversion instead of double-counting it.
-let pendingTrialUserId = null;
 let cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [] };
 const DB = { load: () => cache };
 
@@ -775,6 +769,8 @@ Paddle.Initialize({
     token: 'live_e173d47036db9b102418e3d9795',
     eventCallback: function (event) {
         if (event.name === 'checkout.completed') {
+            // The Pixel StartTrial waits for the webhook to confirm the trial.
+            markMetaTrialReturned();
             if (currentUser) {
                 // Existing signed-in user finishing checkout from the subscription gate —
                 // the webhook needs a moment to reach Supabase, so poll briefly for it.
@@ -786,10 +782,6 @@ Paddle.Initialize({
                 // sent to PostHog from (api/paddle-webhook.js). This is the browser-side
                 // step before it, so the funnel can show checkouts that never confirmed.
                 track('checkout_completed', { billing_cycle: S.billingCycle || 'monthly', provider: 'paddle', ...getStoredUTM() });
-                // Same event_id the server sends via Conversions API for this same
-                // trial start (see api/paddle-webhook.js) — Meta uses matching
-                // event_id + event_name to merge the two into one counted conversion.
-                if (typeof fbq === 'function') fbq('track', 'StartTrial', {}, { eventID: 'trial_started_' + pendingTrialUserId });
                 if (typeof gtag === 'function') gtag('event', 'trial_started');
                 S.authMode = 'signin';
                 toast('Trial started! Check your email to confirm your account, then sign in.', 'success');
@@ -811,7 +803,8 @@ function handlePaystackReturn() {
     const query = params.toString();
     window.history.replaceState({}, '', window.location.pathname + (query ? '?' + query : ''));
     track('checkout_completed', { billing_cycle: S.billingCycle || 'monthly', provider: 'paystack', ...getStoredUTM() });
-    if (typeof fbq === 'function' && pendingTrialUserId) fbq('track', 'StartTrial', {}, { eventID: 'trial_started_' + pendingTrialUserId });
+    // The Pixel StartTrial waits for the webhook to confirm the trial.
+    markMetaTrialReturned();
     if (typeof gtag === 'function') gtag('event', 'trial_started');
     if (currentUser) {
         toast('Almost there! Confirming your subscription…', 'success');
@@ -824,6 +817,168 @@ function handlePaystackReturn() {
         toast('Trial started! Check your email to confirm your account, then sign in.', 'success');
         render();
     }
+}
+
+// ─── META STARTTRIAL (browser Pixel half) ────────────────────────
+// One trial is reported to Meta twice, by this Pixel call and by the server's
+// Conversions API call (lib/meta-attribution.js), under one shared event_id so
+// Meta counts it once. The id comes from our server when checkout opens and is
+// kept in localStorage, because a Paystack checkout is a full redirect away
+// from this page and anything held only in memory is gone when they return.
+//
+// The Pixel fires only once api/meta-attribution.js (status check) says the webhook has confirmed
+// the trial, the same moment the server copy is sent, never on checkout alone.
+// Normally that's seconds after the parent returns. If the webhook is slow the
+// page keeps checking for ten minutes, and every later visit within 48 hours
+// checks again (Meta only pairs the two copies within about that window).
+//
+// Debugging: /app/?metadebug=1 turns on console logging on this device
+// (?metadebug=0 turns it off). /app/?meta_test=TEST12345 sends this device's
+// next trial to Events Manager > Test Events under that code (?meta_test=off).
+const META_TRIAL_KEY = 'sprout_meta_trial';
+const META_TRIAL_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+const META_CLICK_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+let metaTrialWatching = false;
+
+(function readMetaUrlFlags() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const debug = params.get('metadebug');
+        if (debug === '1') localStorage.setItem('sprout_meta_debug', '1');
+        else if (debug === '0') localStorage.removeItem('sprout_meta_debug');
+        const test = params.get('meta_test');
+        if (test && /^TEST[A-Za-z0-9]{1,20}$/.test(test)) localStorage.setItem('sprout_meta_test', test);
+        else if (test === 'off') localStorage.removeItem('sprout_meta_test');
+    } catch (e) {}
+})();
+function metaDebug(...args) {
+    try { if (localStorage.getItem('sprout_meta_debug') === '1') console.log('[meta]', ...args); } catch (e) {}
+}
+// Read straight from storage: cookie-consent.js is a deferred script and may
+// not have run yet when this is first needed.
+function metaConsent() {
+    try { return localStorage.getItem('sprout_cookie_consent'); } catch (e) { return null; }
+}
+function readCookie(name) {
+    const match = new RegExp('(?:^|; )' + name + '=([^;]*)').exec(document.cookie);
+    return match ? decodeURIComponent(match[1]) : '';
+}
+// Meta's browser id (_fbp) and click id (_fbc), both set by the Pixel itself.
+// When the Pixel loaded too late to see the ad's fbclid (cookies accepted on a
+// later page), fbc is rebuilt from the click js/utm-capture.js kept, with the
+// time of the original click. Never built without a real fbclid, and nothing
+// at all is read without consent.
+function metaMatchKeys() {
+    if (metaConsent() !== 'accepted') return {};
+    const keys = {};
+    const fbp = readCookie('_fbp');
+    if (fbp) keys.fbp = fbp;
+    const fbc = readCookie('_fbc');
+    if (fbc) keys.fbc = fbc;
+    else {
+        try {
+            const click = JSON.parse(localStorage.getItem('sprout_fbclid') || 'null');
+            if (click && click.v && click.ts && Date.now() - click.ts < META_CLICK_MAX_AGE_MS) keys.fbc = `fb.1.${click.ts}.${click.v}`;
+        } catch (e) {}
+    }
+    return keys;
+}
+function loadMetaTrial() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(META_TRIAL_KEY) || 'null');
+        if (!saved || !saved.eventId) return null;
+        if (Date.now() - saved.savedAt > META_TRIAL_MAX_AGE_MS) { localStorage.removeItem(META_TRIAL_KEY); return null; }
+        return saved;
+    } catch (e) { return null; }
+}
+function saveMetaTrial(value) {
+    try { localStorage.setItem(META_TRIAL_KEY, JSON.stringify(value)); } catch (e) {}
+}
+async function metaAuthHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    try {
+        const { data } = await sb.auth.getSession();
+        if (data?.session?.access_token) headers.Authorization = `Bearer ${data.session.access_token}`;
+    } catch (e) {}
+    return headers;
+}
+// Called as checkout opens. A signed-in parent is identified by their session;
+// a brand-new sign-up has none yet, so the server checks the fresh account id.
+async function registerMetaTrial(userId) {
+    try {
+        const headers = await metaAuthHeaders();
+        const keys = metaMatchKeys();
+        let testEventCode;
+        try { testEventCode = localStorage.getItem('sprout_meta_test') || undefined; } catch (e) {}
+        const res = await fetch('/api/meta-attribution', {
+            method: 'POST',
+            headers,
+            keepalive: true,
+            body: JSON.stringify({ userId: headers.Authorization ? undefined : userId, consent: metaConsent(), ...keys, testEventCode }),
+        });
+        const body = await res.json().catch(() => null);
+        if (!body?.eventId) return;
+        const previous = loadMetaTrial();
+        // Reopening checkout for the same trial keeps its "already fired" mark.
+        if (!previous || previous.eventId !== body.eventId) {
+            saveMetaTrial({ eventId: body.eventId, savedAt: Date.now(), returned: false, fired: false });
+        }
+        metaDebug('checkout registered', { eventId: body.eventId, consent: metaConsent(), fbp: Boolean(keys.fbp), fbc: Boolean(keys.fbc) });
+    } catch (e) { /* tracking must never break checkout */ }
+}
+// Paddle's checkout.completed, or the return from Paystack.
+function markMetaTrialReturned() {
+    const pending = loadMetaTrial();
+    if (pending && !pending.returned) saveMetaTrial({ ...pending, returned: true });
+    watchMetaTrial();
+}
+async function checkMetaTrialConfirmed(eventId) {
+    try {
+        const res = await fetch('/api/meta-attribution', { method: 'POST', headers: await metaAuthHeaders(), body: JSON.stringify({ action: 'status', eventId }) });
+        const body = await res.json().catch(() => null);
+        return body?.confirmed === true;
+    } catch (e) { return false; }
+}
+// Every 3s for the first 30s after checkout, then every 20s for ten more
+// minutes. A page that never came back from checkout checks once per visit.
+async function watchMetaTrial() {
+    const pending = loadMetaTrial();
+    if (!pending || pending.fired || metaTrialWatching) return;
+    metaTrialWatching = true;
+    try {
+        for (let attempt = 1; ; attempt++) {
+            const current = loadMetaTrial();
+            if (!current || current.fired) return;
+            if (await checkMetaTrialConfirmed(current.eventId)) { await fireMetaStartTrial(current.eventId); return; }
+            if (!current.returned || attempt > 40) break;
+            await new Promise((resolve) => setTimeout(resolve, attempt <= 10 ? 3000 : 20000));
+        }
+        metaDebug('trial not confirmed yet, will check again on the next visit');
+    } finally {
+        metaTrialWatching = false;
+    }
+}
+// The "fired" mark is saved before the call, so a refresh, a re-render or a
+// second tab can't send it twice (and Meta would merge a same-id repeat anyway).
+async function fireMetaStartTrial(eventId) {
+    const consent = metaConsent();
+    if (consent === 'declined') { try { localStorage.removeItem(META_TRIAL_KEY); } catch (e) {} return; }
+    if (consent !== 'accepted') {
+        // Banner still up: fire if they accept on this page, otherwise the next
+        // visit's check picks it up.
+        metaDebug('trial confirmed, waiting for cookie consent');
+        if (window.sproutConsent) window.sproutConsent.onChange((value) => { if (value === 'accepted') fireMetaStartTrial(eventId); });
+        return;
+    }
+    // js/meta-pixel.js is deferred, so give it a moment to define fbq.
+    for (let i = 0; i < 20 && typeof fbq !== 'function'; i++) await new Promise((resolve) => setTimeout(resolve, 500));
+    if (typeof fbq !== 'function') { metaDebug('Pixel not loaded, StartTrial not sent'); return; }
+    const current = loadMetaTrial();
+    if (!current || current.fired || current.eventId !== eventId) return;
+    saveMetaTrial({ ...current, fired: true });
+    fbq('track', 'StartTrial', {}, { eventID: eventId });
+    const keys = metaMatchKeys();
+    metaDebug('StartTrial fired', { eventId, fbp: Boolean(keys.fbp), fbc: Boolean(keys.fbc) });
 }
 
 async function refreshUserAfterCheckout() {
@@ -854,9 +1009,10 @@ function openTrialCheckout({ email, geo, userId, billingCycle, referralCode }) {
     const isZA = geo === 'ZA';
     track('checkout_started', { billing_cycle: billingCycle, geo, provider: isZA ? 'paystack' : 'paddle', has_referral_code: Boolean(referralCode), ...getStoredUTM() });
     if (typeof fbq === 'function') fbq('track', 'InitiateCheckout');
-    pendingTrialUserId = userId;
+    // Capped at 3s: Meta tracking must never hold up a parent's checkout.
+    const metaRegistered = Promise.race([registerMetaTrial(userId), new Promise((resolve) => setTimeout(resolve, 3000))]);
     // Returned so doSignUp can keep its button locked until the Paystack redirect fires.
-    if (isZA) return openPaystackCheckout({ userId, billingCycle });
+    if (isZA) return openPaystackCheckout({ userId, billingCycle, beforeRedirect: metaRegistered });
     openPaddleCheckout({ email, userId, billingCycle, referralCode });
 }
 
@@ -868,7 +1024,7 @@ function openTrialCheckout({ email, geo, userId, billingCycle, referralCode }) {
 // Paystack has no free trial of its own. The server opens a R1 charge that
 // only exists to store the card; api/paystack-webhook.js refunds it the
 // moment it lands and starts the real subscription 14 days out.
-async function openPaystackCheckout({ userId, billingCycle }) {
+async function openPaystackCheckout({ userId, billingCycle, beforeRedirect }) {
     try {
         const res = await fetch('/api/paystack-checkout', {
             method: 'POST',
@@ -883,6 +1039,8 @@ async function openPaystackCheckout({ userId, billingCycle }) {
         // Full redirect rather than an overlay: South African cards almost
         // always hand off to the bank's own 3-D Secure page, which refuses to
         // run inside an iframe. Paystack sends them back to /app/?checkout=paystack.
+        // Leaving the page first would lose the Meta event_id still on its way.
+        await beforeRedirect;
         window.location.href = body.authorization_url;
     } catch (e) {
         toast('Could not start checkout. Please try again.', 'error');
@@ -1039,6 +1197,9 @@ async function initApp() {
     }
     render();
     handlePaystackReturn();
+    // Catches a trial the webhook confirmed after the parent had already left
+    // the page (see watchMetaTrial).
+    watchMetaTrial();
     registerServiceWorker().then(() => { syncPushSubscription(); });
     maybeOpenApprovals();
 }
@@ -5992,10 +6153,10 @@ function render() {
 
 initApp();
 </script>
-<script src="/js/utm-capture.js?v=1"></script>
+<script src="/js/utm-capture.js?v=2"></script>
 <script defer src="/js/cookie-consent.js?v=2"></script>
 <script defer src="/js/analytics.js?v=1"></script>
-<script defer src="/js/meta-pixel.js?v=1"></script>
+<script defer src="/js/meta-pixel.js?v=2"></script>
 <script defer src="/js/posthog.js?v=2"></script>
 </body>
 </html>
