@@ -7,7 +7,7 @@
 **What it shows** (everything is read live from Supabase on each load / Refresh):
 
 - KPI tiles: total sign-ups, active (paying), trialing, canceled, no subscription, estimated MRR (ZA in Rand, rest of world in Dollars), families active in the last 7 days.
-- Users by status donut, sign-ups per week (last 12 weeks).
+- Users by status donut, trials started per day since 15 September 2026.
 - Breakdowns: country, payment rail (Paystack/Paddle), billing cycle, traffic source, referral partners, engagement totals.
 - Needs attention: trials ending within 7 days, failed payments, scheduled cancellations, subscribers with no children added, subscribers quiet for 5+ days, canceled accounts awaiting the 60-day purge.
 - Latest contact-form messages.
@@ -16,6 +16,7 @@
 **Definitions**
 
 - *Status* is the `subscription_status` the billing webhooks write to each user's metadata: `active`, `trialing`, `canceled`, or none (signed up but never started a trial).
+- *Trial started* is worked out, since no start date is stored: for a family still on trial it is the first billing date minus 14 days (exact); for anyone who has since paid or canceled it is the sign-up date, because the card step comes straight after the sign-up form. Accounts purged 60 days after canceling lose their subscription details and drop out of this chart.
 - *Last activity* is the latest of: last sign-in, a chore ticked off, a transaction, a chore or child added. Supabase only updates last sign-in on a fresh login, so app activity is included to avoid understating it.
 - *Estimated MRR* uses list prices (R59 / R590 for South Africa, $4.50 / $45 elsewhere, yearly divided by 12) for users whose status is `active` and who have a billing cycle and gateway on record. It is an estimate, not the gateways' ledger.
 - *Provider* is `payment_provider` where set (Paystack); accounts with a Paddle customer id are shown as Paddle.

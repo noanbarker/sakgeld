@@ -69,6 +69,22 @@ function internalEmailSet(value) {
   return new Set(String(value || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
 }
 
+// No trial start date is stored on the account, so it's worked out. While a
+// trial is running, both billing rails set next_billed_at to exactly 14 days
+// after it began, so that's exact. Once the trial has moved on (paid,
+// canceled), the sign-up date stands in: the card step comes straight after
+// the sign-up form, and the two matched to within a day for every family when
+// this was written. Accounts that never started a trial get null.
+const TRIAL_DAYS = 14;
+function trialStartedAt(user, meta) {
+  if (!meta.subscription_status) return null;
+  if (meta.subscription_status === 'trialing' && meta.next_billed_at) {
+    const start = new Date(meta.next_billed_at).getTime() - TRIAL_DAYS * 86400000;
+    if (!Number.isNaN(start)) return new Date(start).toISOString();
+  }
+  return user.created_at || null;
+}
+
 // Pure: turns raw rows into the shape the page renders. Kept separate from the
 // handler so it can be run against a saved snapshot without any credentials.
 function buildDashboard(raw, now = new Date(), internalEmails = new Set()) {
@@ -122,6 +138,7 @@ function buildDashboard(raw, now = new Date(), internalEmails = new Set()) {
       country: meta.country || null,
       signup_geo: meta.signup_geo || null,
       signed_up_at: user.created_at || null,
+      trial_started_at: trialStartedAt(user, meta),
       last_sign_in_at: user.last_sign_in_at || null,
       last_activity_at: lastActivity,
       status,
