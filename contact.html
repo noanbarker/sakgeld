@@ -422,9 +422,22 @@ async function sendContactMessage() {
   btn.disabled = true;
   btn.textContent = 'Sending...';
 
-  var result = await ctSb.from('contact_messages').insert({ name: name, email: email, topic: topic, message: message });
+  // api/contact-message saves it and emails it to us. The sign-in token (if
+  // any) only tells us whether the sender already has a Sprout account.
+  var ok = false;
+  try {
+    var headers = { 'Content-Type': 'application/json' };
+    var session = (await ctSb.auth.getSession()).data.session;
+    if (session) headers['Authorization'] = 'Bearer ' + session.access_token;
+    var res = await fetch('/api/contact-message', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({ name: name, email: email, topic: topic, message: message })
+    });
+    ok = res.ok;
+  } catch (e) {}
 
-  if (result.error) {
+  if (!ok) {
     if (window.sproutTrack) window.sproutTrack('contact_form_failed', { topic: topic });
     btn.disabled = false;
     btn.textContent = 'Send message';
