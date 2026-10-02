@@ -86,7 +86,8 @@ person's `subscription_status`, `lifecycle_stage`, `billing_interval`,
 | `savings_goal_created` | Bonus milestone. | `goals_count`, `threshold`, `bonus_amount` |
 | `payout_recorded` | Parent marked money as handed over. | `amount` |
 | `kid_mode_entered` / `kid_pin_failed` | Kid PIN screen. | |
-| `parent_pin_set`, `currency_changed`, `manage_subscription_opened`, `signed_out` | Settings. | |
+| `parent_pin_set`, `currency_changed`, `manage_subscription_opened`, `signed_out` | Settings. | `role`, `for_other_parent` (on `parent_pin_set`) |
+| `co_parent_added` / `co_parent_removed` / `parent_renamed` | Settings → Parents & PINs. | |
 | `push_enabled` / `push_disabled` / `push_permission_denied` / `push_enable_failed` | Push notifications toggled in Settings. | `standalone`, `ios`, `reason` |
 | `push_notification_opened` | Parent tapped a push notification and landed in the app. | |
 | `push_notification_sent` (server) | A kid's completion or reward claim triggered a push. | `kind`, `devices`, `pending_total` |
@@ -97,7 +98,7 @@ person's `subscription_status`, `lifecycle_stage`, `billing_interval`,
 `billing_cycle`, `payment_provider`, `signup_geo` (ZA/ROW), `country`,
 `referral_code`, `utm_source/medium/campaign/content/term`, `signed_up_at`,
 `trial_started_at`, `first_paid_at`, `kids_count`, `chores_count`,
-`has_parent_pin`, `onboarding_complete`, `cancel_scheduled`.
+`has_parent_pin`, `has_co_parent`, `onboarding_complete`, `cancel_scheduled`.
 
 ## The questions the dashboards answer
 

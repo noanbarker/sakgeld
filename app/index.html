@@ -722,6 +722,14 @@ function maybeOpenApprovals() {
         window.history.replaceState({}, '', window.location.pathname + (query ? '?' + query : ''));
     } catch (e) {}
     track('push_notification_opened');
+    // With two parents, open the PIN pad of whoever last used this device;
+    // if nobody has yet, leave them on the home screen to pick.
+    if (coParent()) {
+        let last = null;
+        try { last = localStorage.getItem('sprout_last_parent'); } catch (e) {}
+        if (parentProfiles.some(p => p.id === last && !p.removed)) goParent(last);
+        return;
+    }
     goParent();
 }
 
@@ -1105,9 +1113,32 @@ const COUNTRIES = [
 ];
 
 let hasParentPin = false;
+// Up to two parent profiles share the one login (see 20261002120000_add_parent_profiles.sql).
+// Includes removed co-parents, so history can still name who did what.
+let parentProfiles = [];
+async function loadParentProfiles() {
+    const { data, error } = await sb.rpc('get_parent_profiles');
+    if (error) return false;
+    parentProfiles = data || [];
+    return true;
+}
+function ownerProfile() { return parentProfiles.find(p => p.is_owner) || null; }
+function coParent() { return parentProfiles.find(p => !p.is_owner && !p.removed) || null; }
+function activeParent() { return parentProfiles.find(p => p.id === S.activeParentId) || null; }
+// Billing and managing the co-parent are the owner's alone.
+function activeIsOwner() { const a = activeParent(); return !a || a.is_owner; }
+// Stamped on approvals, payouts and adjustments as actioned_by.
+function actionedBy() { return S.activeParentId || null; }
+// " · Mom" after a history line — only once the family has had a second parent,
+// otherwise every line would just repeat the one parent's name.
+function byParent(id) {
+    if (!id || parentProfiles.length < 2) return '';
+    const p = parentProfiles.find(x => x.id === id);
+    return p ? ` · ${esc(p.name)}` : '';
+}
 async function loadCache() {
     const uid = currentUser.id;
-    const [kRes, cRes, compRes, txRes, bmRes, rwRes, rcRes, distRes, chRes, pinRes] = await Promise.all([
+    const [kRes, cRes, compRes, txRes, bmRes, rwRes, rcRes, distRes, chRes, pinRes, profilesOk] = await Promise.all([
         sb.from('kids').select('id,user_id,name,emoji,balance,created_at,color_key,date_of_birth,last_distribution_at,cycle_amount,cycle_amount_pending').eq('user_id', uid),
         sb.from('chores').select('*').eq('user_id', uid),
         sb.from('completions').select('*').eq('user_id', uid),
@@ -1118,8 +1149,9 @@ async function loadCache() {
         sb.from('distributions').select('*').eq('user_id', uid),
         sb.from('cycle_history').select('*').eq('user_id', uid),
         sb.rpc('has_parent_pin'),
+        loadParentProfiles(),
     ]);
-    hasParentPin = !!pinRes.data;
+    hasParentPin = profilesOk ? !!ownerProfile()?.has_pin : !!pinRes.data;
     cache = {
         kids: kRes.data || [],
         chores: (cRes.data || []).map(c => ({ ...c, assignedTo: c.assigned_to, oneOff: c.one_off || false, expiresOn: c.expires_on || null })),
@@ -1139,6 +1171,7 @@ async function loadCache() {
             kids_count: cache.kids.length,
             chores_count: cache.chores.filter(c => !c.archived).length,
             has_parent_pin: hasParentPin,
+            has_co_parent: !!coParent(),
         });
     } catch (e) {}
 }
@@ -1166,6 +1199,11 @@ async function initApp() {
             const intent = localStorage.getItem('sprout_recovery_intent');
             localStorage.removeItem('sprout_recovery_intent');
             S.authMode = intent === 'pin' ? 'reset-pin' : 'reset';
+            if (intent === 'pin') {
+                S.resetPinParentId = localStorage.getItem('sprout_recovery_parent');
+                localStorage.removeItem('sprout_recovery_parent');
+                await loadParentProfiles();
+            }
             render(); return;
         }
         if (currentUser) {
@@ -1184,7 +1222,7 @@ async function initApp() {
                 maybeOpenApprovals();
             }
         }
-        else { cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [] }; S.view = 'home'; }
+        else { parentProfiles = []; S.activeParentId = null; S.pinParentId = null; cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [] }; S.view = 'home'; }
         render();
     });
     const { data: { session } } = await sb.auth.getSession();
@@ -1232,6 +1270,9 @@ const S = {
     selectedKidDays: {},   // per-kid rota: { kidId: ['Mon','Wed'] }
     selectedKids: 'all',
     parentPin: '',
+    pinParentId: null,    // the parent profile whose PIN pad is showing
+    activeParentId: null, // the parent profile using the dashboard right now
+    resetPinParentId: null, // whose PIN a "Forgot PIN?" email link resets
     historyOpen: false,
     settingsSection: null,
     moneySection: null,
@@ -2437,6 +2478,13 @@ function snapModalInputs() {
         const v = document.getElementById('rw-val');
         if (n) S.modal.data = { ...S.modal.data, name: n.value, description: d?.value, value: v?.value };
     }
+    if (t === 'add-co-parent') {
+        const on = document.getElementById('cp-owner-name');
+        const op = document.getElementById('cp-owner-pin');
+        const n = document.getElementById('cp-name');
+        const p = document.getElementById('cp-pin');
+        if (n) S.modal.data = { ...S.modal.data, ownerName: on?.value, ownerPin: op?.value, name: n.value, pin: p?.value };
+    }
     if (t === 'capture-expense') {
         const a = document.getElementById('exp-amount');
         const d = document.getElementById('exp-desc');
@@ -2766,6 +2814,8 @@ async function doForgotPassword() {
 async function doForgotParentPin() {
     if (!currentUser?.email) return;
     localStorage.setItem('sprout_recovery_intent', 'pin');
+    if (S.pinParentId) localStorage.setItem('sprout_recovery_parent', S.pinParentId);
+    else localStorage.removeItem('sprout_recovery_parent');
     const redirectTo = window.location.origin + window.location.pathname;
     const { error } = await sb.auth.resetPasswordForEmail(currentUser.email, { redirectTo });
     if (error) { toast('Could not send reset email.', 'error'); return; }
@@ -2804,6 +2854,10 @@ async function doResetPassword() {
     await sb.auth.signOut();
 }
 function vResetParentPin() {
+    // The email link remembers which parent tapped "Forgot PIN?" — but only on
+    // the device it was tapped on, so with two parents it's always a choice.
+    const resetPinChoices = parentProfiles.filter(p => !p.removed);
+    const selected = resetPinChoices.some(p => p.id === S.resetPinParentId) ? S.resetPinParentId : ownerProfile()?.id;
     return `
     <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
       <div style="width:100%;max-width:440px">
@@ -2816,6 +2870,10 @@ function vResetParentPin() {
               <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture>
             </div>
             <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:18px;text-align:center">Choose a new 4-digit parent PIN.</p>
+            ${resetPinChoices.length > 1 ? `
+            <select id="rpp-parent" class="mb-3">
+              ${resetPinChoices.map(p => `<option value="${p.id}" ${p.id === selected ? 'selected' : ''}>${esc(p.name)}'s PIN</option>`).join('')}
+            </select>` : ''}
             <input id="rpp-pin" placeholder="New 4-digit PIN" maxlength="4" inputmode="numeric" class="mb-3"
               onkeydown="if(event.key==='Enter')doResetParentPin()">
             <p id="rpp-err" style="color:#f43f5e;font-size:14px;margin:4px 0 12px;min-height:20px"></p>
@@ -2830,7 +2888,10 @@ async function doResetParentPin() {
     const errEl = document.getElementById('rpp-err');
     if (!/^\d{4}$/.test(pin)) { if (errEl) errEl.textContent = 'PIN must be exactly 4 digits.'; return; }
     if (errEl) errEl.textContent = 'Saving…';
-    const { error } = await sb.rpc('set_parent_pin', { p_new_pin: pin });
+    const profileId = document.getElementById('rpp-parent')?.value || ownerProfile()?.id;
+    const { error } = profileId
+        ? await sb.rpc('set_parent_profile_pin', { p_profile_id: profileId, p_new_pin: pin })
+        : await sb.rpc('set_parent_pin', { p_new_pin: pin });
     if (error) { if (errEl) errEl.textContent = error.message; return; }
     S.authMode = 'signin';
     toast('PIN updated! Sign in to continue.');
@@ -3146,13 +3207,14 @@ function vHome() {
             <!-- Family Portal label -->
             <p style="margin:0 auto;text-align:center;font-family:var(--font-family);font-weight:800;color:var(--color-green);font-size:30px;white-space:nowrap">Family Portal</p>
             <p style="margin:6px auto 20px;text-align:center;font-family:var(--font-family);font-weight:600;color:var(--color-text-secondary);font-size:15px">Who's using Sprout?</p>
-            <!-- Parent button -->
-            <button onclick="goParent()" class="pr-btn-primary" style="margin-bottom:10px">
-              <span style="display:inline-flex">${uiIcon('users', 19)}</span>
-              <span>Parent</span>
+            <!-- Parent button(s): one per parent once there's a co-parent -->
+            ${(coParent() ? [ownerProfile(), coParent()] : [null]).map(p => `
+            <button onclick="goParent(${p ? `'${p.id}'` : ''})" class="pr-btn-primary" style="margin-bottom:10px">
+              <span style="display:inline-flex">${uiIcon(p ? 'user' : 'users', 19)}</span>
+              <span>${p ? esc(p.name) : 'Parent'}</span>
               <span style="flex:1"></span>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M7 5l4 4-4 4" stroke="rgba(255,255,255,0.5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
+            </button>`).join('')}
             <!-- Kid cards grid -->
             ${kids.length === 0
               ? `<p style="text-align:center;color:var(--color-text-secondary);font-family:var(--font-family);font-size:13px;padding:12px 0 20px">No kids yet — log in as parent to add them.</p>`
@@ -3510,9 +3572,9 @@ async function recordReconSpend(kidId) {
     const createdAt = new Date().toISOString();
     const newBalance = appBal - amount;
     await sb.from('kids').update({ balance: newBalance }).eq('id', kidId).eq('user_id', currentUser.id);
-    await sb.from('transactions').insert({ id, user_id: currentUser.id, kid_id: kidId, amount: -amount, type: 'expense', description: 'Recorded from reconciliation', created_at: createdAt });
+    await sb.from('transactions').insert({ id, user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kidId, amount: -amount, type: 'expense', description: 'Recorded from reconciliation', created_at: createdAt });
     k.balance = newBalance;
-    cache.transactions.push({ id, kidId, amount: -amount, type: 'expense', description: 'Recorded from reconciliation', createdAt });
+    cache.transactions.push({ actioned_by: actionedBy(), id, kidId, amount: -amount, type: 'expense', description: 'Recorded from reconciliation', createdAt });
     toast(`${R(amount)} recorded as spent for ${k.name}.`);
     render();
 }
@@ -3530,9 +3592,9 @@ async function captureExpense() {
     const newBalance = (k.balance || 0) - amount;
     const id = uid();
     await sb.from('kids').update({ balance: newBalance }).eq('id', kidId).eq('user_id', currentUser.id);
-    await sb.from('transactions').insert({ id, user_id: currentUser.id, kid_id: kidId, amount: -amount, type: 'expense', description: desc, created_at: createdAt });
+    await sb.from('transactions').insert({ id, user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kidId, amount: -amount, type: 'expense', description: desc, created_at: createdAt });
     k.balance = newBalance;
-    cache.transactions.push({ id, kidId, amount: -amount, type: 'expense', description: desc, createdAt });
+    cache.transactions.push({ actioned_by: actionedBy(), id, kidId, amount: -amount, type: 'expense', description: desc, createdAt });
     closeModal();
     toast(`${R(amount)} recorded as spent for ${k.name}.`);
 }
@@ -3593,7 +3655,7 @@ function vParent() {
           </button>`;
         }).join('')}
         <div style="padding:12px 4px 0;margin-top:8px;border-top:1px solid #16a34a">
-          <button class="manage-sub-btn" onclick="openManageSubscription()" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('card', 16)} Manage Subscription</button>
+          ${activeIsOwner() ? `<button class="manage-sub-btn" onclick="openManageSubscription()" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('card', 16)} Manage Subscription</button>` : ''}
           <button id="nav-faq" onclick="setTab('faq')" style="color:${S.tab === 'faq' ? 'var(--color-green-700)' : 'var(--color-text-secondary)'};font-size:13px;font-weight:${S.tab === 'faq' ? '800' : '400'};font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('help', 16)} FAQ</button>
           <button onclick="signOut()" style="color:var(--color-text-secondary);font-size:13px;font-family:var(--font-family);display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer">${uiIcon('logout', 16)} Sign out</button>
         </div>
@@ -4064,7 +4126,7 @@ function pDistributions(db) {
               <div style="width:36px;height:36px;background:var(--color-green-100);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--color-green-700)">${uiIcon('banknote', 17)}</div>
               <div class="flex-1">
                 <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary)">${esc(kid?.name) || '?'}</p>
-                <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${dateStr(d.createdAt)}</p>
+                <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${dateStr(d.createdAt)}${byParent(d.actioned_by)}</p>
               </div>
               <p style="font-family:var(--font-family);font-weight:800;color:var(--color-green-600)">${R(d.amount)}</p>
             </div>`;
@@ -4105,10 +4167,10 @@ async function runDistribution(kidId) {
     if (owed <= 0) return toast('Nothing owed since the last distribution.');
     const id = uid();
     const createdAt = new Date().toISOString();
-    await sb.from('distributions').insert({ id, user_id: currentUser.id, kid_id: kidId, amount: owed, created_at: createdAt });
+    await sb.from('distributions').insert({ id, user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kidId, amount: owed, created_at: createdAt });
     await sb.from('kids').update({ last_distribution_at: createdAt }).eq('id', kidId).eq('user_id', currentUser.id);
     k.last_distribution_at = createdAt;
-    cache.distributions.push({ id, kidId, amount: owed, createdAt });
+    cache.distributions.push({ actioned_by: actionedBy(), id, kidId, amount: owed, createdAt });
     track('payout_recorded', { amount: owed });
     toast(`${R(owed)} marked as distributed to ${k.name}.`);
     render();
@@ -4129,7 +4191,7 @@ function pExpenditure(db) {
               <div style="width:36px;height:36px;background:var(--color-coral-bg);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--color-coral-text)">${uiIcon('bag', 17)}</div>
               <div class="flex-1">
                 <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary)">${esc(kid?.name) || '?'}</p>
-                <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${esc(t.description) || 'Money spent'} · ${dateStr(t.createdAt)}</p>
+                <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${esc(t.description) || 'Money spent'} · ${dateStr(t.createdAt)}${byParent(t.actioned_by)}</p>
               </div>
               <p style="font-family:var(--font-family);font-weight:800;color:var(--color-coral)">${R(Math.abs(t.amount))}</p>
               <button onclick="deleteExpense('${t.id}')" title="Delete" class="icon-btn danger">${uiIcon('trash', 15)}</button>
@@ -4209,7 +4271,7 @@ function pBonuses(db) {
           ${kid ? `<div style="width:54px;height:54px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:27px;flex-shrink:0">${kidIcon(kid)}</div>` : ''}
           <div class="flex-1 min-w-0">
             <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:13px">${esc(t.description)}</p>
-            <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary);margin-top:1px">${esc(kid?.name) || '?'} · ${dateStr(t.createdAt)}</p>
+            <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary);margin-top:1px">${esc(kid?.name) || '?'} · ${dateStr(t.createdAt)}${byParent(t.actioned_by)}</p>
           </div>
           <p style="font-family:var(--font-family);font-weight:800;color:var(--color-green-600);font-size:14px;flex-shrink:0">+${R(t.amount)}</p>
         </div>`;
@@ -4295,7 +4357,7 @@ function pRewards(db) {
           ${kid ? `<div style="width:54px;height:54px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:27px;flex-shrink:0">${kidIcon(kid)}</div>` : ''}
           <div class="flex-1 min-w-0">
             <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:13px">${esc(t.description)}</p>
-            <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary);margin-top:1px">${esc(kid?.name) || '?'} · ${dateStr(t.createdAt)}</p>
+            <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary);margin-top:1px">${esc(kid?.name) || '?'} · ${dateStr(t.createdAt)}${byParent(t.actioned_by)}</p>
           </div>
           <p style="font-family:var(--font-family);font-weight:800;color:var(--color-green-600);font-size:14px;flex-shrink:0">+${R(t.amount)}</p>
         </div>`;
@@ -4383,7 +4445,7 @@ function pSettings() {
         { id: 'allowance', title: 'Allowance System',         subtitle: isCycleMode() ? `Amount per Cycle — ${CYCLE_PERIOD_LABELS[getCyclePeriod()]}` : 'Amount per Chore' },
         { id: 'currency', title: 'Currency / Value Display', subtitle: 'Choose how values are displayed' },
         { id: 'tree',     title: 'Tree Growth Stages',       subtitle: 'Set the balance thresholds for each tree stage' },
-        { id: 'pin',      title: 'Parent PIN',               subtitle: hasParentPin ? 'A PIN is currently set' : 'No PIN set' },
+        { id: 'pin',      title: 'Parents & PINs',           subtitle: coParent() ? `${esc(ownerProfile()?.name)} and ${esc(coParent().name)}` : (hasParentPin ? 'A PIN is set · add a co-parent' : 'No PIN set') },
         { id: 'notifications', title: 'Notifications',       subtitle: pushSubscribed ? 'On for this device' : 'Get told when a chore needs approving' },
     ];
     const chevron = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex-shrink:0"><path d="M7 5l4 4-4 4" stroke="var(--color-text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -4401,12 +4463,14 @@ function pSettings() {
             ${chevron}
           </button>`).join('')}
           <div class="md:hidden">
+            ${activeIsOwner() ? `
             <button onclick="openManageSubscription()" class="manage-sub-btn card mb-3" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;cursor:pointer">
               <span>
                 <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:2px">Manage Subscription</p>
                 <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary)">Update payment method, billing history, or cancel</p>
               </span>
             </button>
+            ` : ''}
             <button onclick="setTab('faq')" class="card mb-3" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;cursor:pointer">
               <span>
                 <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:2px">FAQ</p>
@@ -4521,13 +4585,52 @@ function pSettings() {
     }
 
     if (S.settingsSection === 'pin') {
+        const owner = ownerProfile();
+        const co = coParent();
+        const me = activeParent() || owner;
+        const iAmOwner = activeIsOwner();
+        // Before the profiles migration has run there are no profiles: keep the old single-PIN card.
+        if (!owner) {
+            return `
+            <div style="max-width:600px">
+              ${backBtn}
+              <div class="card">
+                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Parent PIN</p>
+                <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">${hasParentPin ? 'A PIN is currently set to protect the parent dashboard.' : 'No PIN set — anyone can access the parent dashboard.'}</p>
+                <button onclick="openModal('set-parent-pin')" class="btn-primary" style="width:auto;padding:10px 28px">${hasParentPin ? 'Change PIN' : 'Set PIN'}</button>
+              </div>
+            </div>`;
+        }
+        const smallBtn = (label, onclick, danger) => `<button onclick="${onclick}" style="font-family:var(--font-family);font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;cursor:pointer;border:1.5px solid ${danger ? 'var(--color-coral-border)' : 'var(--color-border)'};color:${danger ? 'var(--color-coral-text)' : 'var(--color-text-primary)'};background:${danger ? 'var(--color-coral-bg)' : 'var(--color-surface)'}">${label}</button>`;
+        const row = p => {
+            const isMe = me && p.id === me.id;
+            const btns = [];
+            if (isMe || iAmOwner) btns.push(smallBtn('Rename', `openModal('rename-parent',{profileId:'${p.id}'})`));
+            if (isMe) btns.push(smallBtn(p.has_pin ? 'Change my PIN' : 'Set my PIN', `openModal('set-parent-pin',{profileId:'${p.id}'})`));
+            else if (iAmOwner) btns.push(smallBtn('Reset PIN', `openModal('set-parent-pin',{profileId:'${p.id}'})`));
+            if (!p.is_owner && iAmOwner) btns.push(smallBtn('Remove', 'removeCoParent()', true));
+            return `
+            <div style="padding:14px 0;border-top:1px solid var(--color-border)">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">${esc(p.name)}</p>
+                ${p.is_owner ? `<span style="font-family:var(--font-family);font-size:10px;font-weight:700;background:var(--color-green-100);color:var(--color-green-700);padding:2px 8px;border-radius:99px">ACCOUNT OWNER</span>` : ''}
+                ${isMe && co ? `<span style="font-family:var(--font-family);font-size:10px;font-weight:700;background:var(--color-background);color:var(--color-text-secondary);padding:2px 8px;border-radius:99px">YOU</span>` : ''}
+              </div>
+              <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-bottom:10px">${p.has_pin ? faIcon('lock') + ' PIN set' : faIcon('triangle-exclamation') + ' No PIN — anyone can open the parent dashboard'}</p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">${btns.join('')}</div>
+            </div>`;
+        };
         return `
         <div style="max-width:600px">
           ${backBtn}
           <div class="card">
-            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Parent PIN</p>
-            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">${hasParentPin ? 'A PIN is currently set to protect the parent dashboard.' : 'No PIN set — anyone can access the parent dashboard.'}</p>
-            <button onclick="openModal('set-parent-pin')" class="btn-primary" style="width:auto;padding:10px 28px">${hasParentPin ? 'Change PIN' : 'Set PIN'}</button>
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:4px">Parents & PINs</p>
+            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">${co
+              ? 'Each parent opens the dashboard with their own button and PIN, and both can approve chores, rewards and payouts. Only the account owner can manage the subscription.'
+              : 'Add a co-parent so you each have your own button and PIN on the home screen, while sharing one login.'}</p>
+            ${row(owner)}
+            ${co ? row(co) : ''}
+            ${!co && iAmOwner ? `<button onclick="openModal('add-co-parent')" class="btn-primary" style="width:auto;padding:10px 28px;margin-top:8px">+ Add a co-parent</button>` : ''}
           </div>
         </div>`;
     }
@@ -4632,8 +4735,13 @@ async function checkPin() {
     }
 }
 
-function goParent() {
-    if (hasParentPin) { S.parentPin = ''; go('parent-pin'); } else { enterParentDashboard(); }
+function goParent(profileId) {
+    const p = parentProfiles.find(x => x.id === profileId) || ownerProfile();
+    S.pinParentId = p?.id || null;
+    // No profiles loaded means the profiles migration hasn't run: fall back to the single PIN.
+    const needsPin = p ? p.has_pin : hasParentPin;
+    if (needsPin) { S.parentPin = ''; go('parent-pin'); }
+    else { S.activeParentId = p?.id || null; enterParentDashboard(); }
 }
 function enterParentDashboard() {
     const forcePreview = new URLSearchParams(window.location.search).get('onboarding') === '1';
@@ -4643,6 +4751,7 @@ function enterParentDashboard() {
 }
 
 function vParentPin() {
+    const pinParent = parentProfiles.find(p => p.id === S.pinParentId);
     const dots = [0,1,2,3].map(i =>
         `<div class="pin-dot ${S.parentPin.length > i ? 'filled' : ''}"></div>`).join('');
     const keys = [1,2,3,4,5,6,7,8,9,null,0,'⌫'];
@@ -4655,12 +4764,13 @@ function vParentPin() {
       <button onclick="go('home')" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:14px;background:none;border:none;cursor:pointer;margin-bottom:40px;position:absolute;top:24px;left:24px">← Back</button>
       <div class="flex flex-col items-center">
         <div style="width:80px;height:80px;background:var(--color-green-100);border:2px solid var(--color-green-border);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--color-green-700);margin-bottom:12px">${uiIcon('user', 36, 2)}</div>
-        <h2 style="font-family:var(--font-family);font-size:28px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Parent</h2>
-        <p style="font-family:var(--font-family);color:var(--color-text-secondary);margin-bottom:40px">Enter parent PIN</p>
+        <h2 style="font-family:var(--font-family);font-size:28px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${coParent() && pinParent ? esc(pinParent.name) : 'Parent'}</h2>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);margin-bottom:40px">${coParent() && pinParent ? 'Enter your PIN' : 'Enter parent PIN'}</p>
         <div id="ppin-dots" class="pin-dots-row" style="display:flex;gap:24px;margin-bottom:12px">${dots}</div>
         <p id="ppin-err" style="color:var(--color-coral);font-family:var(--font-family);font-size:14px;margin-bottom:24px;min-height:20px"></p>
         <div class="grid grid-cols-3 gap-3 w-72">${pad}</div>
         <button type="button" onclick="doForgotParentPin()" style="background:none;border:none;cursor:pointer;font-family:var(--font-family);font-size:13px;font-weight:600;color:#15803d;padding:0;margin-top:24px">Forgot PIN?</button>
+        ${pinParent && !pinParent.is_owner ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-muted);margin-top:6px">Or ask ${esc(ownerProfile()?.name || 'the account owner')} to reset it in Settings.</p>` : ''}
       </div>
     </div>`;
 }
@@ -4672,9 +4782,13 @@ function parentPinPress(k) {
     if (S.parentPin.length === 4) setTimeout(checkParentPin, 120);
 }
 async function checkParentPin() {
-    const { data: ok, error } = await sb.rpc('verify_parent_pin', { p_guess: S.parentPin });
+    const { data: ok, error } = S.pinParentId
+        ? await sb.rpc('verify_parent_profile_pin', { p_profile_id: S.pinParentId, p_guess: S.parentPin })
+        : await sb.rpc('verify_parent_pin', { p_guess: S.parentPin });
     if (!error && ok) {
-        S.parentPin = ''; enterParentDashboard();
+        S.parentPin = ''; S.activeParentId = S.pinParentId;
+        try { if (S.pinParentId) localStorage.setItem('sprout_last_parent', S.pinParentId); } catch (e) {}
+        enterParentDashboard();
     } else {
         if (navigator.vibrate) navigator.vibrate([40,40,40]);
         const el = document.getElementById('ppin-err');
@@ -4986,7 +5100,7 @@ function vKid() {
                 </div>
                 <div class="flex-1 min-w-0">
                   <p style="font-family:var(--font-family);font-weight:600;color:var(--color-text-primary);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.description)}</p>
-                  <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary)">${dateStr(txDate(t))}</p>
+                  <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary)">${dateStr(txDate(t))}${byParent(t.actioned_by)}</p>
                 </div>
                 <p style="font-family:var(--font-family);font-weight:800;font-size:13px;flex-shrink:0;color:${t.amount>0?ac.header:'var(--color-coral)'}">
                   ${t.amount>0?'+':''}${R(t.amount)}
@@ -5218,7 +5332,7 @@ function renderModal() {
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:14px;margin-bottom:20px">${data.msg}</p>
         <div style="display:flex;gap:8px">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
-          <button onclick="${data.onConfirm}" style="flex:1;padding:10px;font-family:var(--font-family);font-size:14px;font-weight:700;background:var(--color-coral);color:white;border:none;border-radius:var(--radius-lg);cursor:pointer">Delete</button>
+          <button onclick="${data.onConfirm}" style="flex:1;padding:10px;font-family:var(--font-family);font-size:14px;font-weight:700;background:var(--color-coral);color:white;border:none;border-radius:var(--radius-lg);cursor:pointer">${data.confirmLabel || 'Delete'}</button>
         </div>`;
     }
 
@@ -5238,15 +5352,52 @@ function renderModal() {
     }
 
     if (type === 'set-parent-pin') {
-        const hasPin = hasParentPin;
+        // No profileId (onboarding, or before the profiles migration) means the owner's PIN.
+        const p = parentProfiles.find(x => x.id === data.profileId) || ownerProfile();
+        const hasPin = p ? p.has_pin : hasParentPin;
+        // Only the owner's PIN can be removed, and only while there's no co-parent.
+        const canRemove = hasPin && (!p || p.is_owner) && !coParent();
+        const forOther = p && activeParent() && p.id !== activeParent().id;
         body = `
-        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Parent PIN</h3>
-        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:14px;margin-bottom:16px">${hasPin ? faIcon('lock') + ' A PIN is currently set.' : faIcon('triangle-exclamation') + ' No PIN set — anyone can access the parent dashboard.'}</p>
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${coParent() && p ? `${esc(p.name)}'s PIN` : 'Parent PIN'}</h3>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:14px;margin-bottom:16px">${forOther
+          ? `Set a temporary PIN for ${esc(p.name)}. They can change it from Settings once they're in.`
+          : hasPin ? faIcon('lock') + ' A PIN is currently set.' : faIcon('triangle-exclamation') + ' No PIN set — anyone can access the parent dashboard.'}</p>
         <input id="pp-pin" placeholder="New 4-digit PIN" maxlength="4" inputmode="numeric" class="mb-4">
         <div style="display:flex;gap:8px">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
-          ${hasPin ? `<button onclick="removeParentPin()" style="flex:1;padding:10px;font-family:var(--font-family);font-size:14px;font-weight:700;border:1.5px solid var(--color-coral-border);color:var(--color-coral-text);border-radius:var(--radius-lg);background:var(--color-coral-bg);cursor:pointer">Remove</button>` : ''}
+          ${canRemove ? `<button onclick="removeParentPin()" style="flex:1;padding:10px;font-family:var(--font-family);font-size:14px;font-weight:700;border:1.5px solid var(--color-coral-border);color:var(--color-coral-text);border-radius:var(--radius-lg);background:var(--color-coral-bg);cursor:pointer">Remove</button>` : ''}
           <button onclick="saveParentPin()" class="btn-primary flex-1" style="padding:10px">Save PIN</button>
+        </div>`;
+    }
+
+    if (type === 'rename-parent') {
+        const p = parentProfiles.find(x => x.id === data.profileId);
+        body = `
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Rename parent</h3>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:14px;margin-bottom:16px">This is the name on the home screen button and in history, e.g. "Mom" or "Dad".</p>
+        <input id="rn-name" placeholder="Name" maxlength="30" value="${esc(p?.name || '')}" class="mb-4">
+        <div style="display:flex;gap:8px">
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+          <button onclick="saveParentName('${p?.id || ''}')" class="btn-primary flex-1" style="padding:10px">Save</button>
+        </div>`;
+    }
+
+    if (type === 'add-co-parent') {
+        const owner = ownerProfile();
+        const needsOwnerPin = !owner?.has_pin;
+        body = `
+        <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Add a co-parent</h3>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:14px;margin-bottom:16px">You'll each get your own button and PIN on the home screen, and share this login. Your co-parent can approve and pay out everything you can, but can't manage the subscription.</p>
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">You</p>
+        <input id="cp-owner-name" placeholder="Your name, e.g. Mom" maxlength="30" value="${esc(data.ownerName ?? (owner?.name === 'Parent 1' ? '' : owner?.name || ''))}" class="mb-3">
+        ${needsOwnerPin ? `<input id="cp-owner-pin" placeholder="Your 4-digit PIN" maxlength="4" inputmode="numeric" value="${esc(data.ownerPin || '')}" class="mb-3">` : ''}
+        <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin:8px 0">Co-parent</p>
+        <input id="cp-name" placeholder="Their name, e.g. Dad" maxlength="30" value="${esc(data.name || '')}" class="mb-3">
+        <input id="cp-pin" placeholder="Their 4-digit PIN" maxlength="4" inputmode="numeric" value="${esc(data.pin || '')}" class="mb-4">
+        <div style="display:flex;gap:8px">
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+          <button onclick="addCoParent()" class="btn-primary flex-1" style="padding:10px">Add co-parent</button>
         </div>`;
     }
 
@@ -5602,9 +5753,9 @@ async function saveManualAdjustment(kidId) {
     const createdAt  = new Date().toISOString();
     const { error } = await sb.from('kids').update({ balance: newBalance }).eq('id', kidId).eq('user_id', currentUser.id);
     if (error) return toast('Could not save. Check your connection.', 'error');
-    await sb.from('transactions').insert({ id, user_id: currentUser.id, kid_id: kidId, amount: delta, type: 'manual', description: desc, created_at: createdAt });
+    await sb.from('transactions').insert({ id, user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kidId, amount: delta, type: 'manual', description: desc, created_at: createdAt });
     kid.balance = newBalance;
-    cache.transactions.push({ id, kidId, amount: delta, type: 'manual', description: desc, createdAt });
+    cache.transactions.push({ actioned_by: actionedBy(), id, kidId, amount: delta, type: 'manual', description: desc, createdAt });
     closeModal();
     toast(isAdd ? `${R(amount)} added to ${kid.name}'s balance.` : `${R(amount)} deducted from ${kid.name}'s balance.`);
     if (isAdd) await checkBonusMilestones(kidId, newBalance);
@@ -5752,8 +5903,8 @@ async function checkBonusMilestones(kidId, newBalance) {
         m.claimedBy = newClaimed;
         bonusTotal += m.bonusAmount;
         const txId = uid();
-        txInserts.push({ id: txId, user_id: currentUser.id, kid_id: kidId, amount: m.bonusAmount, type: 'bonus', description: `Bonus: ${m.name || 'Balance milestone'} (${R(m.threshold)})`, created_at: now });
-        cache.transactions.push({ id: txId, kidId, amount: m.bonusAmount, type: 'bonus', description: `Bonus: ${m.name || 'Balance milestone'} (${R(m.threshold)})`, createdAt: now });
+        txInserts.push({ id: txId, user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kidId, amount: m.bonusAmount, type: 'bonus', description: `Bonus: ${m.name || 'Balance milestone'} (${R(m.threshold)})`, created_at: now });
+        cache.transactions.push({ actioned_by: actionedBy(), id: txId, kidId, amount: m.bonusAmount, type: 'bonus', description: `Bonus: ${m.name || 'Balance milestone'} (${R(m.threshold)})`, createdAt: now });
     }
     if (bonusTotal > 0) {
         const finalBalance = kid.balance + bonusTotal;
@@ -5772,7 +5923,7 @@ async function approveChore(cid) {
     const chore = cache.chores.find(x => x.id === comp.choreId);
     const kid   = cache.kids.find(x => x.id === comp.kidId);
     render();
-    const { data: won } = await sb.from('completions').update({ approved: true })
+    const { data: won } = await sb.from('completions').update({ actioned_by: actionedBy(), approved: true })
         .eq('id', cid).eq('user_id', currentUser.id).eq('approved', false).select('id');
     if (!won || !won.length) return;
     // In allowance-per-cycle mode, a normal chore's weight only feeds the cycle
@@ -5789,9 +5940,9 @@ async function approveChore(cid) {
         // transactions strictly after last_distribution_at.
         const txCreatedAt = new Date().toISOString();
         await sb.from('kids').update({ balance: newBalance }).eq('id', kid.id).eq('user_id', currentUser.id);
-        await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, kid_id: kid.id, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt, chore_date: comp.dueDate || null });
+        await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kid.id, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt, chore_date: comp.dueDate || null });
         kid.balance = newBalance;
-        cache.transactions.push({ id: txId, kidId: kid.id, amount: chore.value, type: 'chore', description: chore.name, createdAt: txCreatedAt, choreDate: comp.dueDate || null });
+        cache.transactions.push({ actioned_by: actionedBy(), id: txId, kidId: kid.id, amount: chore.value, type: 'chore', description: chore.name, createdAt: txCreatedAt, choreDate: comp.dueDate || null });
         await checkBonusMilestones(kid.id, newBalance);
     }
     const approvedCount = cache.completions.filter(c => c.approved).length;
@@ -5808,7 +5959,7 @@ async function approveAllForKid(kidId) {
     const ids = comps.map(c => c.id);
     comps.forEach(comp => { comp.approved = true; });
     render();
-    const { data: won } = await sb.from('completions').update({ approved: true })
+    const { data: won } = await sb.from('completions').update({ actioned_by: actionedBy(), approved: true })
         .in('id', ids).eq('user_id', currentUser.id).eq('approved', false).select('id');
     const wonIds = new Set((won || []).map(r => r.id));
     const wonComps = comps.filter(c => wonIds.has(c.id));
@@ -5819,7 +5970,7 @@ async function approveAllForKid(kidId) {
         if (chore && (!isCycleMode() || chore.oneOff)) {
             totalAdded += chore.value;
             const txCreatedAt = new Date().toISOString();
-            txInserts.push({ id: uid(), user_id: currentUser.id, kid_id: kidId, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt, chore_date: comp.dueDate || null });
+            txInserts.push({ id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kidId, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt, chore_date: comp.dueDate || null });
         }
     });
     if (totalAdded > 0) {
@@ -5830,7 +5981,7 @@ async function approveAllForKid(kidId) {
     }
     if (txInserts.length) {
         await sb.from('transactions').insert(txInserts);
-        txInserts.forEach(t => cache.transactions.push({ id: t.id, kidId, amount: t.amount, type: t.type, description: t.description, createdAt: t.created_at, choreDate: t.chore_date }));
+        txInserts.forEach(t => cache.transactions.push({ actioned_by: t.actioned_by, id: t.id, kidId, amount: t.amount, type: t.type, description: t.description, createdAt: t.created_at, choreDate: t.chore_date }));
     }
     const approvedCountAll = cache.completions.filter(c => c.approved).length;
     trackLoops(approvedCountAll === wonComps.length ? 'first_chore_approved' : null, { hasApprovedChore: true });
@@ -5840,7 +5991,7 @@ async function approveAllForKid(kidId) {
 }
 async function rejectChore(cid) {
     track('chore_rejected');
-    await sb.from('completions').update({ rejected: true }).eq('id', cid).eq('user_id', currentUser.id);
+    await sb.from('completions').update({ actioned_by: actionedBy(), rejected: true }).eq('id', cid).eq('user_id', currentUser.id);
     const c = cache.completions.find(x => x.id === cid);
     if (c) c.rejected = true;
     render();
@@ -5905,16 +6056,16 @@ async function approveReward(cid) {
     const reward = cache.rewards.find(x => x.id === comp.rewardId);
     const kid    = cache.kids.find(x => x.id === comp.kidId);
     const approvedAt = new Date().toISOString();
-    await sb.from('reward_completions').update({ approved: true, approved_at: approvedAt }).eq('id', cid).eq('user_id', currentUser.id);
+    await sb.from('reward_completions').update({ actioned_by: actionedBy(), approved: true, approved_at: approvedAt }).eq('id', cid).eq('user_id', currentUser.id);
     comp.approved = true; comp.approvedAt = approvedAt;
     if (reward && kid) {
         const newBalance = (kid.balance || 0) + reward.value;
         const txId = uid();
         const txCreatedAt = new Date().toISOString();
         await sb.from('kids').update({ balance: newBalance }).eq('id', kid.id).eq('user_id', currentUser.id);
-        await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, kid_id: kid.id, amount: reward.value, type: 'reward', description: reward.name, created_at: txCreatedAt });
+        await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kid.id, amount: reward.value, type: 'reward', description: reward.name, created_at: txCreatedAt });
         kid.balance = newBalance;
-        cache.transactions.push({ id: txId, kidId: kid.id, amount: reward.value, type: 'reward', description: reward.name, createdAt: txCreatedAt });
+        cache.transactions.push({ actioned_by: actionedBy(), id: txId, kidId: kid.id, amount: reward.value, type: 'reward', description: reward.name, createdAt: txCreatedAt });
         await checkBonusMilestones(kid.id, newBalance);
     }
     track('reward_approved', { amount: reward?.value });
@@ -5922,7 +6073,7 @@ async function approveReward(cid) {
     render();
 }
 async function rejectReward(cid) {
-    await sb.from('reward_completions').update({ rejected: true }).eq('id', cid).eq('user_id', currentUser.id);
+    await sb.from('reward_completions').update({ actioned_by: actionedBy(), rejected: true }).eq('id', cid).eq('user_id', currentUser.id);
     const c = cache.rewardCompletions.find(x => x.id === cid);
     if (c) c.rejected = true;
     render();
@@ -5965,6 +6116,7 @@ function trackLoops(event, properties) {
 }
 
 async function openManageSubscription() {
+    if (!activeIsOwner()) return toast('Only the account owner can manage the subscription.', 'warn');
     const btns = document.querySelectorAll('.manage-sub-btn');
     btns.forEach((b) => { b.disabled = true; b.style.opacity = '0.6'; });
     try {
@@ -6041,9 +6193,9 @@ async function confirmSwitchToPerChore() {
             const newBalance = (kid.balance || 0) + amountPaid;
             const txId = uid();
             await sb.from('kids').update({ balance: newBalance }).eq('id', kid.id).eq('user_id', currentUser.id);
-            await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, kid_id: kid.id, amount: amountPaid, type: 'cycle_allowance', description: desc, created_at: createdAt });
+            await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kid.id, amount: amountPaid, type: 'cycle_allowance', description: desc, created_at: createdAt });
             kid.balance = newBalance;
-            cache.transactions.push({ id: txId, kidId: kid.id, amount: amountPaid, type: 'cycle_allowance', description: desc, createdAt });
+            cache.transactions.push({ actioned_by: actionedBy(), id: txId, kidId: kid.id, amount: amountPaid, type: 'cycle_allowance', description: desc, createdAt });
         }
         await sb.from('cycle_history').insert({ id: historyId, user_id: currentUser.id, kid_id: kid.id, period_type: period, start_date: anchor, end_date: today, weight_completed: completed, weight_assigned: assigned, percent: pct, amount_ceiling: ceiling, amount_paid: amountPaid, created_at: createdAt });
         cache.cycleHistory.push({ id: historyId, kidId: kid.id, periodType: period, startDate: anchor, endDate: today, weightCompleted: completed, weightAssigned: assigned, percent: pct, amountCeiling: ceiling, amountPaid: amountPaid, createdAt });
@@ -6066,17 +6218,77 @@ function saveCurrency(code) {
 async function saveParentPin() {
     const pin = document.getElementById('pp-pin').value.trim();
     if (!/^\d{4}$/.test(pin)) return toast('PIN must be exactly 4 digits.', 'warn');
-    const { error } = await sb.rpc('set_parent_pin', { p_new_pin: pin });
+    const p = parentProfiles.find(x => x.id === S.modal?.data?.profileId) || ownerProfile();
+    const { error } = p
+        ? await sb.rpc('set_parent_profile_pin', { p_profile_id: p.id, p_new_pin: pin })
+        : await sb.rpc('set_parent_pin', { p_new_pin: pin });
     if (error) return toast('Could not save PIN.', 'error');
-    hasParentPin = true;
-    track('parent_pin_set');
-    closeModal(); toast('Parent PIN saved!', 'pin');
+    if (p) p.has_pin = true;
+    if (!p || p.is_owner) hasParentPin = true;
+    track('parent_pin_set', { role: p && !p.is_owner ? 'co_parent' : 'owner', for_other_parent: !!(p && activeParent() && p.id !== activeParent().id) });
+    closeModal(); toast(coParent() && p ? `${p.name}'s PIN saved!` : 'Parent PIN saved!', 'pin');
 }
 async function removeParentPin() {
     const { error } = await sb.rpc('remove_parent_pin');
-    if (error) return toast('Could not remove PIN.', 'error');
+    if (error) return toast(coParent() ? 'Remove the co-parent first.' : 'Could not remove PIN.', 'error');
     hasParentPin = false;
+    const owner = ownerProfile();
+    if (owner) owner.has_pin = false;
     closeModal(); toast('Parent PIN removed.');
+}
+async function saveParentName(profileId) {
+    const name = document.getElementById('rn-name').value.trim();
+    if (!name) return toast('Enter a name.', 'warn');
+    const { error } = await sb.rpc('rename_parent_profile', { p_profile_id: profileId, p_name: name });
+    if (error) return toast('Could not save the name.', 'error');
+    const p = parentProfiles.find(x => x.id === profileId);
+    if (p) p.name = name;
+    track('parent_renamed');
+    closeModal(); toast('Name saved!');
+}
+async function addCoParent() {
+    snapModalInputs();
+    const owner = ownerProfile();
+    const { ownerName = '', ownerPin = '', name = '', pin = '' } = S.modal.data;
+    if (!ownerName.trim() || !name.trim()) return toast('Enter both names.', 'warn');
+    if (!owner?.has_pin && !/^\d{4}$/.test(ownerPin.trim())) return toast('Your PIN must be exactly 4 digits.', 'warn');
+    if (!/^\d{4}$/.test(pin.trim())) return toast("Their PIN must be exactly 4 digits.", 'warn');
+    if (owner && ownerName.trim() !== owner.name) {
+        const { error } = await sb.rpc('rename_parent_profile', { p_profile_id: owner.id, p_name: ownerName.trim() });
+        if (error) return toast('Could not save your name.', 'error');
+    }
+    if (owner && !owner.has_pin) {
+        const { error } = await sb.rpc('set_parent_profile_pin', { p_profile_id: owner.id, p_new_pin: ownerPin.trim() });
+        if (error) return toast('Could not save your PIN.', 'error');
+    }
+    const { error } = await sb.rpc('add_co_parent', { p_name: name.trim(), p_pin: pin.trim() });
+    if (error) return toast('Could not add the co-parent.', 'error');
+    await loadParentProfiles();
+    hasParentPin = !!ownerProfile()?.has_pin;
+    // The owner is the one adding, so from here on their actions are stamped as theirs.
+    S.activeParentId = ownerProfile()?.id || null;
+    track('co_parent_added');
+    try { if (window.posthog && posthog.setPersonProperties) posthog.setPersonProperties({ has_co_parent: true, has_parent_pin: true }); } catch (e) {}
+    closeModal(); toast(`${name.trim()} added! You each have your own button on the home screen now.`, 'success');
+}
+function removeCoParent() {
+    const co = coParent();
+    if (!co) return;
+    openModal('confirm-delete', {
+        msg: `${esc(co.name)} will lose their button and PIN. Everything they approved stays in your history under their name.`,
+        onConfirm: 'doRemoveCoParent()',
+        confirmLabel: 'Remove',
+    });
+}
+async function doRemoveCoParent() {
+    const co = coParent();
+    if (!co) return closeModal();
+    const { error } = await sb.rpc('remove_co_parent', { p_profile_id: co.id });
+    if (error) return toast('Could not remove the co-parent.', 'error');
+    co.removed = true; co.has_pin = false;
+    track('co_parent_removed');
+    try { if (window.posthog && posthog.setPersonProperties) posthog.setPersonProperties({ has_co_parent: false }); } catch (e) {}
+    closeModal(); toast(`${co.name} removed.`);
 }
 
 // ─── RENDER ──────────────────────────────────────────────────────
