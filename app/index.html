@@ -4408,6 +4408,23 @@ const FAQ_ITEMS = [
       a: "Reconciliation lets you compare what the app says a child should have against what they actually have in real life, like their bank account or piggy bank. It's a quick way to check the two match up, especially after handing over cash or making a manual adjustment." },
     { q: "Can more than one parent manage it?",
       a: "Yes. Add a co-parent in Settings under Parents & PINs. You share one login, but each parent gets their own button on the home screen and their own PIN. Both of you can approve chores and rewards, record payouts and manage the kids, and Sprout shows which parent approved what. Only the account owner can manage the subscription." },
+    { q: "Is there an iOS or Android app?",
+      a: `No, we developed Sprout as a web app in order to make it accessible on any device that has an internet browser.
+
+The app can function as a normal app on your phone home screen by following these easy steps:
+
+<strong>On an iPhone/iPad:</strong>
+1. Open Safari and go to <a href="https://www.sproutearnsave.com" target="_blank" rel="noopener" style="color:var(--color-green-700);font-weight:700">www.sproutearnsave.com</a>. (It must be Safari, not Gmail or WhatsApp's built-in browser.) Sign in with your email and password.
+2. Tap the menu button at the bottom of the screen (it's three lines next to the address bar).
+3. Tap the "Share" button.
+4. Scroll down and tap Add to Home Screen.
+5. Tap Add in the top right corner.
+
+<strong>On an Android phone:</strong>
+1. Open Chrome and go to <a href="https://www.sproutearnsave.com" target="_blank" rel="noopener" style="color:var(--color-green-700);font-weight:700">www.sproutearnsave.com</a>. Sign in with your email and password.
+2. Tap the three dots in the top right corner.
+3. Tap Add to Home screen (on some phones it says Install app).
+4. Tap Install or Add.` },
     { q: "What if my child forgets their PIN, or I forget my parent PIN?",
       a: `You can reset a child's PIN anytime from their profile in the Kids tab. If you forget your own parent PIN, use "Forgot PIN?" on the PIN screen to reset it via your account email. A co-parent can also ask the account owner to reset their PIN from Settings.` },
     { q: "Can I change our home currency after we've already set everything up?",
@@ -4427,7 +4444,7 @@ function pFAQ() {
               <span style="font-size:14.5px;font-weight:800;color:var(--color-green-700)">${item.q}</span>
               <span style="font-size:19px;font-weight:800;color:var(--color-green-600);flex:none;line-height:1">${open ? '−' : '+'}</span>
             </button>
-            ${open ? `<div style="padding:0 18px 18px;font-size:14px;line-height:1.6;color:var(--color-text-secondary)">${item.a}</div>` : ''}
+            ${open ? `<div style="padding:0 18px 18px;font-size:14px;line-height:1.6;color:var(--color-text-secondary);white-space:pre-line">${item.a}</div>` : ''}
           </div>`;
         }).join('')}
       </div>
