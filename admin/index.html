@@ -93,6 +93,13 @@
   .attn li { display: flex; justify-content: space-between; gap: 10px; }
   .attn li span:last-child { color: var(--text-3); font-size: 13px; white-space: nowrap; }
   .attn .empty { color: var(--text-3); font-size: 13px; }
+  .attn .card { align-self: start; }
+  .attn .card h3 { margin: 0; }
+  .attn-toggle { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; cursor: pointer; }
+  .attn-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+  .attn-toggle .sign { flex: none; width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--border); display: grid; place-items: center; font-size: 16px; font-weight: 600; line-height: 1; color: var(--text-2); }
+  .attn-toggle:hover .sign { border-color: var(--text-3); color: var(--text); }
+  .attn .detail { margin-top: 12px; }
   .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
   .toolbar input[type=search] { flex: 1 1 220px; }
   .toolbar .count { color: var(--text-3); font-size: 13px; margin-left: auto; }
@@ -453,11 +460,26 @@
     bars('#engagement', [['Children', t.kids], ['Active chores', t.chores_active], ['Chores done (7d)', t.completions_7d], ['Chores done (30d)', t.completions_30d], ['Awaiting approval', t.pending_approvals], ['Push enabled', t.push_subscriptions]], k => k);
   }
 
+  // Collapsed by default: the title and count say enough at a glance, and the
+  // plus opens the list. Which ones are open survives a Refresh, not a reload.
+  const openAttention = new Set();
   function attentionCard(title, items, fmt, okText) {
     const card = el('div', { class: 'card ' + (items.length ? '' : 'ok') });
-    card.append(el('h3', {}, `${title} `, el('small', {}, `(${items.length})`)));
-    if (!items.length) card.append(el('div', { class: 'empty' }, okText));
-    else { const ul = el('ul'); for (const u of items) { const [l, r] = fmt(u); ul.append(el('li', {}, el('span', {}, l), el('span', {}, r))); } card.append(ul); }
+    const open = openAttention.has(title);
+    const sign = el('span', { class: 'sign', 'aria-hidden': 'true' }, open ? '\u2212' : '+');
+    const toggle = el('button', { type: 'button', class: 'attn-toggle', 'aria-expanded': String(open) }, el('h3', {}, `${title} `, el('small', {}, `(${items.length})`)), sign);
+    const detail = el('div', { class: 'detail' });
+    if (!items.length) detail.append(el('div', { class: 'empty' }, okText));
+    else { const ul = el('ul'); for (const u of items) { const [l, r] = fmt(u); ul.append(el('li', {}, el('span', {}, l), el('span', {}, r))); } detail.append(ul); }
+    detail.hidden = !open;
+    toggle.addEventListener('click', () => {
+      const nowOpen = detail.hidden;
+      detail.hidden = !nowOpen;
+      sign.textContent = nowOpen ? '\u2212' : '+';
+      toggle.setAttribute('aria-expanded', String(nowOpen));
+      if (nowOpen) openAttention.add(title); else openAttention.delete(title);
+    });
+    card.append(toggle, detail);
     return card;
   }
   function renderAttention(users) {
