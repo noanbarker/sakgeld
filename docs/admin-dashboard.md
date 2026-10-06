@@ -9,9 +9,8 @@
 - KPI tiles: total sign-ups, active (paying), trialing, canceled, no subscription, estimated MRR (ZA in Rand, rest of world in Dollars), families active in the last 7 days.
 - Users by status donut, trials started per day since 15 September 2026.
 - Breakdowns: country, payment rail (Paystack/Paddle), billing cycle, traffic source, referral partners, engagement totals.
-- Needs attention: trials ending within 7 days, failed payments, scheduled cancellations, subscribers with no children added, subscribers quiet for 5+ days, canceled accounts awaiting the 60-day purge.
-- Latest contact-form messages.
-- All users table: name, email, country, sign-up date, last activity, status, plan, next billing / trial end date, kids, chores, chores done in 7 days, notes. Searchable, filterable by status, sortable by any column, exportable to CSV.
+- Needs attention: failed payments, scheduled cancellations, subscribers with no children added, subscribers quiet for 5+ days, canceled accounts awaiting the 60-day purge.
+- All users table: name, email, country, sign-up date, last activity, status, cancellation scheduled (Yes/No for active and trialing accounts, a dash otherwise), plan, next billing / trial end date, kids, chores, chores done in 7 days, notes. Searchable, filterable by status, sortable by any column, exportable to CSV.
 
 **Definitions**
 

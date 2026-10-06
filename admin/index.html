@@ -105,6 +105,7 @@
   tr:last-child td { border-bottom: 0; }
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
   td .dim { color: var(--text-3); font-size: 12px; display: block; }
+  td.dimcell { color: var(--text-3); }
   .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid transparent; }
   .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   .pill.active { color: var(--active); background: color-mix(in srgb, var(--active) 12%, transparent); }
@@ -120,10 +121,6 @@
   #gate form { display: grid; gap: 10px; }
   #gate .err { color: var(--canceled); font-size: 13px; min-height: 18px; }
   .hidden { display: none !important; }
-  .msg { padding: 12px; font-size: 14px; }
-  .msg + .msg { border-top: 1px solid var(--border); }
-  .msg .who { font-weight: 600; }
-  .msg .body { color: var(--text-2); white-space: pre-wrap; }
   @media (max-width: 640px) { .kpi .value { font-size: 24px; } header h1 { font-size: 18px; } }
 </style>
 </head>
@@ -184,8 +181,6 @@
     <h2>Needs attention</h2>
     <div class="attn" id="attention"></div>
 
-    <h2>Contact messages <small id="msgCount"></small></h2>
-    <div class="card" id="messages" style="padding:0"></div>
 
     <h2>All users <small id="userCount"></small></h2>
     <div class="toolbar">
@@ -208,6 +203,7 @@
           <th data-k="signed_up_at">Signed up</th>
           <th data-k="last_activity_at">Last activity</th>
           <th data-k="status">Status</th>
+          <th data-k="cancel_sched">Cancellation scheduled</th>
           <th data-k="plan">Plan</th>
           <th data-k="next_date">Next date</th>
           <th data-k="kids" class="num">Kids</th>
@@ -322,7 +318,6 @@
     renderTrials(users);
     renderBreakdowns(users);
     renderAttention(users);
-    renderMessages();
     renderTable();
   }
 
@@ -467,22 +462,11 @@
   }
   function renderAttention(users) {
     const wrap = $('#attention'); wrap.replaceChildren();
-    const trials = users.filter(u => u.status === 'trialing' && trialEnd(u)).sort((a, b) => new Date(trialEnd(a)) - new Date(trialEnd(b)));
-    wrap.append(attentionCard('Trials ending soon', trials.filter(u => daysUntil(trialEnd(u)) <= 7), u => [displayName(u) + (u.kids ? '' : ' · no children yet'), `${fmtDate(trialEnd(u))} (${daysUntil(trialEnd(u))}d)`], 'No trials end in the next 7 days.'));
     wrap.append(attentionCard('Payment failed', users.filter(u => u.payment_failed_at), u => [displayName(u), `${ago(u.payment_failed_at)} · ${u.payment_retry_count} retr${u.payment_retry_count === 1 ? 'y' : 'ies'}`], 'No failed payments outstanding.'));
     wrap.append(attentionCard('Cancellation scheduled', users.filter(u => u.cancel_scheduled && u.status !== 'canceled'), u => [displayName(u), 'access ends ' + fmtDate(u.current_period_ends_at)], 'Nobody is scheduled to cancel.'));
     wrap.append(attentionCard('Paying or trialing, no children added', users.filter(u => (u.status === 'active' || u.status === 'trialing') && u.kids === 0), u => [displayName(u), STATUS_LABEL[u.status] + ' · ' + ago(u.signed_up_at)], 'Every subscriber has set up at least one child.'));
     wrap.append(attentionCard('Subscribers quiet for 5+ days', users.filter(u => u.status === 'active' && daysAgo(u.last_activity_at) >= 5), u => [displayName(u), 'last seen ' + ago(u.last_activity_at)], 'All paying families have been active in the last 5 days.'));
     wrap.append(attentionCard('Canceled, data purge pending', users.filter(u => u.status === 'canceled' && u.canceled_at), u => [displayName(u), `purge ${fmtDate(new Date(new Date(u.canceled_at).getTime() + 60 * 86400000).toISOString())}`], 'No canceled accounts waiting to be purged.'));
-  }
-
-  function renderMessages() {
-    const wrap = $('#messages'); wrap.replaceChildren();
-    $('#msgCount').textContent = `${totals().contact_messages} total, latest ${Math.min(10, data.contact_messages.length)}`;
-    if (!data.contact_messages.length) { wrap.append(el('div', { class: 'msg note' }, 'No contact-form messages yet.')); return; }
-    for (const m of data.contact_messages) {
-      wrap.append(el('div', { class: 'msg' }, el('div', {}, el('span', { class: 'who' }, `${m.name} · ${m.email}`), el('span', { class: 'dim' }, ` ${m.topic || ''} · ${fmtDateTime(m.created_at)}`)), el('div', { class: 'body' }, m.message)));
-    }
   }
 
   // ---------- users table ----------
@@ -491,11 +475,17 @@
     if (k === 'next_date') return trialEnd(u) || '';
     if (k === 'name') return displayName(u).toLowerCase();
     if (k === 'notes') return notesFor(u).length;
+    if (k === 'cancel_sched') return cancelScheduled(u) === null ? -1 : Number(cancelScheduled(u));
     return u[k] ?? '';
   };
+  // Only a live subscription can have a cancellation waiting; anyone already
+  // canceled, or who never subscribed, gets a dash instead of Yes/No.
+  function cancelScheduled(u) {
+    if (u.status !== 'active' && u.status !== 'trialing' && u.status !== 'past_due') return null;
+    return Boolean(u.cancel_scheduled);
+  }
   function notesFor(u) {
     const n = [];
-    if (u.cancel_scheduled && u.status !== 'canceled') n.push('cancel scheduled');
     if (u.payment_failed_at) n.push('payment failed');
     if (!u.email_verified) n.push('email unverified');
     if (!u.onboarding_complete && u.status !== 'none') n.push('onboarding incomplete');
@@ -531,6 +521,11 @@
         el('td', {}, fmtDate(u.signed_up_at), el('span', { class: 'dim' }, ago(u.signed_up_at))),
         el('td', {}, fmtDate(u.last_activity_at), el('span', { class: 'dim' }, ago(u.last_activity_at))),
         el('td', {}, el('span', { class: 'pill ' + u.status }, STATUS_LABEL[u.status] || u.status)),
+        cancelScheduled(u) === null
+          ? el('td', { class: 'dimcell' }, '—')
+          : cancelScheduled(u)
+            ? el('td', {}, el('span', { class: 'pill canceled' }, 'Yes'), u.current_period_ends_at ? el('span', { class: 'dim' }, 'access ends ' + fmtDate(u.current_period_ends_at)) : '')
+            : el('td', { class: 'dimcell' }, 'No'),
         el('td', {}, u.provider ? ({ paystack: 'Paystack', paddle: 'Paddle' })[u.provider] || u.provider : '—', el('span', { class: 'dim' }, u.billing_cycle || '')),
         el('td', {}, next && nextLabel ? fmtDate(next) : '—', el('span', { class: 'dim' }, next && nextLabel ? nextLabel : '')),
         el('td', { class: 'num' }, u.kids),
@@ -546,7 +541,7 @@
   $('#statusFilter').addEventListener('change', renderTable);
   document.querySelector('#users thead').addEventListener('click', e => {
     const th = e.target.closest('th'); if (!th) return;
-    if (sortKey === th.dataset.k) sortAsc = !sortAsc; else { sortKey = th.dataset.k; sortAsc = !['signed_up_at', 'last_activity_at', 'kids', 'chores', 'completions_7d', 'notes'].includes(sortKey); }
+    if (sortKey === th.dataset.k) sortAsc = !sortAsc; else { sortKey = th.dataset.k; sortAsc = !['signed_up_at', 'last_activity_at', 'kids', 'chores', 'completions_7d', 'notes', 'cancel_sched'].includes(sortKey); }
     renderTable();
   });
   $('#exportCsv').addEventListener('click', () => {
