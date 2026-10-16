@@ -56,7 +56,9 @@ module.exports = async (req, res) => {
       res.status(200).json({ kept: true });
       return;
     }
-    res.status(502).json({ error: 'We couldn’t switch your subscription back on. Please contact us and we’ll sort it out.' });
+    res.status(502).json({ error: result.needsNewCard
+      ? 'Your saved card can’t be used any more. Let your subscription run out, then restart it with a new card.'
+      : 'We couldn’t switch your subscription back on. Please contact us and we’ll sort it out.' });
     return;
   }
 
