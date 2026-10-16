@@ -1,5 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
-const { savedCard, restartWithSavedCard, cycleOf, PLAN_AMOUNTS_CENTS } = require('../lib/paystack-restart');
+const { savedCard, restartWithSavedCard, keepSubscription, cycleOf, PLAN_AMOUNTS_CENTS } = require('../lib/paystack-restart');
 
 // One "Manage Subscription" button, two payment rails behind it.
 //
@@ -45,6 +45,21 @@ module.exports = async (req, res) => {
   // Paystack's error for it reads like an outage), so a returning family gets
   // a restart instead. This lives here rather than in its own endpoint because
   // api/ is at Vercel's 12-function limit. See lib/paystack-restart.js.
+  if (action === 'keep') {
+    const live = metadata.subscription_status === 'active' || metadata.subscription_status === 'trialing';
+    if (!live || !metadata.cancel_scheduled || metadata.payment_provider !== 'paystack') {
+      res.status(409).json({ error: 'There is no cancellation to undo on this account.' });
+      return;
+    }
+    const result = await keepSubscription(supabaseAdmin, userData.user);
+    if (result.ok) {
+      res.status(200).json({ kept: true });
+      return;
+    }
+    res.status(502).json({ error: 'We couldn’t switch your subscription back on. Please contact us and we’ll sort it out.' });
+    return;
+  }
+
   if (metadata.subscription_status === 'canceled') {
     const onPaystack = metadata.payment_provider === 'paystack' || (!metadata.paddle_customer_id && metadata.paystack_customer_code);
     if (action === 'restart_preview') {
