@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { PLAN_AMOUNTS_CENTS } = require('../lib/paystack-restart');
 
 // South African checkout. Everyone outside South Africa still goes to Paddle
 // (see openTrialCheckout in app/index.html) — this endpoint exists because
@@ -84,6 +85,11 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // A family whose subscription ended has already had their free trial, so
+  // coming back costs the first period up front instead of R1. The webhook
+  // keeps the charge and starts billing one period later (lib/paystack-restart.js).
+  const isRestart = metadata.subscription_status === 'canceled';
+
   const initRes = await fetch('https://api.paystack.co/transaction/initialize', {
     method: 'POST',
     headers: {
@@ -92,7 +98,7 @@ module.exports = async (req, res) => {
     },
     body: JSON.stringify({
       email: user.email,
-      amount: CARD_SETUP_AMOUNT_KOBO,
+      amount: isRestart ? PLAN_AMOUNTS_CENTS[billingCycle] : CARD_SETUP_AMOUNT_KOBO,
       currency: 'ZAR',
       // Card only: the subscription rail can only charge a stored card
       // authorisation, so paying this R1 by EFT would leave us with nothing to
@@ -103,7 +109,7 @@ module.exports = async (req, res) => {
       // sprout_purpose only tells the webhook which of its two kinds of
       // charge.success this is (card setup vs. a later subscription renewal).
       metadata: {
-        sprout_purpose: 'card_setup',
+        sprout_purpose: isRestart ? 'restart_card' : 'card_setup',
         supabase_user_id: userId,
         billing_cycle: billingCycle,
         plan_code: planCode,

@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { savedCard, restartWithSavedCard, cycleOf, PLAN_AMOUNTS_CENTS } = require('../lib/paystack-restart');
 
 // One "Manage Subscription" button, two payment rails behind it.
 //
@@ -33,6 +34,50 @@ module.exports = async (req, res) => {
   }
 
   const metadata = userData.user.user_metadata || {};
+
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (e) { body = {}; }
+  }
+  const action = (body && body.action) || 'portal';
+
+  // Neither gateway can manage a subscription that has already ended (and
+  // Paystack's error for it reads like an outage), so a returning family gets
+  // a restart instead. This lives here rather than in its own endpoint because
+  // api/ is at Vercel's 12-function limit. See lib/paystack-restart.js.
+  if (metadata.subscription_status === 'canceled') {
+    const onPaystack = metadata.payment_provider === 'paystack' || (!metadata.paddle_customer_id && metadata.paystack_customer_code);
+    if (action === 'restart_preview') {
+      const card = onPaystack ? await savedCard(metadata) : null;
+      const billingCycle = cycleOf(metadata);
+      res.status(200).json({
+        provider: onPaystack ? 'paystack' : 'paddle',
+        billingCycle,
+        amount: PLAN_AMOUNTS_CENTS[billingCycle] / 100,
+        currency: 'ZAR',
+        card: card ? { last4: card.last4, brand: card.brand } : null,
+      });
+      return;
+    }
+    if (action === 'restart') {
+      if (!onPaystack) {
+        res.status(409).json({ error: 'Please restart through checkout.', needsNewCard: true });
+        return;
+      }
+      const result = await restartWithSavedCard(supabaseAdmin, userData.user);
+      if (result.ok) {
+        res.status(200).json({ restarted: true });
+        return;
+      }
+      res.status(result.needsNewCard ? 402 : 500).json({
+        error: result.error || (result.declined ? 'Your saved card was declined.' : 'Your saved card can no longer be used.'),
+        needsNewCard: Boolean(result.needsNewCard),
+      });
+      return;
+    }
+    res.status(409).json({ error: 'Your subscription has ended. Reload the page to restart it.' });
+    return;
+  }
 
   // Every family who signed up before the South African rail existed is on
   // Paddle and has no payment_provider tag, so the presence of a Paddle

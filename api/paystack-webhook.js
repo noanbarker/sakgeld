@@ -16,6 +16,7 @@ const {
 const { trackSubscriptionChange } = require('../lib/posthog');
 // Meta StartTrial: shared event_id with the browser Pixel, plus match keys.
 const { sendStartTrialConversion } = require('../lib/meta-attribution');
+const { startPaidSubscription, liveSubscription } = require('../lib/paystack-restart');
 
 // South African subscription rail. The rest of the world is billed by Paddle
 // (api/paddle-webhook.js) and nothing here touches those customers.
@@ -250,6 +251,26 @@ async function startTrialFromCardSetup(supabaseAdmin, data) {
   });
 }
 
+// A returning family paid their first period on a new card (see
+// api/paystack-checkout.js). Unlike card setup, nothing is refunded: this is
+// the real payment, and the subscription it starts bills one period from now.
+async function restartFromNewCard(supabaseAdmin, data) {
+  const userId = (data.metadata || {}).supabase_user_id;
+  const authorizationCode = data.authorization && data.authorization.authorization_code;
+  const customerCode = data.customer && data.customer.customer_code;
+  if (!userId || !authorizationCode || !customerCode) {
+    console.error('RESTART PAID BUT MISSING DETAILS — reopen by hand. Reference:', data.reference);
+    return;
+  }
+  const done = await startPaidSubscription(supabaseAdmin, {
+    userId, customerCode, authorizationCode, amountCents: data.amount, paidAt: data.paid_at,
+    // On a redelivery, reuse the subscription the first attempt created.
+    existingSubscription: await liveSubscription(customerCode),
+  });
+  // Thrown so the handler releases the dedupe claim and Paystack redelivers.
+  if (!done) throw new Error('restart could not reopen the account');
+}
+
 // A subscription charge went through — either the first one at the end of the
 // trial, or a later renewal.
 async function handleSubscriptionCharge(supabaseAdmin, data) {
@@ -386,8 +407,11 @@ module.exports = async (req, res) => {
 
   try {
     if (name === 'charge.success') {
-      if ((data.metadata || {}).sprout_purpose === 'card_setup') {
+      const purpose = (data.metadata || {}).sprout_purpose;
+      if (purpose === 'card_setup') {
         await startTrialFromCardSetup(supabaseAdmin, data);
+      } else if (purpose === 'restart_card') {
+        await restartFromNewCard(supabaseAdmin, data);
       } else if (data.plan && data.plan.plan_code) {
         await handleSubscriptionCharge(supabaseAdmin, data);
       }

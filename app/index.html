@@ -995,7 +995,9 @@ async function refreshUserAfterCheckout() {
         const { data } = await sb.auth.getUser();
         if (data?.user) {
             currentUser = data.user;
-            if (currentUser.user_metadata?.subscription_status) break;
+            // 'canceled' doesn't count: a returning family already has it before the restart lands.
+            const st = currentUser.user_metadata?.subscription_status;
+            if (st && st !== 'canceled') break;
         }
     }
     render();
@@ -2927,6 +2929,9 @@ function setBillingCycle(cycle) {
 // must be blocked here rather than let into the app.
 function vSubscriptionGate() {
     const status = currentUser?.user_metadata?.subscription_status;
+    // A cancelled subscription can't be managed any more — Paystack refuses to
+    // open its card page for one — so a returning family gets its own screen.
+    if (status === 'canceled') return vRestartGate();
     const needsAttention = !!status;
     return `
     <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
@@ -2948,6 +2953,115 @@ function vSubscriptionGate() {
         </div>
       </div>
     </div>`;
+}
+
+// ─── RESTART AFTER CANCELLING ────────────────────────────────────
+// A returning family has had their free trial, so restarting is paid from
+// today. South African families can restart in one click on the card Paystack
+// already holds; if that card is gone or declined, they enter a new one on
+// Paystack's page (charged the same amount). Paddle families go back through
+// Paddle's checkout. The server decides all of this — see lib/paystack-restart.js.
+function vRestartGate() {
+    // Keyed to the account so signing in as someone else never shows the last card.
+    const r = S.restart && S.restart.userId === currentUser?.id ? S.restart : null;
+    if (!r) loadRestartOptions();
+    const font = 'font-family:var(--font-family)';
+    const ready = r && r.state === 'ready';
+    const card = ready && !r.declined ? r.card : null;
+    const onPaystack = ready && r.provider === 'paystack';
+    const price = ready ? `R${r.amount}${r.billingCycle === 'yearly' ? ' a year' : ' a month'}` : '';
+    const brand = card ? esc(card.brand.charAt(0).toUpperCase() + card.brand.slice(1)) : '';
+    let body;
+    if (!ready) {
+        body = `<button class="btn-primary" disabled style="margin-bottom:14px;opacity:0.6">Checking your account…</button>`;
+    } else if (card) {
+        body = `
+            <div style="${font};font-size:14.5px;line-height:1.5;color:var(--color-text-secondary);background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:14px 16px;margin-bottom:22px;text-align:left">
+              Restart today for <strong>${price}</strong>, charged to your <strong>${brand} ending ${esc(card.last4)}</strong>. It renews automatically and you can cancel any time.
+            </div>
+            <button id="restart-btn" onclick="restartSubscription()" class="btn-primary" style="margin-bottom:12px">${r.busy ? 'Restarting…' : `Restart for ${price}`}</button>
+            <div style="margin-bottom:6px"><button onclick="resumeCheckout()" style="${font};font-size:13.5px;font-weight:700;color:#15803d;background:none;border:none;cursor:pointer;text-decoration:underline">Use a different card</button></div>`;
+    } else {
+        const note = onPaystack
+            ? `${r.declined ? 'Your saved card didn’t go through. ' : ''}The next page asks for your card. You’ll be charged <strong>${price}</strong> today, and it renews automatically. Cancel any time.`
+            : 'The next page asks for your payment details.';
+        body = `
+            <p style="${font};font-size:14px;line-height:1.5;color:var(--color-text-secondary);margin-bottom:22px">${note}</p>
+            <button onclick="resumeCheckout()" class="btn-primary" style="margin-bottom:14px">Restart Subscription</button>`;
+    }
+    return `
+    <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
+      <div style="width:100%;max-width:440px">
+        <div class="pr-card" style="padding:52px 40px 44px;text-align:center">
+          <div class="pr-stripe"></div>
+          <div style="position:relative;z-index:1">
+            <div style="display:flex;justify-content:center;margin-bottom:20px"><picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture></div>
+            <h2 style="${font};font-size:22px;font-weight:900;color:#14532d;margin-bottom:10px">Welcome back!</h2>
+            <p style="${font};font-size:14px;color:var(--color-text-secondary);margin-bottom:22px">Your subscription has ended. Restart it to pick up where you left off — your family’s chores and savings are still here.</p>
+            ${body}
+            <div>
+              <button onclick="signOut()" style="${font};font-size:13px;font-weight:600;color:var(--color-text-muted);background:none;border:none;cursor:pointer">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+async function loadRestartOptions() {
+    const userId = currentUser?.id;
+    S.restart = { state: 'loading', userId };
+    try {
+        const { data: { session } } = await sb.auth.getSession();
+        const res = await fetch('/api/billing-portal', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'restart_preview' })
+        });
+        const body = await res.json().catch(() => null);
+        if (!res.ok || !body) throw new Error('preview failed');
+        S.restart = { state: 'ready', userId, ...body };
+        track('restart_screen_viewed', { provider: body.provider, has_saved_card: Boolean(body.card) });
+    } catch (e) {
+        // Still lets them restart: the card page works without the preview.
+        S.restart = { state: 'ready', userId, provider: (currentUser?.user_metadata?.signup_geo === 'ZA' ? 'paystack' : 'paddle'), card: null, amount: currentUser?.user_metadata?.billing_cycle === 'yearly' ? 590 : 59, billingCycle: currentUser?.user_metadata?.billing_cycle || 'monthly' };
+    }
+    render();
+}
+async function restartSubscription() {
+    if (!activeIsOwner()) return toast('Only the account owner can restart the subscription.', 'warn');
+    if (!S.restart || S.restart.busy) return;
+    S.restart.busy = true;
+    render();
+    const btn = document.getElementById('restart-btn');
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+    try {
+        const { data: { session } } = await sb.auth.getSession();
+        const res = await fetch('/api/billing-portal', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'restart' })
+        });
+        const body = await res.json().catch(() => null);
+        if (res.ok && body?.restarted) {
+            track('subscription_restarted', { method: 'saved_card' });
+            const { data } = await sb.auth.getUser();
+            if (data?.user) currentUser = data.user;
+            S.restart = null;
+            toast('Welcome back! Your subscription is active again.');
+            render();
+            return;
+        }
+        S.restart.busy = false;
+        if (body?.needsNewCard) {
+            S.restart.declined = true;
+            track('subscription_restart_declined');
+        }
+        toast(body?.error || 'Could not restart your subscription. Please try again.', 'error');
+    } catch (e) {
+        S.restart.busy = false;
+        toast('Could not restart your subscription. Please try again.', 'error');
+    }
+    render();
 }
 async function doSignIn() {
     const email = document.getElementById('l-email')?.value?.trim();
