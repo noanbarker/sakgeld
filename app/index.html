@@ -1200,13 +1200,21 @@ async function initApp() {
         if (event === 'PASSWORD_RECOVERY') {
             const intent = localStorage.getItem('sprout_recovery_intent');
             localStorage.removeItem('sprout_recovery_intent');
-            S.authMode = intent === 'pin' ? 'reset-pin' : 'reset';
-            if (intent === 'pin') {
-                S.resetPinParentId = localStorage.getItem('sprout_recovery_parent');
+            // A "Forgot PIN?" request noted on the account covers the link opening
+            // in another browser. It only counts for an hour (how long the link
+            // lasts), and a password request made on this browser wins.
+            const pinRequest = session?.user?.user_metadata?.pin_reset_request;
+            const pinViaAccount = intent !== 'password' && pinRequest && Date.now() - pinRequest.at < 3600000;
+            const isPin = intent === 'pin' || pinViaAccount;
+            S.authMode = isPin ? 'reset-pin' : 'reset';
+            if (isPin) {
+                S.resetPinParentId = localStorage.getItem('sprout_recovery_parent') || pinRequest?.parent || null;
                 localStorage.removeItem('sprout_recovery_parent');
                 await loadParentProfiles();
             }
-            render(); return;
+            render();
+            if (pinRequest) sb.auth.updateUser({ data: { pin_reset_request: null } });
+            return;
         }
         if (currentUser) {
             await loadCache();
@@ -1273,6 +1281,7 @@ const S = {
     selectedKids: 'all',
     parentPin: '',
     pinParentId: null,    // the parent profile whose PIN pad is showing
+    pinForgot: false,     // PIN pad swapped for "enter your password, choose a new PIN"
     activeParentId: null, // the parent profile using the dashboard right now
     resetPinParentId: null, // whose PIN a "Forgot PIN?" email link resets
     historyOpen: false,
@@ -2813,11 +2822,52 @@ async function doForgotPassword() {
     S.authMode = 'signin';
     toast('Check your email for a link to reset your password.');
 }
+// Checks the account password without touching the signed-in session: a
+// throwaway client signs in on the side, so no auth events fire in the app.
+async function checkAccountPassword(password) {
+    const probe = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'sprout-password-check' }
+    });
+    const { error } = await probe.auth.signInWithPassword({ email: currentUser.email, password });
+    if (error) return error;
+    // 'local' ends only the throwaway session — the default would sign the parent out everywhere.
+    await probe.auth.signOut({ scope: 'local' });
+    return null;
+}
+// "Forgot PIN?" on the PIN pad: the parent is already signed in, so their
+// account password is enough to choose a new PIN without leaving the app.
+async function doPinResetWithPassword() {
+    const pass = document.getElementById('fp-pass')?.value;
+    const pin = document.getElementById('fp-pin')?.value?.trim();
+    const errEl = document.getElementById('fp-err');
+    if (!pass) { if (errEl) errEl.textContent = 'Please enter your account password.'; return; }
+    if (!/^\d{4}$/.test(pin)) { if (errEl) errEl.textContent = 'PIN must be exactly 4 digits.'; return; }
+    if (errEl) errEl.textContent = 'Checking…';
+    const pwError = await checkAccountPassword(pass);
+    if (pwError) {
+        if (errEl) errEl.textContent = pwError.code === 'invalid_credentials' ? "That password isn't right." : pwError.message;
+        return;
+    }
+    const { error } = S.pinParentId
+        ? await sb.rpc('set_parent_profile_pin', { p_profile_id: S.pinParentId, p_new_pin: pin })
+        : await sb.rpc('set_parent_pin', { p_new_pin: pin });
+    if (error) { if (errEl) errEl.textContent = error.message; return; }
+    track('parent_pin_reset', { method: 'password' });
+    await loadCache();
+    S.pinForgot = false; S.parentPin = ''; S.activeParentId = S.pinParentId;
+    try { if (S.pinParentId) localStorage.setItem('sprout_last_parent', S.pinParentId); } catch (e) {}
+    enterParentDashboard();
+    toast('PIN updated!');
+}
 async function doForgotParentPin() {
     if (!currentUser?.email) return;
     localStorage.setItem('sprout_recovery_intent', 'pin');
     if (S.pinParentId) localStorage.setItem('sprout_recovery_parent', S.pinParentId);
     else localStorage.removeItem('sprout_recovery_parent');
+    // The email link often opens in a different browser to this one (on iPhone,
+    // Safari rather than the home-screen app), which can't see this device's
+    // storage — so the PIN request is also noted on the account itself.
+    await sb.auth.updateUser({ data: { pin_reset_request: { parent: S.pinParentId || null, at: Date.now() } } });
     const redirectTo = window.location.origin + window.location.pathname;
     const { error } = await sb.auth.resetPasswordForEmail(currentUser.email, { redirectTo });
     if (error) { toast('Could not send reset email.', 'error'); return; }
@@ -2880,6 +2930,7 @@ function vResetParentPin() {
               onkeydown="if(event.key==='Enter')doResetParentPin()">
             <p id="rpp-err" style="color:#f43f5e;font-size:14px;margin:4px 0 12px;min-height:20px"></p>
             <button onclick="doResetParentPin()" class="btn-primary">Set new PIN</button>
+            <div style="text-align:center;margin-top:16px"><button type="button" onclick="setAuthMode('reset')" style="background:none;border:none;cursor:pointer;font-family:var(--font-family);font-size:13px;font-weight:600;color:#15803d;padding:0">Reset my account password instead</button></div>
           </div>
         </div>
       </div>
@@ -2895,9 +2946,15 @@ async function doResetParentPin() {
         ? await sb.rpc('set_parent_profile_pin', { p_profile_id: profileId, p_new_pin: pin })
         : await sb.rpc('set_parent_pin', { p_new_pin: pin });
     if (error) { if (errEl) errEl.textContent = error.message; return; }
-    S.authMode = 'signin';
-    toast('PIN updated! Sign in to continue.');
-    await sb.auth.signOut();
+    track('parent_pin_reset', { method: 'email' });
+    // The link already signed them in, so carry straight on into the app
+    // rather than signing out and making them log in again.
+    S.authMode = 'signin'; S.resetPinParentId = null;
+    await loadCache();
+    S.activeParentId = profileId || null;
+    try { if (profileId) localStorage.setItem('sprout_last_parent', profileId); } catch (e) {}
+    enterParentDashboard();
+    toast('PIN updated!');
 }
 function captureSignupDraft() {
     return {
@@ -4915,6 +4972,7 @@ async function checkPin() {
 function goParent(profileId) {
     const p = parentProfiles.find(x => x.id === profileId) || ownerProfile();
     S.pinParentId = p?.id || null;
+    S.pinForgot = false;
     // No profiles loaded means the profiles migration hasn't run: fall back to the single PIN.
     const needsPin = p ? p.has_pin : hasParentPin;
     if (needsPin) { S.parentPin = ''; go('parent-pin'); }
@@ -4942,11 +5000,23 @@ function vParentPin() {
       <div class="flex flex-col items-center">
         <div style="width:80px;height:80px;background:var(--color-green-100);border:2px solid var(--color-green-border);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--color-green-700);margin-bottom:12px">${uiIcon('user', 36, 2)}</div>
         <h2 style="font-family:var(--font-family);font-size:28px;font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${coParent() && pinParent ? esc(pinParent.name) : 'Parent'}</h2>
+        ${S.pinForgot ? `
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);margin-bottom:24px;text-align:center;max-width:288px">Enter your Sprout account password, then choose a new PIN.</p>
+        <div style="width:288px">
+          ${pwField('fp-pass', 'Account password', '', 'mb-3', "document.getElementById('fp-pin').focus()")}
+          <input id="fp-pin" placeholder="New 4-digit PIN" maxlength="4" inputmode="numeric" class="mb-3"
+            onkeydown="if(event.key==='Enter')doPinResetWithPassword()">
+          <p id="fp-err" style="color:var(--color-coral);font-family:var(--font-family);font-size:14px;margin:4px 0 12px;min-height:20px"></p>
+          <button onclick="doPinResetWithPassword()" class="btn-primary">Set new PIN</button>
+        </div>
+        <button type="button" onclick="doForgotParentPin()" style="background:none;border:none;cursor:pointer;font-family:var(--font-family);font-size:13px;font-weight:600;color:#15803d;padding:0;margin-top:24px">Forgot your password too? Email me a link</button>
+        <button type="button" onclick="S.pinForgot=false;S.parentPin='';render()" style="background:none;border:none;cursor:pointer;font-family:var(--font-family);font-size:13px;font-weight:600;color:var(--color-text-muted);padding:0;margin-top:14px">Back to PIN pad</button>
+        ` : `
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);margin-bottom:40px">${coParent() && pinParent ? 'Enter your PIN' : 'Enter parent PIN'}</p>
         <div id="ppin-dots" class="pin-dots-row" style="display:flex;gap:24px;margin-bottom:12px">${dots}</div>
         <p id="ppin-err" style="color:var(--color-coral);font-family:var(--font-family);font-size:14px;margin-bottom:24px;min-height:20px"></p>
         <div class="grid grid-cols-3 gap-3 w-72">${pad}</div>
-        <button type="button" onclick="doForgotParentPin()" style="background:none;border:none;cursor:pointer;font-family:var(--font-family);font-size:13px;font-weight:600;color:#15803d;padding:0;margin-top:24px">Forgot PIN?</button>
+        <button type="button" onclick="S.pinForgot=true;render()" style="background:none;border:none;cursor:pointer;font-family:var(--font-family);font-size:13px;font-weight:600;color:#15803d;padding:0;margin-top:24px">Forgot PIN?</button>`}
         ${pinParent && !pinParent.is_owner ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-muted);margin-top:6px">Or ask ${esc(ownerProfile()?.name || 'the account owner')} to reset it in Settings.</p>` : ''}
       </div>
     </div>`;
