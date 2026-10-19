@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { PLAN_AMOUNTS_CENTS } = require('../lib/paystack-restart');
+const { readOfferToken } = require('../lib/trial-offer');
 
 // South African checkout. Everyone outside South Africa still goes to Paddle
 // (see openTrialCheckout in app/index.html) — this endpoint exists because
@@ -15,6 +16,7 @@ const { PLAN_AMOUNTS_CENTS } = require('../lib/paystack-restart');
 // that releases itself instead of a charge that needs refunding — but the
 // integration isn't eligible for it. Worth revisiting with Paystack support.)
 const CARD_SETUP_AMOUNT_KOBO = 100; // R1.00, refunded the instant it lands.
+const STANDARD_TRIAL_DAYS = 14;
 
 const PLAN_CODES = {
   monthly: process.env.PAYSTACK_PLAN_MONTHLY_ZA,
@@ -36,8 +38,22 @@ module.exports = async (req, res) => {
   if (typeof body === 'string') {
     try { body = JSON.parse(body); } catch (e) { body = {}; }
   }
-  const userId = body && body.userId;
   const billingCycle = body && body.billingCycle === 'yearly' ? 'yearly' : 'monthly';
+  // A personal offer link (lib/trial-offer.js) decides both the account and
+  // the trial length; a token that doesn't verify is refused rather than
+  // quietly falling back to 14 days, so the parent isn't surprised later.
+  let offer = null;
+  if (body && body.offerToken) {
+    offer = readOfferToken(body.offerToken, process.env.TRIAL_OFFER_SECRET);
+    if (!offer) {
+      console.error('Trial offer link failed verification');
+      res.status(400).json({ error: 'This offer link is not valid. Please email hello@sproutearnsave.com.' });
+      return;
+    }
+    if (offer.expired) console.log('Expired trial offer link honoured for', offer.userId);
+  }
+  const userId = offer ? offer.userId : body && body.userId;
+  const trialDays = offer ? offer.trialDays : STANDARD_TRIAL_DAYS;
   if (!userId) {
     res.status(400).json({ error: 'Missing userId' });
     return;
@@ -81,13 +97,25 @@ module.exports = async (req, res) => {
   // family twice. The dashboard's "Continue to Checkout" button is reachable
   // whenever this metadata is missing, so the guard belongs here too.
   if (metadata.subscription_status === 'trialing' || metadata.subscription_status === 'active') {
-    res.status(409).json({ error: 'This account already has an active subscription' });
+    res.status(409).json({ error: offer
+      ? 'Your Sprout trial is already running. Sign in to get going.'
+      : 'This account already has an active subscription' });
     return;
+  }
+
+  // The offer link arrived in this parent's inbox, which proves the address is
+  // theirs — so confirm it now. Most families it goes to never clicked the
+  // original confirmation email, and Supabase won't let them sign in until
+  // that's done, which would lock them out right after starting the trial.
+  if (offer && !user.email_confirmed_at) {
+    const { error: confirmError } = await supabaseAdmin.auth.admin.updateUserById(userId, { email_confirm: true });
+    if (confirmError) console.error('Could not confirm email from trial offer link:', userId, confirmError.message);
   }
 
   // A family whose subscription ended has already had their free trial, so
   // coming back costs the first period up front instead of R1. The webhook
   // keeps the charge and starts billing one period later (lib/paystack-restart.js).
+  // An offer link never turns a restart into a second free trial.
   const isRestart = metadata.subscription_status === 'canceled';
 
   const initRes = await fetch('https://api.paystack.co/transaction/initialize', {
@@ -113,6 +141,7 @@ module.exports = async (req, res) => {
         supabase_user_id: userId,
         billing_cycle: billingCycle,
         plan_code: planCode,
+        trial_days: trialDays,
         referral_code: metadata.referral_code || '',
       },
     }),

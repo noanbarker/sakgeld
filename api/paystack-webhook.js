@@ -30,6 +30,10 @@ const { startPaidSubscription, liveSubscription } = require('../lib/paystack-res
 // (trialing / active / past_due / canceled), which is what app/index.html
 // already reads, from those narrower signals.
 const TRIAL_DAYS = 14;
+// Personal offer links (lib/trial-offer.js) can set a longer trial. The value
+// comes back in metadata our own checkout wrote with the secret key, but it's
+// still only honoured if it's one of these.
+const ALLOWED_TRIAL_DAYS = [14, 30];
 
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -113,13 +117,14 @@ async function applySubscriptionState(supabaseAdmin, userId, patch) {
 
 // The card-setup charge from api/paystack-checkout.js has just succeeded, so
 // we now hold a reusable card authorisation. Refund the R1 immediately, then
-// create the real subscription with its first debit set 14 days out — that
-// start_date is Paystack's documented mechanism for a free trial period.
+// create the real subscription with its first debit set 14 days out (30 for
+// an offer link) — that start_date is Paystack's documented mechanism for a free trial period.
 async function startTrialFromCardSetup(supabaseAdmin, data) {
   const meta = data.metadata || {};
   const userId = meta.supabase_user_id;
   const planCode = meta.plan_code;
   const billingCycle = meta.billing_cycle === 'yearly' ? 'yearly' : 'monthly';
+  const trialDays = ALLOWED_TRIAL_DAYS.includes(Number(meta.trial_days)) ? Number(meta.trial_days) : TRIAL_DAYS;
   const authorizationCode = data.authorization && data.authorization.authorization_code;
   const customerCode = data.customer && data.customer.customer_code;
 
@@ -145,7 +150,7 @@ async function startTrialFromCardSetup(supabaseAdmin, data) {
       data.reference, refund.status, JSON.stringify(refund.body));
   }
 
-  const startDate = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const startDate = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString();
   const created = await paystack('/subscription', {
     method: 'POST',
     body: JSON.stringify({

@@ -810,6 +810,8 @@ function handlePaystackReturn() {
     params.delete('checkout');
     const query = params.toString();
     window.history.replaceState({}, '', window.location.pathname + (query ? '?' + query : ''));
+    let fromOffer = false;
+    try { fromOffer = sessionStorage.getItem('sprout_offer_return') === '1'; sessionStorage.removeItem('sprout_offer_return'); } catch (e) {}
     track('checkout_completed', { billing_cycle: S.billingCycle || 'monthly', provider: 'paystack', ...getStoredUTM() });
     // The Pixel StartTrial waits for the webhook to confirm the trial.
     markMetaTrialReturned();
@@ -822,7 +824,7 @@ function handlePaystackReturn() {
         // address, so there's nothing to poll for yet — same landing place as
         // the Paddle flow gives a brand-new parent.
         S.authMode = 'signin';
-        toast('Trial started! Check your email to confirm your account, then sign in.', 'success');
+        toast(fromOffer ? 'Trial started! Sign in to get going.' : 'Trial started! Check your email to confirm your account, then sign in.', 'success');
         render();
     }
 }
@@ -1015,14 +1017,14 @@ function resumeCheckout() {
 // `geo` here is the visitor's detected location (see getGeoPref), which is what
 // decided the price shown on the sign-up page — never the country dropdown,
 // which is kept purely for our own Supabase analytics (see doSignUp).
-function openTrialCheckout({ email, geo, userId, billingCycle, referralCode }) {
+function openTrialCheckout({ email, geo, userId, billingCycle, referralCode, offerToken }) {
     const isZA = geo === 'ZA';
     track('checkout_started', { billing_cycle: billingCycle, geo, provider: isZA ? 'paystack' : 'paddle', has_referral_code: Boolean(referralCode), ...getStoredUTM() });
     if (typeof fbq === 'function') fbq('track', 'InitiateCheckout');
     // Capped at 3s: Meta tracking must never hold up a parent's checkout.
     const metaRegistered = Promise.race([registerMetaTrial(userId), new Promise((resolve) => setTimeout(resolve, 3000))]);
     // Returned so doSignUp can keep its button locked until the Paystack redirect fires.
-    if (isZA) return openPaystackCheckout({ userId, billingCycle, beforeRedirect: metaRegistered });
+    if (isZA) return openPaystackCheckout({ userId, billingCycle, offerToken, beforeRedirect: metaRegistered });
     openPaddleCheckout({ email, userId, billingCycle, referralCode });
 }
 
@@ -1034,12 +1036,12 @@ function openTrialCheckout({ email, geo, userId, billingCycle, referralCode }) {
 // Paystack has no free trial of its own. The server opens a R1 charge that
 // only exists to store the card; api/paystack-webhook.js refunds it the
 // moment it lands and starts the real subscription 14 days out.
-async function openPaystackCheckout({ userId, billingCycle, beforeRedirect }) {
+async function openPaystackCheckout({ userId, billingCycle, offerToken, beforeRedirect }) {
     try {
         const res = await fetch('/api/paystack-checkout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, billingCycle }),
+            body: JSON.stringify({ userId, billingCycle, offerToken }),
         });
         const body = await res.json().catch(() => null);
         if (!res.ok || !body || !body.authorization_url) {
@@ -1051,6 +1053,9 @@ async function openPaystackCheckout({ userId, billingCycle, beforeRedirect }) {
         // run inside an iframe. Paystack sends them back to /app/?checkout=paystack.
         // Leaving the page first would lose the Meta event_id still on its way.
         await beforeRedirect;
+        // The offer link already confirmed their email, so the return trip can
+        // send them straight to sign in (see handlePaystackReturn).
+        try { if (offerToken) sessionStorage.setItem('sprout_offer_return', '1'); } catch (e) {}
         window.location.href = body.authorization_url;
     } catch (e) {
         toast('Could not start checkout. Please try again.', 'error');
@@ -3291,9 +3296,36 @@ function loadCardCheck() {
             sessionStorage.removeItem(CARD_CHECK_KEY);
             return null;
         }
+        const fromLink = readOfferLink();
+        if (fromLink) {
+            sessionStorage.setItem(CARD_CHECK_KEY, JSON.stringify(fromLink));
+            return fromLink;
+        }
         const saved = JSON.parse(sessionStorage.getItem(CARD_CHECK_KEY) || 'null');
-        return saved && saved.userId && saved.email ? saved : null;
+        return saved && saved.userId && (saved.email || saved.offerToken) ? saved : null;
     } catch (e) { return null; }
+}
+// A personal trial-offer link from an email: /app/?offer=<token> (see
+// lib/trial-offer.js). The server is what checks the token; reading the
+// account id and trial length out of it here is only for what the screen says.
+function readOfferLink() {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('offer');
+    if (!token) return null;
+    params.delete('offer');
+    const query = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (query ? '?' + query : ''));
+    let body = {};
+    try { body = JSON.parse(atob(token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/'))); } catch (e) {}
+    if (!body.u) return null;
+    // Deferred: this runs while S is still being built.
+    setTimeout(() => track('trial_offer_opened', { trial_days: body.d, ...getStoredUTM() }), 0);
+    return { userId: body.u, email: '', geo: 'ZA', billingCycle: 'monthly', referralCode: '', offerToken: token, trialDays: body.d || 30 };
+}
+function setOfferCycle(cycle) {
+    if (!S.cardCheck) return;
+    setCardCheck({ ...S.cardCheck, billingCycle: cycle === 'yearly' ? 'yearly' : 'monthly' });
+    render();
 }
 function setCardCheck(checkout) {
     S.cardCheck = checkout || null;
@@ -3304,13 +3336,13 @@ function setCardCheck(checkout) {
 }
 // The same four promises wherever a South African is about to be sent to
 // Paystack: here, and on the subscription gate for someone finishing later.
-function cardCheckPoints(billingCycle) {
+function cardCheckPoints(billingCycle, trialDays = 14) {
     const pr = SIGNUP_PRICING.ZA;
     const after = billingCycle === 'yearly' ? `${pr.sym}${pr.yearly} a year` : `${pr.sym}${pr.monthly} a month`;
     const tick = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px"><path d="M20 6 9 17l-5-5"/></svg>';
     const points = [
         `The next page shows a <strong>R1 charge</strong>. It only checks your card is real, and it's <strong>refunded straight away</strong>.`,
-        `You pay <strong>nothing for 14 days</strong>.`,
+        `You pay <strong>nothing for ${trialDays} days</strong>.`,
         `Cancel during the trial and you're never charged.`,
         `After the trial it's ${after}.`,
     ];
@@ -3319,6 +3351,12 @@ function cardCheckPoints(billingCycle) {
 }
 function vCardCheck() {
     const c = S.cardCheck;
+    const isOffer = Boolean(c.offerToken);
+    const pr = SIGNUP_PRICING.ZA;
+    const cycleBtn = (cycle, label) => `<button type="button" onclick="setOfferCycle('${cycle}')" style="flex:1;padding:10px 8px;border-radius:var(--radius-full);border:2px solid ${c.billingCycle === cycle ? '#16a34a' : 'var(--color-border, #e2e8f0)'};background:${c.billingCycle === cycle ? '#f0fdf4' : 'white'};color:#14532d;font-family:var(--font-family);font-size:14px;font-weight:800;cursor:pointer">${label}</button>`;
+    const cycleToggle = isOffer
+        ? `<div style="display:flex;gap:8px;margin:0 0 18px">${cycleBtn('monthly', `Monthly · ${pr.sym}${pr.monthly}`)}${cycleBtn('yearly', `Yearly · ${pr.sym}${pr.yearly}`)}</div>`
+        : '';
     return `
     <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
       <div style="width:100%;max-width:440px">
@@ -3326,17 +3364,18 @@ function vCardCheck() {
           <div class="pr-stripe"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;justify-content:center;margin-bottom:16px"><picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:84px;width:auto;display:block"></picture></div>
-            <p style="font-family:var(--font-family);font-size:12.5px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-green-600);margin:0 0 6px">Account created · Step 2 of 2</p>
-            <h2 style="font-family:var(--font-family);font-size:23px;font-weight:900;color:#14532d;margin:0 0 8px">One last step: a quick card check</h2>
-            <p style="font-family:var(--font-family);font-size:14.5px;color:var(--color-text-secondary);margin:0 0 22px">Here's exactly what happens next, so nothing on the payment page surprises you.</p>
-            ${cardCheckPoints(c.billingCycle)}
+            <p style="font-family:var(--font-family);font-size:12.5px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-green-600);margin:0 0 6px">${isOffer ? `Your ${c.trialDays}-day free trial` : 'Account created · Step 2 of 2'}</p>
+            <h2 style="font-family:var(--font-family);font-size:23px;font-weight:900;color:#14532d;margin:0 0 8px">${isOffer ? `${c.trialDays} days of Sprout, on us` : 'One last step: a quick card check'}</h2>
+            <p style="font-family:var(--font-family);font-size:14.5px;color:var(--color-text-secondary);margin:0 0 22px">${isOffer ? "Your account is already set up. Pick a plan, do a quick card check and you're in." : "Here's exactly what happens next, so nothing on the payment page surprises you."}</p>
+            ${cycleToggle}
+            ${cardCheckPoints(c.billingCycle, c.trialDays)}
             <button id="cc-continue" onclick="continueCardCheck()" class="btn-primary" style="margin-bottom:12px">Continue to card check</button>
             <div style="display:flex;gap:6px;align-items:flex-start;justify-content:center;font-family:var(--font-family);font-size:12.5px;line-height:1.5;color:var(--color-text-muted);margin-bottom:18px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:3px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
               <span>Secure payment by Paystack. Sprout never sees your card number.</span>
             </div>
             <p style="font-family:var(--font-family);font-size:12.5px;color:var(--color-text-muted);margin:0 0 6px">Questions first? <a href="mailto:hello@sproutearnsave.com" style="color:#15803d;font-weight:700;text-decoration:none">hello@sproutearnsave.com</a></p>
-            <p style="font-family:var(--font-family);font-size:12.5px;color:var(--color-text-muted);margin:0">Rather finish later? <button type="button" onclick="leaveCardCheck()" style="background:none;border:none;cursor:pointer;color:#15803d;font-weight:700;font-family:var(--font-family);font-size:12.5px;padding:0">Sign in</button> any time to pick this up.</p>
+            ${isOffer ? '' : `<p style="font-family:var(--font-family);font-size:12.5px;color:var(--color-text-muted);margin:0">Rather finish later? <button type="button" onclick="leaveCardCheck()" style="background:none;border:none;cursor:pointer;color:#15803d;font-weight:700;font-family:var(--font-family);font-size:12.5px;padding:0">Sign in</button> any time to pick this up.</p>`}
           </div>
         </div>
       </div>
@@ -6598,10 +6637,10 @@ function trackScreen() {
     let screen;
     if (S.authMode === 'reset') screen = 'reset-password';
     else if (S.authMode === 'reset-pin') screen = 'reset-parent-pin';
-    else if (!currentUser) screen = S.authMode === 'signin' ? 'signin' : (S.cardCheck ? 'card-check' : 'signup');
+    else if (!currentUser) screen = S.authMode === 'signin' ? 'signin' : (S.cardCheck ? (S.cardCheck.offerToken ? 'trial-offer' : 'card-check') : 'signup');
     else {
         const subStatus = currentUser.user_metadata?.subscription_status;
-        if (subStatus !== 'trialing' && subStatus !== 'active') screen = 'subscription-gate';
+        if (subStatus !== 'trialing' && subStatus !== 'active') screen = S.cardCheck?.offerToken ? 'trial-offer' : 'subscription-gate';
         else if (S.view === 'parent') screen = 'parent:' + S.tab;
         else if (S.view === 'parent-onboarding') screen = 'onboarding:' + (ONBOARD_STEPS[S.onboardStep] || S.onboardStep);
         else screen = S.view || 'home';
@@ -6633,7 +6672,7 @@ function render() {
     }
     const subStatus = currentUser.user_metadata?.subscription_status;
     if (subStatus !== 'trialing' && subStatus !== 'active') {
-        document.getElementById('app').innerHTML = vSubscriptionGate() + toastHtml;
+        document.getElementById('app').innerHTML = (S.cardCheck?.offerToken ? vCardCheck() : vSubscriptionGate()) + toastHtml;
         return;
     }
     const views = { home: vHome, parent: vParent, 'kid-pin': vKidPin, kid: vKid, 'parent-pin': vParentPin, 'parent-onboarding': vOnboarding };
