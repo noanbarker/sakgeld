@@ -7,7 +7,7 @@
 **What it shows** (everything is read live from Supabase on each load / Refresh):
 
 - KPI tiles: total sign-ups, active (paying), trialing, canceled, no subscription, estimated MRR (ZA in Rand, rest of world in Dollars), families active in the last 7 days.
-- Users by status donut, trials started per day since 15 September 2026.
+- Users by status donut, then a full-width chart of trials started per day since 15 September 2026 with the count above each bar.
 - Breakdowns: country, payment rail (Paystack/Paddle), billing cycle, traffic source, referral partners, engagement totals.
 - Needs attention (each card shows its title and count, collapsed; the + opens the list): failed payments, scheduled cancellations, no kids added (paying or trialing families with no children set up), subscribers quiet for 5+ days, canceled accounts awaiting the 60-day purge.
 - All users table: name, email, country, sign-up date, last activity, status (the table's own breakdown, see below), plan, next billing / trial end date, kids, chores, chores done in 7 days, notes. Searchable, filterable by status, sortable by any column, exportable to CSV.

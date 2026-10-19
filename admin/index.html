@@ -66,7 +66,7 @@
   .kpi.active .value { color: var(--active); }
   .kpi.trialing .value { color: var(--trialing); }
   .kpi.canceled .value { color: var(--canceled); }
-  .charts { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .charts { grid-template-columns: 1fr; }
   .three { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
   .donut-wrap { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
   .donut-wrap svg { flex: 0 0 auto; }
@@ -302,8 +302,9 @@
       if (res.status === 401) { setKey(''); return showGate('That key was not accepted.'); }
       if (!res.ok) { const body = await res.json().catch(() => ({})); throw new Error(body.error || ('Server returned ' + res.status)); }
       data = await res.json();
-      render();
+      // Shown first so the charts can measure their real width while drawing.
       $('#content').classList.remove('hidden');
+      render();
     } catch (err) {
       $('#loading').textContent = 'Could not load: ' + err.message;
       return;
@@ -417,23 +418,25 @@
     const last7 = days.slice(-7).reduce((s, d) => s + d.n, 0);
     $('#trialsSub').textContent = `since 15 Sept · ${total} total · ${last7} in the last 7 days`;
 
-    const W = 520, H = 200, padL = 28, padB = 28, padT = 16, padR = 8;
-    const max = Math.max(1, ...days.map(d => d.n));
+    const wrapWidth = $('#trials').clientWidth;
+    const W = Math.max(300, Math.round(wrapWidth || 520)), H = 240, padL = 28, padB = 28, padT = 18, padR = 8;
+    const peak = Math.max(1, ...days.map(d => d.n));
+    const step = Math.max(1, Math.ceil(peak / 4));
+    const max = step * Math.ceil(peak / step);
     const innerW = W - padL - padR, innerH = H - padT - padB;
     const bw = innerW / days.length;
     const gap = Math.min(4, bw * 0.2);
     const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Trials started per day' });
     const wrap = $('#trials'); wrap.replaceChildren(svg);
     const tip = el('div', { class: 'tip' }); wrap.append(tip);
-    const ticks = max <= 4 ? max : 4;
-    for (let i = 0; i <= ticks; i++) {
-      const v = Math.round(max * i / ticks), y = padT + innerH - innerH * v / max;
+    for (let v = 0; v <= max; v += step) {
+      const y = padT + innerH - innerH * v / max;
       svg.append(svgEl('line', { x1: padL, x2: W - padR, y1: y, y2: y, stroke: 'var(--grid)', 'stroke-width': 1 }));
       const t = svgEl('text', { x: padL - 6, y: y + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--text-3)' }); t.textContent = v; svg.append(t);
     }
-    // Label roughly eight dates along the bottom, always including today.
-    const labelEvery = Math.max(1, Math.ceil(days.length / 8));
-    const showValues = bw >= 14;
+    // As many dates along the bottom as fit (about 60px each), always including today.
+    const labelEvery = Math.max(1, Math.ceil(days.length / Math.max(2, Math.floor(innerW / 60))));
+    const valueSize = Math.max(7, Math.min(11, bw * 0.8));
     days.forEach((d, i) => {
       const h = innerH * d.n / max, x = padL + i * bw + gap / 2, y = padT + innerH - h;
       const rect = svgEl('rect', { x, y: d.n ? y : padT + innerH - 1, width: Math.max(2, bw - gap), height: d.n ? h : 1, rx: Math.min(4, (bw - gap) / 2), fill: d.n ? 'var(--bar)' : 'var(--grid)' });
@@ -444,9 +447,10 @@
       svg.append(rect, hit);
       const isLast = i === days.length - 1;
       if (isLast || (i % labelEvery === 0 && days.length - 1 - i >= labelEvery)) {
-        const t = svgEl('text', { x: padL + i * bw + bw / 2, y: H - 8, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--text-3)' }); t.textContent = d.label; svg.append(t);
+        // Today's label is right-aligned so it can't run off the edge of the chart.
+        const t = svgEl('text', { x: isLast ? padL + (i + 1) * bw : padL + i * bw + bw / 2, y: H - 8, 'text-anchor': isLast ? 'end' : 'middle', 'font-size': 11, fill: 'var(--text-3)' }); t.textContent = d.label; svg.append(t);
       }
-      if (d.n && showValues) { const t = svgEl('text', { x: padL + i * bw + bw / 2, y: y - 4, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--text-2)' }); t.textContent = d.n; svg.append(t); }
+      if (d.n) { const t = svgEl('text', { x: padL + i * bw + bw / 2, y: y - 4, 'text-anchor': 'middle', 'font-size': valueSize, 'font-weight': 600, fill: 'var(--text-2)' }); t.textContent = d.n; svg.append(t); }
     });
   }
 
@@ -595,6 +599,11 @@
       tbody.append(tr);
     }
   }
+  let trialsResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(trialsResizeTimer);
+    trialsResizeTimer = setTimeout(() => { if (data) renderTrials(visibleUsers()); }, 150);
+  });
   document.querySelector('.tablewrap').addEventListener('scroll', e => e.currentTarget.classList.toggle('scrolled', e.currentTarget.scrollLeft > 0), { passive: true });
   $('#search').addEventListener('input', renderTable);
   $('#showInternal').addEventListener('change', render);
