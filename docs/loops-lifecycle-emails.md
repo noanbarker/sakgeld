@@ -36,7 +36,7 @@ welcome only sends while the account is still trialing and not cancelling.
 | 0 | Welcome to Sprout, your 14-day trial starts today | always |
 | 1 | Start small: choose 3 chores | chore count is 0 |
 | 2 | Tonight, let them mark one chore done | no chore completed yet |
-| 3 | Put Sprout on your home screen (takes 30 seconds) | trialing (deliberately no behaviour filter: every trial gets it) |
+| 3 | Put Sprout on your home screen (takes 30 seconds). Since 19 October 2026: iOS 27 steps (View More) and an animated GIF under each phone's steps, cut from the onboarding videos in `images/onboarding/` | trialing (deliberately no behaviour filter: every trial gets it) |
 | 5 | Make saving something they can actually see | trialing |
 
 Workflow `trial_conversion_v2`, trigger `trial_started`: day 7 "One week in,
