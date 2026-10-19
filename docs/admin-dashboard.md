@@ -10,11 +10,12 @@
 - Users by status donut, trials started per day since 15 September 2026.
 - Breakdowns: country, payment rail (Paystack/Paddle), billing cycle, traffic source, referral partners, engagement totals.
 - Needs attention (each card shows its title and count, collapsed; the + opens the list): failed payments, scheduled cancellations, no kids added (paying or trialing families with no children set up), subscribers quiet for 5+ days, canceled accounts awaiting the 60-day purge.
-- All users table: name, email, country, sign-up date, last activity, status, cancellation scheduled (Yes/No for active and trialing accounts, a dash otherwise), plan, next billing / trial end date, kids, chores, chores done in 7 days, notes. Searchable, filterable by status, sortable by any column, exportable to CSV.
+- All users table: name, email, country, sign-up date, last activity, status (the table's own breakdown, see below), plan, next billing / trial end date, kids, chores, chores done in 7 days, notes. Searchable, filterable by status, sortable by any column, exportable to CSV.
 
 **Definitions**
 
 - *Status* is the `subscription_status` the billing webhooks write to each user's metadata: `active`, `trialing`, `canceled`, or none (signed up but never started a trial).
+- *Users-table status* splits the billing status further: Trialing, Trialing – Cancelled (cancellation scheduled), Trial – Past due (the first payment after the trial failed), Active, Active – Cancelled, Active – Past due (a renewal failed), Cancelled, No trial (signed up, never started one). Nothing stored says whether a past-due family has ever paid, so a failure within one billing cycle of the trial ending counts as the first payment. The donut, tiles and filters elsewhere on the page still use the simple statuses.
 - *Trial started* is worked out, since no start date is stored: for a family still on trial it is the first billing date minus 14 days (exact); for anyone who has since paid or canceled it is the sign-up date, because the card step comes straight after the sign-up form. Accounts purged 60 days after canceling lose their subscription details and drop out of this chart.
 - *Last activity* is the latest of: last sign-in, a chore ticked off, a transaction, a chore or child added. Supabase only updates last sign-in on a fresh login, so app activity is included to avoid understating it.
 - *Estimated MRR* uses list prices (R59 / R590 for South Africa, $4.50 / $45 elsewhere, yearly divided by 12) for users whose status is `active` and who have a billing cycle and gateway on record. It is an estimate, not the gateways' ledger.

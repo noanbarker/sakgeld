@@ -126,6 +126,11 @@
   .pill.canceled { color: var(--canceled); background: color-mix(in srgb, var(--canceled) 12%, transparent); }
   .pill.none { color: var(--none); background: color-mix(in srgb, var(--none) 14%, transparent); }
   .pill.past_due, .pill.paused { color: #b45309; background: color-mix(in srgb, #b45309 12%, transparent); }
+  /* Users-table statuses (see tableStatus): amber = cancellation waiting,
+     red = a payment has failed, grey = finished or never started. */
+  .pill.trialing_cancelled, .pill.active_cancelled { color: #b45309; background: color-mix(in srgb, #b45309 12%, transparent); }
+  .pill.trial_past_due, .pill.active_past_due { color: var(--canceled); background: color-mix(in srgb, var(--canceled) 12%, transparent); }
+  .pill.cancelled, .pill.no_trial { color: var(--none); background: color-mix(in srgb, var(--none) 14%, transparent); }
   .flag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--text-2); margin-right: 4px; }
   .note { font-size: 12px; color: var(--text-3); margin-top: 8px; }
   #gate { max-width: 380px; margin: 80px auto; }
@@ -200,10 +205,14 @@
       <input type="search" id="search" placeholder="Search name, email, country…">
       <select id="statusFilter">
         <option value="">All statuses</option>
-        <option value="active">Active</option>
         <option value="trialing">Trialing</option>
-        <option value="canceled">Canceled</option>
-        <option value="none">No subscription</option>
+        <option value="trialing_cancelled">Trialing – Cancelled</option>
+        <option value="trial_past_due">Trial – Past due</option>
+        <option value="active">Active</option>
+        <option value="active_cancelled">Active – Cancelled</option>
+        <option value="active_past_due">Active – Past due</option>
+        <option value="cancelled">Cancelled</option>
+        <option value="no_trial">No trial</option>
       </select>
       <span class="count" id="filteredCount"></span>
     </div>
@@ -216,7 +225,6 @@
           <th data-k="signed_up_at">Signed up</th>
           <th data-k="last_activity_at">Last activity</th>
           <th data-k="status">Status</th>
-          <th data-k="cancel_sched">Cancellation scheduled</th>
           <th data-k="plan">Plan</th>
           <th data-k="next_date">Next date</th>
           <th data-k="kids" class="num">Kids</th>
@@ -503,14 +511,42 @@
     if (k === 'next_date') return trialEnd(u) || '';
     if (k === 'name') return displayName(u).toLowerCase();
     if (k === 'notes') return notesFor(u).length;
-    if (k === 'cancel_sched') return cancelScheduled(u) === null ? -1 : Number(cancelScheduled(u));
+    if (k === 'status') return TABLE_STATUS_ORDER.indexOf(tableStatus(u));
     return u[k] ?? '';
   };
-  // Only a live subscription can have a cancellation waiting; anyone already
-  // canceled, or who never subscribed, gets a dash instead of Yes/No.
-  function cancelScheduled(u) {
-    if (u.status !== 'active' && u.status !== 'trialing' && u.status !== 'past_due') return null;
-    return Boolean(u.cancel_scheduled);
+  // The users table splits the billing status further than the rest of the
+  // page does: a scheduled cancellation and a failed payment each get their own
+  // status, so nobody has to read the Notes column to spot them.
+  const TABLE_STATUS_LABEL = {
+    trialing: 'Trialing', trialing_cancelled: 'Trialing – Cancelled', trial_past_due: 'Trial – Past due',
+    active: 'Active', active_cancelled: 'Active – Cancelled', active_past_due: 'Active – Past due',
+    cancelled: 'Cancelled', no_trial: 'No trial',
+  };
+  const TABLE_STATUS_ORDER = Object.keys(TABLE_STATUS_LABEL);
+  // Nothing on the account says whether a past-due family has ever paid. A
+  // failure within one billing cycle of the trial ending can only have been the
+  // first charge (a renewal comes a full cycle later), so that's "Trial – Past
+  // due"; anything later is a renewal that failed.
+  function neverPaid(u) {
+    const start = new Date(u.trial_started_at || u.signed_up_at).getTime();
+    const cycleDays = u.billing_cycle === 'yearly' ? 365 : 30;
+    const failedAt = u.payment_failed_at ? new Date(u.payment_failed_at).getTime() : Date.now();
+    return failedAt < start + (14 + cycleDays) * 86400000;
+  }
+  function tableStatus(u) {
+    if (u.status === 'trialing') return u.cancel_scheduled ? 'trialing_cancelled' : 'trialing';
+    if (u.status === 'active') return u.cancel_scheduled ? 'active_cancelled' : 'active';
+    if (u.status === 'past_due') return neverPaid(u) ? 'trial_past_due' : 'active_past_due';
+    if (u.status === 'canceled') return 'cancelled';
+    if (u.status === 'none') return 'no_trial';
+    return u.status;
+  }
+  // The small grey line under the status pill: the date that matters for it.
+  function statusDetail(u, s) {
+    if ((s === 'trialing_cancelled' || s === 'active_cancelled') && u.current_period_ends_at) return 'access ends ' + fmtDate(u.current_period_ends_at);
+    if ((s === 'trial_past_due' || s === 'active_past_due') && u.payment_failed_at) return 'payment failed ' + ago(u.payment_failed_at);
+    if (s === 'cancelled' && u.canceled_at) return 'cancelled ' + fmtDate(u.canceled_at);
+    return '';
   }
   function notesFor(u) {
     const n = [];
@@ -528,7 +564,7 @@
   function filteredUsers() {
     const q = $('#search').value.trim().toLowerCase();
     const s = $('#statusFilter').value;
-    let rows = visibleUsers().filter(u => (!s || u.status === s) && (!q || [u.name, u.email, u.country, u.provider, u.utm_source, u.referral_code].some(v => v && String(v).toLowerCase().includes(q))));
+    let rows = visibleUsers().filter(u => (!s || tableStatus(u) === s) && (!q || [u.name, u.email, u.country, u.provider, u.utm_source, u.referral_code].some(v => v && String(v).toLowerCase().includes(q))));
     rows.sort((a, b) => { const x = sortValue(a, sortKey), y = sortValue(b, sortKey); const c = x < y ? -1 : x > y ? 1 : 0; return sortAsc ? c : -c; });
     return rows;
   }
@@ -541,19 +577,14 @@
     const tbody = $('#users tbody'); tbody.replaceChildren();
     for (const u of rows) {
       const next = trialEnd(u);
-      const nextLabel = u.status === 'trialing' ? 'trial ends' : u.status === 'active' ? 'next bill' : '';
+      const nextLabel = u.status === 'trialing' ? (u.cancel_scheduled ? '' : 'trial ends') : u.status === 'active' ? (u.cancel_scheduled ? '' : 'next bill') : '';
       const tr = el('tr', {},
         el('td', {}, displayName(u)),
         el('td', {}, u.email || '—'),
         el('td', {}, u.country || '—', u.signup_geo && u.signup_geo !== (u.country === 'ZA' ? 'ZA' : 'ROW') ? el('span', { class: 'dim' }, 'geo ' + u.signup_geo) : ''),
         el('td', {}, fmtDate(u.signed_up_at), el('span', { class: 'dim' }, ago(u.signed_up_at))),
         el('td', {}, fmtDate(u.last_activity_at), el('span', { class: 'dim' }, ago(u.last_activity_at))),
-        el('td', {}, el('span', { class: 'pill ' + u.status }, STATUS_LABEL[u.status] || u.status)),
-        cancelScheduled(u) === null
-          ? el('td', { class: 'dimcell' }, '—')
-          : cancelScheduled(u)
-            ? el('td', {}, el('span', { class: 'pill canceled' }, 'Yes'), u.current_period_ends_at ? el('span', { class: 'dim' }, 'access ends ' + fmtDate(u.current_period_ends_at)) : '')
-            : el('td', { class: 'dimcell' }, 'No'),
+        (() => { const s = tableStatus(u), d = statusDetail(u, s); return el('td', {}, el('span', { class: 'pill ' + s }, TABLE_STATUS_LABEL[s] || STATUS_LABEL[s] || s), d ? el('span', { class: 'dim' }, d) : ''); })(),
         el('td', {}, u.provider ? ({ paystack: 'Paystack', paddle: 'Paddle' })[u.provider] || u.provider : '—', el('span', { class: 'dim' }, u.billing_cycle || '')),
         el('td', {}, next && nextLabel ? fmtDate(next) : '—', el('span', { class: 'dim' }, next && nextLabel ? nextLabel : '')),
         el('td', { class: 'num' }, u.kids),
@@ -570,14 +601,14 @@
   $('#statusFilter').addEventListener('change', renderTable);
   document.querySelector('#users thead').addEventListener('click', e => {
     const th = e.target.closest('th'); if (!th) return;
-    if (sortKey === th.dataset.k) sortAsc = !sortAsc; else { sortKey = th.dataset.k; sortAsc = !['signed_up_at', 'last_activity_at', 'kids', 'chores', 'completions_7d', 'notes', 'cancel_sched'].includes(sortKey); }
+    if (sortKey === th.dataset.k) sortAsc = !sortAsc; else { sortKey = th.dataset.k; sortAsc = !['signed_up_at', 'last_activity_at', 'kids', 'chores', 'completions_7d', 'notes'].includes(sortKey); }
     renderTable();
   });
   $('#exportCsv').addEventListener('click', () => {
     if (!data) return;
-    const cols = ['name', 'email', 'country', 'signed_up_at', 'last_activity_at', 'status', 'provider', 'billing_cycle', 'next_billed_at', 'current_period_ends_at', 'canceled_at', 'cancel_scheduled', 'payment_failed_at', 'email_verified', 'onboarding_complete', 'utm_source', 'referral_code', 'kids', 'chores', 'completions', 'completions_7d', 'pending_approvals', 'push_enabled'];
+    const cols = ['name', 'email', 'country', 'signed_up_at', 'last_activity_at', 'table_status', 'status', 'provider', 'billing_cycle', 'next_billed_at', 'current_period_ends_at', 'canceled_at', 'cancel_scheduled', 'payment_failed_at', 'email_verified', 'onboarding_complete', 'utm_source', 'referral_code', 'kids', 'chores', 'completions', 'completions_7d', 'pending_approvals', 'push_enabled'];
     const esc = v => { const s = v === null || v === undefined ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-    const csv = [cols.join(','), ...filteredUsers().map(u => cols.map(c => esc(u[c])).join(','))].join('\n');
+    const csv = [cols.join(','), ...filteredUsers().map(u => cols.map(c => esc(c === 'table_status' ? TABLE_STATUS_LABEL[tableStatus(u)] || tableStatus(u) : u[c])).join(','))].join('\n');
     const a = el('a', { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: `sprout-users-${new Date().toISOString().slice(0, 10)}.csv` });
     document.body.append(a); a.click(); a.remove();
   });
