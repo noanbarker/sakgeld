@@ -137,7 +137,7 @@ body{margin:0}
       "name": "Is there an iOS or Android app?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "No, we developed Sprout as a web app in order to make it accessible on any device that has an internet browser. The app can function as a normal app on your phone home screen. On an iPhone or iPad: open Safari, go to www.sproutearnsave.com and sign in, tap the menu button at the bottom of the screen, tap Share, scroll down and tap Add to Home Screen, then tap Add. On an Android phone: open Chrome, go to www.sproutearnsave.com and sign in, tap the three dots in the top right corner, tap Add to Home screen (or Install app), then tap Install or Add."
+        "text": "No, we developed Sprout as a web app in order to make it accessible on any device that has an internet browser. The app can function as a normal app on your phone home screen. On an iPhone or iPad: open Safari, go to www.sproutearnsave.com and sign in, tap the menu button at the bottom of the screen (three lines on the left of the address bar, or three dots on some iPhones), tap Share, tap View More, tap Add to Home Screen, then tap Add. On an Android phone: open Chrome, go to www.sproutearnsave.com and sign in, tap the three dots in the top right corner, tap Add to Home screen (or Install app), then tap Install or Add."
       }
     },
     {
@@ -269,16 +269,17 @@ The app can function as a normal app on your phone home screen by following thes
 
 <strong>On an iPhone/iPad:</strong>
 1. Open Safari and go to <a href="https://www.sproutearnsave.com" style="color:#15803d;font-weight:700">www.sproutearnsave.com</a>. (It must be Safari, not Gmail or WhatsApp's built-in browser.) Sign in with your email and password.
-2. Tap the menu button at the bottom of the screen (it's three lines next to the address bar).
-3. Tap the "Share" button.
-4. Scroll down and tap Add to Home Screen.
+2. Tap the menu button at the bottom of the screen. It's the three lines on the left of the address bar (on some iPhones it's three dots next to the address bar).
+3. Tap "Share".
+4. Tap "View More", then tap Add to Home Screen.
 5. Tap Add in the top right corner.
-
+<button class="faq-video-btn" type="button" data-video="iphone" style="display:inline-flex;align-items:center;gap:6px;margin:8px 0 4px;padding:7px 14px;border-radius:99px;border:1.5px solid #16a34a;background:#fff;color:#15803d;font-family:'Nunito',sans-serif;font-size:13.5px;font-weight:800;cursor:pointer">▶ View a video</button><video class="faq-video" data-video="iphone" muted loop playsinline controls preload="none" style="display:none;width:100%;max-width:240px;margin:10px 0 6px;border-radius:22px;border:1px solid #e5ece7;box-shadow:0 8px 24px rgba(0,0,0,.12);background:#fff"><source src="/images/onboarding/home-screen-iphone.mp4" type="video/mp4"></video>
 <strong>On an Android phone:</strong>
 1. Open Chrome and go to <a href="https://www.sproutearnsave.com" style="color:#15803d;font-weight:700">www.sproutearnsave.com</a>. Sign in with your email and password.
 2. Tap the three dots in the top right corner.
 3. Tap Add to Home screen (on some phones it says Install app).
-4. Tap Install or Add.</div>
+4. Tap Install or Add.
+<button class="faq-video-btn" type="button" data-video="android" style="display:inline-flex;align-items:center;gap:6px;margin:8px 0 4px;padding:7px 14px;border-radius:99px;border:1.5px solid #16a34a;background:#fff;color:#15803d;font-family:'Nunito',sans-serif;font-size:13.5px;font-weight:800;cursor:pointer">▶ View a video</button><video class="faq-video" data-video="android" muted loop playsinline controls preload="none" style="display:none;width:100%;max-width:240px;margin:10px 0 6px;border-radius:22px;border:1px solid #e5ece7;box-shadow:0 8px 24px rgba(0,0,0,.12);background:#fff"><source src="/images/onboarding/home-screen-android.mp4" type="video/mp4"></video></div>
           </div>
           <div class="faq-item" style="background:#f6faf7;border:1px solid #e5ece7;border-radius:14px;margin-bottom:10px;overflow:hidden">
             <button class="faq-toggle" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
@@ -527,9 +528,26 @@ document.querySelectorAll('.faq-toggle').forEach(function(btn) {
       i.querySelector('.faq-answer').style.display = 'none';
       i.querySelector('.faq-sign').textContent = '+';
     });
+    document.querySelectorAll('.faq-video').forEach(function(v) { v.pause(); });
     if (!isOpen) {
       answer.style.display = 'block';
       sign.textContent = '−';
+    }
+  });
+});
+// "View a video" under the home-screen steps: shows that phone's video in place.
+document.querySelectorAll('.faq-video-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var video = btn.parentNode.querySelector('.faq-video[data-video="' + btn.dataset.video + '"]');
+    var show = video.style.display === 'none';
+    video.style.display = show ? 'block' : 'none';
+    btn.textContent = show ? '✕ Hide video' : '▶ View a video';
+    btn.style.background = show ? '#dcfce7' : '#fff';
+    if (show) {
+      video.play().catch(function() {});
+      try { if (typeof window.sproutTrack === 'function') window.sproutTrack('home_screen_video_played', { platform: btn.dataset.video, source: 'website_faq' }); } catch (e) {}
+    } else {
+      video.pause();
     }
   });
 });

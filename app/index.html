@@ -1294,6 +1294,7 @@ const S = {
     showRefField: false,
     tourStep: -1,
     faqOpen: null,
+    faqVideo: null, // 'iphone' | 'android' — home-screen video open inside the FAQ
     celebration: null
 };
 
@@ -4632,22 +4633,24 @@ function pRewards(db) {
 
 const FAQ_ITEMS = [
     { q: "Is there an iOS or Android app?",
-      a: `No, we developed Sprout as a web app in order to make it accessible on any device that has an internet browser.
+      // A function, not a string, so the "View a video" buttons can open their video in place.
+      a: () => `No, we developed Sprout as a web app in order to make it accessible on any device that has an internet browser.
 
 The app can function as a normal app on your phone home screen by following these easy steps:
 
 <strong>On an iPhone/iPad:</strong>
 1. Open Safari and go to <a href="https://www.sproutearnsave.com" target="_blank" rel="noopener" style="color:var(--color-green-700);font-weight:700">www.sproutearnsave.com</a>. (It must be Safari, not Gmail or WhatsApp's built-in browser.) Sign in with your email and password.
-2. Tap the menu button at the bottom of the screen (it's three lines next to the address bar).
-3. Tap the "Share" button.
-4. Scroll down and tap Add to Home Screen.
+2. Tap the menu button at the bottom of the screen. It's the three lines on the left of the address bar (on some iPhones it's three dots next to the address bar).
+3. Tap "Share".
+4. Tap "View More", then tap Add to Home Screen.
 5. Tap Add in the top right corner.
-
+${faqVideoHTML('iphone')}
 <strong>On an Android phone:</strong>
 1. Open Chrome and go to <a href="https://www.sproutearnsave.com" target="_blank" rel="noopener" style="color:var(--color-green-700);font-weight:700">www.sproutearnsave.com</a>. Sign in with your email and password.
 2. Tap the three dots in the top right corner.
 3. Tap Add to Home screen (on some phones it says Install app).
-4. Tap Install or Add.` },
+4. Tap Install or Add.
+${faqVideoHTML('android')}` },
     { q: "How do I approve or reject a chore my child has marked as done?",
       a: `When a child marks a chore as done, it shows up under "Pending Chore Approvals" on your dashboard. Tap the checkmark to approve it or the cross to reject it - you can also use "Approve all" to clear every pending chore for one child at once.` },
     { q: "Does approving a chore send real money to my child?",
@@ -4681,7 +4684,18 @@ The app can function as a normal app on your phone home screen by following thes
     { q: "Can I change our home currency after we've already set everything up?",
       a: "Yes, anytime in Settings. It changes how amounts are displayed going forward - existing chores, balances and history aren't converted, they just show under the new currency symbol." }
 ];
-function toggleFaq(i) { S.faqOpen = S.faqOpen === i ? null : i; render(); }
+function toggleFaq(i) { S.faqOpen = S.faqOpen === i ? null : i; S.faqVideo = null; render(); }
+// The add-to-home-screen videos from onboarding, opened from the FAQ answer.
+// Kept on one line: the answer is white-space:pre-line, so line breaks show.
+function faqVideoHTML(os) {
+    const open = S.faqVideo === os;
+    return `<button onclick="toggleFaqVideo('${os}')" type="button" style="display:inline-flex;align-items:center;gap:6px;margin:8px 0 4px;padding:7px 14px;border-radius:99px;border:1.5px solid var(--color-green-600);background:${open ? 'var(--color-green-100)' : 'white'};color:var(--color-green-700);font-family:var(--font-family);font-size:13px;font-weight:800;cursor:pointer">${open ? '✕ Hide video' : '▶ View a video'}</button>${open ? `<video src="/images/onboarding/home-screen-${os}.mp4" autoplay muted loop playsinline controls preload="auto" style="display:block;width:100%;max-width:240px;margin:10px 0 6px;border-radius:22px;border:1px solid var(--color-border);box-shadow:0 8px 24px rgba(0,0,0,.12);background:#fff"></video>` : ''}`;
+}
+function toggleFaqVideo(os) {
+    S.faqVideo = S.faqVideo === os ? null : os;
+    if (S.faqVideo) track('home_screen_video_played', { platform: os, source: 'app_faq' });
+    render();
+}
 function pFAQ() {
     return `
     <div style="max-width:680px">
@@ -4695,7 +4709,7 @@ function pFAQ() {
               <span style="font-size:14.5px;font-weight:800;color:var(--color-green-700)">${item.q}</span>
               <span style="font-size:19px;font-weight:800;color:var(--color-green-600);flex:none;line-height:1">${open ? '−' : '+'}</span>
             </button>
-            ${open ? `<div style="padding:0 18px 18px;font-size:14px;line-height:1.6;color:var(--color-text-secondary);white-space:pre-line">${item.a}</div>` : ''}
+            ${open ? `<div style="padding:0 18px 18px;font-size:14px;line-height:1.6;color:var(--color-text-secondary);white-space:pre-line">${typeof item.a === 'function' ? item.a() : item.a}</div>` : ''}
           </div>`;
         }).join('')}
       </div>
