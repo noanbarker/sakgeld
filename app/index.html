@@ -1288,6 +1288,7 @@ const S = {
     settingsSection: null,
     moneySection: null,
     onboardStep: 0,
+    homeScreenOS: null, // 'iphone' | 'android' — which add-to-home-screen video the onboarding is playing
     authMode: new URLSearchParams(window.location.search).get('mode') === 'signin' ? 'signin' : 'signup',
     billingCycle: 'monthly',
     showRefField: false,
@@ -3417,9 +3418,14 @@ function vHome() {
     </div>`;
 }
 
-const ONBOARD_STEPS = ['currency', 'allowance-mode', 'kid', 'chores', 'bonus', 'parent-pin', 'money'];
+const ONBOARD_STEPS = ['currency', 'home-screen', 'allowance-mode', 'kid', 'chores', 'bonus', 'parent-pin', 'money'];
 function onboardNext() { S.onboardStep = Math.min(S.onboardStep + 1, ONBOARD_STEPS.length - 1); render(); }
 function onboardBack() { S.onboardStep = Math.max(S.onboardStep - 1, 0); render(); }
+function chooseHomeScreenOS(os) {
+    S.homeScreenOS = os;
+    track('home_screen_video_played', { platform: os, source: 'onboarding' });
+    render();
+}
 async function finishOnboarding() {
     track('onboarding_completed', { kids_count: cache.kids.length, chores_count: cache.chores.length });
     const { data } = await sb.auth.updateUser({ data: { onboarding_complete: true } });
@@ -3571,6 +3577,36 @@ function vOnboarding() {
         <div style="display:flex;gap:8px">
           <button onclick="onboardBack()" class="btn-outline flex-1">Back</button>
           <button onclick="finishOnboarding()" class="btn-primary flex-1">Finish setup</button>
+        </div>`;
+    }
+
+    if (step === 'home-screen') {
+        // iPhone video is a real iOS 27 Safari screen recording; the Android one recreates Chrome's screens.
+        const os = S.homeScreenOS;
+        // iPads report themselves as Macs, so a touch screen also counts as a phone.
+        const onPhone = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || navigator.maxTouchPoints > 1;
+        const intro = onPhone
+            ? 'Open Sprout straight from your phone, just like any other app. Pick your phone to see how.'
+            : "You're on a computer right now, so do this later on your phone. Then you can open Sprout straight from your home screen, just like any other app. Pick your phone to see how.";
+        const option = (key, label, sub) => `
+          <button onclick="chooseHomeScreenOS('${key}')" type="button"
+            style="flex:1;text-align:center;padding:14px 10px;border-radius:14px;border:2px solid ${os===key?'var(--color-green-600)':'var(--color-border)'};background:${os===key?'var(--color-green-100)':'white'};cursor:pointer">
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px">${label}</p>
+            <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${sub}</p>
+          </button>`;
+        body = `
+        <h2 style="font-family:var(--font-family);font-size:20px;font-weight:900;color:var(--color-text-primary);margin-bottom:6px">How to add Sprout to your home screen</h2>
+        <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);margin-bottom:20px">${intro}</p>
+        <div style="display:flex;gap:10px" class="mb-4">
+          ${option('iphone', 'iPhone / iPad', 'Safari')}
+          ${option('android', 'Android', 'Chrome')}
+        </div>
+        ${os ? `
+        <video src="/images/onboarding/home-screen-${os}.mp4" autoplay muted loop playsinline controls preload="auto"
+          style="display:block;width:100%;max-width:240px;margin:0 auto 20px;border-radius:22px;border:1px solid var(--color-border);box-shadow:0 8px 24px rgba(0,0,0,.12);background:#fff"></video>` : ''}
+        <div style="display:flex;gap:8px">
+          <button onclick="onboardBack()" class="btn-outline flex-1">Back</button>
+          <button onclick="onboardNext()" class="btn-primary flex-1">Continue</button>
         </div>`;
     }
 
