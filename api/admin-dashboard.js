@@ -89,8 +89,14 @@ function trialStartedAt(user, meta) {
 // handler so it can be run against a saved snapshot without any credentials.
 function buildDashboard(raw, now = new Date(), internalEmails = new Set()) {
   const nowMs = now.getTime();
-  const sevenDaysAgo = nowMs - 7 * 24 * 60 * 60 * 1000;
-  const thirtyDaysAgo = nowMs - 30 * 24 * 60 * 60 * 1000;
+  // "Last 7 days" means today plus the six South African calendar days before
+  // it, matching how the page counts days. South Africa is UTC+2 all year
+  // (no daylight saving), so local midnight is a fixed two hours before UTC's.
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const SAST_OFFSET_MS = 2 * 60 * 60 * 1000;
+  const startOfTodaySA = Math.floor((nowMs + SAST_OFFSET_MS) / DAY_MS) * DAY_MS - SAST_OFFSET_MS;
+  const sevenDaysAgo = startOfTodaySA - 6 * DAY_MS;
+  const thirtyDaysAgo = startOfTodaySA - 29 * DAY_MS;
 
   const kids = raw.kids || [];
   const chores = raw.chores || [];

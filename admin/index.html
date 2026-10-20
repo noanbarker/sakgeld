@@ -266,8 +266,18 @@
   };
   const fmtDate = iso => iso ? new Intl.DateTimeFormat('en-ZA', { timeZone: TZ, day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso)) : '—';
   const fmtDateTime = iso => iso ? new Intl.DateTimeFormat('en-ZA', { timeZone: TZ, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso)) : '—';
-  const daysAgo = iso => iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null;
-  const daysUntil = iso => iso ? Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000) : null;
+  // Day counts go by the South African calendar, not 24-hour blocks: a sign-up
+  // at 23:00 last night is "yesterday" at 08:00 this morning, not "today".
+  const saDayKey = d => new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+  const saDayNumber = d => Math.round(Date.parse(saDayKey(d) + 'T00:00:00Z') / 86400000);
+  const daysAgo = iso => iso ? saDayNumber(new Date()) - saDayNumber(new Date(iso)) : null;
+  const daysUntil = iso => iso ? saDayNumber(new Date(iso)) - saDayNumber(new Date()) : null;
+  // "2026-10-20 14:05" in South African time, for the CSV export.
+  const saStamp = iso => {
+    if (!iso) return '';
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(iso)).map(x => [x.type, x.value]));
+    return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
+  };
   const ago = iso => { const d = daysAgo(iso); return d === null ? 'never' : d === 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`; };
   const money = (cur, n) => cur + (Number.isInteger(n) ? n.toLocaleString('en-ZA') : n.toFixed(2));
   const displayName = u => u.name || (u.email ? u.email.split('@')[0] : '(no name)');
@@ -402,7 +412,7 @@
   // each family is worked out server-side (trialStartedAt in api/admin-dashboard.js).
   const TRIALS_FROM = '2026-09-15';
   function renderTrials(users) {
-    const dayKey = d => new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+    const dayKey = saDayKey;
     const today = dayKey(new Date());
     const days = [];
     for (let d = new Date(TRIALS_FROM + 'T12:00:00Z'); dayKey(d) <= today; d.setUTCDate(d.getUTCDate() + 1)) {
@@ -616,9 +626,10 @@
   $('#exportCsv').addEventListener('click', () => {
     if (!data) return;
     const cols = ['name', 'email', 'country', 'signed_up_at', 'last_activity_at', 'table_status', 'status', 'provider', 'billing_cycle', 'next_billed_at', 'current_period_ends_at', 'canceled_at', 'cancel_scheduled', 'payment_failed_at', 'email_verified', 'onboarding_complete', 'utm_source', 'referral_code', 'kids', 'chores', 'completions', 'completions_7d', 'pending_approvals', 'push_enabled'];
+    const CSV_DATE_COLS = new Set(['signed_up_at', 'last_activity_at', 'next_billed_at', 'current_period_ends_at', 'canceled_at', 'payment_failed_at']);
     const esc = v => { const s = v === null || v === undefined ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-    const csv = [cols.join(','), ...filteredUsers().map(u => cols.map(c => esc(c === 'table_status' ? TABLE_STATUS_LABEL[tableStatus(u)] || tableStatus(u) : u[c])).join(','))].join('\n');
-    const a = el('a', { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: `sprout-users-${new Date().toISOString().slice(0, 10)}.csv` });
+    const csv = [cols.join(','), ...filteredUsers().map(u => cols.map(c => esc(c === 'table_status' ? TABLE_STATUS_LABEL[tableStatus(u)] || tableStatus(u) : CSV_DATE_COLS.has(c) ? saStamp(u[c]) : u[c])).join(','))].join('\n');
+    const a = el('a', { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: `sprout-users-${saDayKey(new Date())}.csv` });
     document.body.append(a); a.click(); a.remove();
   });
 
