@@ -3944,6 +3944,7 @@ function vParent() {
       <div style="flex:1;display:flex;flex-direction:column;min-width:0">
         ${mobileHeader}
         <div class="sp-tab-content ${tutorialNudgeVisible() ? 'sp-has-nudge ' : ''}${S.tabAnim === 'fwd' ? 'sp-tab-anim-fwd' : S.tabAnim === 'back' ? 'sp-tab-anim-back' : ''}" style="flex:1;overflow:auto;padding:24px 28px;background-color:#f4faf6;background-image:var(--gradient-dashboard);background-attachment:local">
+          ${paymentFailedBanner()}
           ${cancelScheduledBanner()}
           ${S.tab === 'overview'  ? pOverview(db) :
             S.tab === 'chores'    ? pChores(db) :
@@ -3957,6 +3958,32 @@ function vParent() {
       </div>
     </div>
     ${S.tourStep >= 0 ? renderTour() : ''}`;
+}
+
+// A South African renewal failed. api/paystack-retry-failed.js retries the
+// card on days 1, 3 and 7 and cancels on day 10, and the payment emails tell
+// the parent the family keeps full access until then — so the app honours
+// that window and nags the parent here instead of locking everyone out.
+// Paddle families aren't included: Paddle runs its own retries and emails.
+const PAYMENT_GRACE_DAYS = 10; // Must match GIVE_UP_AFTER_DAYS in api/paystack-retry-failed.js
+function paymentGraceEndsAt(m) {
+    if (m?.subscription_status !== 'past_due' || m.payment_provider !== 'paystack' || !m.payment_failed_at) return null;
+    const ends = new Date(new Date(m.payment_failed_at).getTime() + PAYMENT_GRACE_DAYS * 86400000);
+    return ends > new Date() ? ends : null;
+}
+function hasAppAccess(m) {
+    const st = m?.subscription_status;
+    return st === 'trialing' || st === 'active' || !!paymentGraceEndsAt(m);
+}
+function paymentFailedBanner() {
+    const ends = paymentGraceEndsAt(currentUser?.user_metadata);
+    if (!ends) return '';
+    const date = ends.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' });
+    return `
+    <div style="max-width:900px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;background:#fef2f2;border:1px solid #fca5a5;border-radius:14px;padding:14px 16px;margin-bottom:20px">
+      <p style="font-family:var(--font-family);font-size:14px;line-height:1.45;color:#7f1d1d;margin:0;flex:1;min-width:200px"><strong>Your last payment didn't go through.</strong> We'll try your card again over the next few days. Sprout keeps working until ${date}${activeIsOwner() ? ' — update your card to keep it that way.' : '. Ask the account owner to update the card.'}</p>
+      ${activeIsOwner() ? `<button onclick="openManageSubscription()" class="btn-primary manage-sub-btn" style="width:auto;padding:10px 18px;font-size:14px">Update my card</button>` : ''}
+    </div>`;
 }
 
 // The parent cancelled but still has paid (or trial) time left. Paystack's own
@@ -6639,8 +6666,7 @@ function trackScreen() {
     else if (S.authMode === 'reset-pin') screen = 'reset-parent-pin';
     else if (!currentUser) screen = S.authMode === 'signin' ? 'signin' : (S.cardCheck ? (S.cardCheck.offerToken ? 'trial-offer' : 'card-check') : 'signup');
     else {
-        const subStatus = currentUser.user_metadata?.subscription_status;
-        if (subStatus !== 'trialing' && subStatus !== 'active') screen = S.cardCheck?.offerToken ? 'trial-offer' : 'subscription-gate';
+        if (!hasAppAccess(currentUser.user_metadata)) screen = S.cardCheck?.offerToken ? 'trial-offer' : 'subscription-gate';
         else if (S.view === 'parent') screen = 'parent:' + S.tab;
         else if (S.view === 'parent-onboarding') screen = 'onboarding:' + (ONBOARD_STEPS[S.onboardStep] || S.onboardStep);
         else screen = S.view || 'home';
@@ -6670,8 +6696,7 @@ function render() {
         document.getElementById('app').innerHTML = (showCardCheck ? vCardCheck() : vLogin()) + toastHtml;
         return;
     }
-    const subStatus = currentUser.user_metadata?.subscription_status;
-    if (subStatus !== 'trialing' && subStatus !== 'active') {
+    if (!hasAppAccess(currentUser.user_metadata)) {
         document.getElementById('app').innerHTML = (S.cardCheck?.offerToken ? vCardCheck() : vSubscriptionGate()) + toastHtml;
         return;
     }
