@@ -51,6 +51,7 @@
   button, .btn { font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   button:disabled { opacity: .6; cursor: default; }
+  button.grant { font-size: 12px; padding: 3px 9px; white-space: nowrap; }
   input, select { font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
   h2 { font-size: 15px; font-weight: 600; margin: 28px 0 10px; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
   h2 small { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--text-3); margin-left: 8px; }
@@ -231,6 +232,7 @@
           <th data-k="chores" class="num">Chores</th>
           <th data-k="completions_7d" class="num">Done 7d</th>
           <th data-k="notes">Notes</th>
+          <th>Free time</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -573,7 +575,43 @@
     if (u.utm_source) n.push('via ' + u.utm_source);
     if (u.banned) n.push('banned');
     if (u.internal) n.push('test account');
+    for (const g of u.free_time_grants || []) n.push((g.kind === 'free30' ? '+30 days free ' : '+14-day trial ') + fmtDate(g.granted_at));
     return n;
+  }
+
+  // ---------- free time (lib/free-time.js) ----------
+  // trial14: on a trial or first payment failed → trial ends 14 days from today.
+  // free30: paying → next payment moves 30 days later. No email is sent.
+  function grantKind(u) {
+    if (u.cancel_scheduled) return null;
+    const s = tableStatus(u);
+    if (s === 'trialing') return 'trial14';
+    if (s === 'trial_past_due') return u.provider === 'paystack' ? 'trial14' : null;
+    if (s === 'active') return 'free30';
+    return null;
+  }
+  async function grantFreeTime(u, kind, button) {
+    const who = displayName(u) + (u.email ? ` (${u.email})` : '');
+    const inFourteen = fmtDate(new Date(Date.now() + 14 * 86400000).toISOString());
+    const question = kind === 'trial14'
+      ? `Give ${who} a trial ending ${inFourteen}?\n\nTheir first payment moves to that day. No email is sent to them.`
+      : `Give ${who} 30 days free?\n\nTheir next payment moves 30 days later than it is now due. Nothing is refunded and no email is sent to them.`;
+    if (!confirm(question)) return;
+    button.disabled = true; button.textContent = 'Working…';
+    try {
+      const res = await fetch('/api/admin-dashboard', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + getKey(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'grant_free_time', userId: u.id, kind }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || ('Server returned ' + res.status));
+      alert(`Done. ${displayName(u)}'s ${kind === 'trial14' ? 'trial now ends' : 'next payment is now'} on ${fmtDate(body.until)}.`);
+      load();
+    } catch (err) {
+      alert('Not done: ' + err.message);
+      button.disabled = false; button.textContent = kind === 'trial14' ? '+14-day trial' : '+30 days free';
+    }
   }
   function filteredUsers() {
     const q = $('#search').value.trim().toLowerCase();
@@ -605,6 +643,13 @@
         el('td', { class: 'num' }, u.chores),
         el('td', { class: 'num' }, u.completions_7d),
         el('td', {}, ...notesFor(u).map(n => el('span', { class: 'flag' + (n === 'test account' ? ' internal' : '') }, n))),
+        (() => {
+          const kind = grantKind(u);
+          if (!kind) return el('td', {}, '');
+          const b = el('button', { type: 'button', class: 'grant' }, kind === 'trial14' ? '+14-day trial' : '+30 days free');
+          b.addEventListener('click', () => grantFreeTime(u, kind, b));
+          return el('td', {}, b);
+        })(),
       );
       tbody.append(tr);
     }

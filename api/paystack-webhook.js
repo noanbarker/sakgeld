@@ -365,6 +365,19 @@ async function findUserIdByCustomerCode(supabaseAdmin, customerCode) {
   return null;
 }
 
+// A subscription Sprout itself replaced — after "Keep my subscription"
+// (lib/paystack-restart.js) or free time granted from the admin dashboard
+// (lib/free-time.js). Its ending or non-renewal is ours, not the family's,
+// and must not lock them out or email them. paystack_superseded_code covers
+// the moment before the new code is written to the account.
+async function isSupersededSubscription(supabaseAdmin, userId, subscriptionCode) {
+  if (!subscriptionCode) return false;
+  const { data: current } = await supabaseAdmin.auth.admin.getUserById(userId);
+  const meta = (current && current.user && current.user.user_metadata) || {};
+  if (meta.paystack_superseded_code === subscriptionCode) return true;
+  return Boolean(meta.paystack_subscription_code && meta.paystack_subscription_code !== subscriptionCode);
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -515,6 +528,10 @@ async function handleCancellationScheduled(supabaseAdmin, data) {
   if (!customerCode) return;
   const userId = await findUserIdByCustomerCode(supabaseAdmin, customerCode);
   if (!userId) return;
+  if (await isSupersededSubscription(supabaseAdmin, userId, data.subscription_code)) {
+    console.log('Ignoring non-renewal of superseded Paystack subscription', data.subscription_code, 'for', userId);
+    return;
+  }
 
   const applied = await applySubscriptionState(supabaseAdmin, userId, {
     cancel_scheduled: true,
@@ -551,12 +568,10 @@ async function handleSubscriptionEnded(supabaseAdmin, data) {
   const userId = await findUserIdByCustomerCode(supabaseAdmin, customerCode);
   if (!userId) return;
 
-  // A family who cancelled and then pressed "Keep my subscription" has a new
-  // subscription on file (lib/paystack-restart.js); the old one still ends on
-  // schedule, and that ending must not lock them out.
-  const { data: current } = await supabaseAdmin.auth.admin.getUserById(userId);
-  const onFile = current && current.user && (current.user.user_metadata || {}).paystack_subscription_code;
-  if (data.subscription_code && onFile && data.subscription_code !== onFile) {
+  // A family who cancelled and then pressed "Keep my subscription", or was
+  // given free time, has a new subscription on file; the old one ending must
+  // not lock them out.
+  if (await isSupersededSubscription(supabaseAdmin, userId, data.subscription_code)) {
     console.log('Ignoring end of superseded Paystack subscription', data.subscription_code, 'for', userId);
     return;
   }

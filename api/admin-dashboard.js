@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
+const { grantFreeTime, sendFailureAlert } = require('../lib/free-time');
 
 // Feeds admin/index.html, Sprout's internal dashboard. Everything on that page
 // is derived from this one JSON response, so the page itself never touches
@@ -78,7 +79,9 @@ function internalEmailSet(value) {
 const TRIAL_DAYS = 14;
 function trialStartedAt(user, meta) {
   if (!meta.subscription_status) return null;
-  if (meta.subscription_status === 'trialing' && meta.next_billed_at) {
+  // A trial extended from this dashboard no longer ends 14 days after it began.
+  const extended = Array.isArray(meta.free_time_grants) && meta.free_time_grants.length > 0;
+  if (meta.subscription_status === 'trialing' && meta.next_billed_at && !extended) {
     const start = new Date(meta.next_billed_at).getTime() - TRIAL_DAYS * 86400000;
     if (!Number.isNaN(start)) return new Date(start).toISOString();
   }
@@ -156,6 +159,7 @@ function buildDashboard(raw, now = new Date(), internalEmails = new Set()) {
       cancel_scheduled: Boolean(meta.cancel_scheduled),
       payment_failed_at: meta.payment_failed_at || null,
       payment_retry_count: meta.payment_retry_count || 0,
+      free_time_grants: Array.isArray(meta.free_time_grants) ? meta.free_time_grants : [],
       email_verified: Boolean(user.email_confirmed_at),
       onboarding_complete: Boolean(meta.onboarding_complete),
       utm_source: meta.utm_source || null,
@@ -229,7 +233,7 @@ function buildDashboard(raw, now = new Date(), internalEmails = new Set()) {
 }
 
 module.exports = async (req, res) => {
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET' && req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
@@ -247,6 +251,31 @@ module.exports = async (req, res) => {
   }
 
   const supabaseAdmin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+  // The free-time buttons (lib/free-time.js). Lives here rather than in its
+  // own endpoint because api/ is at Vercel's 12-function limit.
+  if (req.method === 'POST') {
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch (e) { body = {}; }
+    }
+    const { action, userId } = body || {};
+    if (action !== 'grant_free_time' || !userId) {
+      res.status(400).json({ error: 'Unknown request' });
+      return;
+    }
+    try {
+      const granted = await grantFreeTime(supabaseAdmin, userId, body.kind);
+      console.log('Free time granted:', JSON.stringify(granted));
+      res.status(200).json(granted);
+    } catch (err) {
+      console.error('Free time not granted for', userId, body.kind, err.message);
+      await sendFailureAlert(supabaseAdmin, userId, body.kind, err.message);
+      res.status(409).json({ error: err.message });
+    }
+    return;
+  }
+
   try {
     const [users, kids, chores, completions, transactions, referralCodes, referralSignups, contactMessages, pushSubscriptions] = await Promise.all([
       fetchAllUsers(supabaseAdmin),
