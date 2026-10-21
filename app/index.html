@@ -1185,6 +1185,16 @@ async function loadCache() {
 
 async function initApp() {
     document.getElementById('app').innerHTML = '<div class="min-h-screen flex items-center justify-center"><p style="color:var(--color-text-secondary)">Loading…</p></div>';
+    // A dead email link (expired, used, or replaced by a newer email) comes back
+    // as #error=...&error_code=otp_expired. It used to leave people on a page that
+    // said nothing, so they clicked the same dead link over and over.
+    const linkError = new URLSearchParams(window.location.hash.slice(1));
+    if (linkError.get('error_code') || linkError.get('error')) {
+        S.linkExpired = true;
+        S.authMode = 'signin';
+        track('email_link_failed', { error_code: linkError.get('error_code') || linkError.get('error') });
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
     // Registered before getSession() below: Supabase processes a password-recovery
     // link's URL hash as part of that call, and only fires the PASSWORD_RECOVERY
     // event to listeners that are already attached when it happens. Attaching this
@@ -2667,12 +2677,18 @@ function vLogin() {
             </div>
             ` : `
             <h1 style="font-family:var(--font-family);font-size:22px;font-weight:800;color:var(--color-text-primary);text-align:center;margin-bottom:22px">Welcome back</h1>
+            ${S.linkExpired ? `
+            <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:12px;padding:14px 16px;margin-bottom:18px;font-family:var(--font-family);font-size:14px;line-height:1.5;color:#78350f">
+              <strong>That email link has expired.</strong> Only the newest email we send works, so an older one stops working once a new one goes out.<br><br>
+              Enter your email below and tap <strong>Send a new link</strong>, then use the link in that newest email. Already confirmed? Just sign in.
+            </div>` : ''}
             <input type="email" id="l-email" placeholder="Email address" value="${esc(draft.email)}" class="mb-3"
               onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()">
             ${pwField('l-pass', 'Password', draft.pass, 'mb-1', 'doSignIn()')}
             <div style="text-align:right;margin-bottom:12px"><button type="button" onclick="setAuthMode('forgot')" style="background:none;border:none;cursor:pointer;font-family:var(--font-family);font-size:13px;font-weight:600;color:#15803d;padding:0">Forgot password?</button></div>
             <p id="l-err" style="color:#f43f5e;font-size:14px;margin:4px 0 12px;min-height:20px"></p>
             <button onclick="doSignIn()" class="btn-primary">Sign In</button>
+            ${S.linkExpired ? `<button type="button" id="l-resend" onclick="resendConfirmation()" style="margin-top:10px;width:100%;padding:12px;border-radius:var(--radius-full);border:2px solid #15803d;background:white;color:#15803d;font-family:var(--font-family);font-size:15px;font-weight:700;cursor:pointer">Send a new link</button>` : ''}
             <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-muted);text-align:center;margin-top:16px">
               New to Sprout? <button type="button" onclick="setAuthMode('signup')" style="background:none;border:none;cursor:pointer;color:#15803d;font-weight:700;font-family:var(--font-family);font-size:13px;padding:0">Start your free trial</button>
             </p>
@@ -3148,9 +3164,12 @@ async function doSignIn() {
     errEl.textContent = error.message;
 }
 async function resendConfirmation() {
-    const email = S.unconfirmedEmail;
+    // From the expired-link notice nobody has typed a password yet, so the
+    // email comes straight from the box.
+    const email = S.unconfirmedEmail || document.getElementById('l-email')?.value?.trim();
     const errEl = document.getElementById('l-err');
-    if (!email || !errEl) return;
+    if (!errEl) return;
+    if (!email) { errEl.style.color = '#f43f5e'; errEl.textContent = 'Please enter your email first.'; return; }
     const btn = document.getElementById('l-resend');
     if (btn) btn.disabled = true;
     // Lands them in the app already signed in, where the subscription gate offers
@@ -3238,7 +3257,9 @@ async function submitSignUp({ name, email, pass, country, referralCode, billingC
         // referral_code records which school or partner sent this family in; the
         // Paddle webhook resolves it against referral_codes once there's a
         // subscription to attach it to.
-        options: { data: { name, country, billing_cycle: billingCycle, signup_geo: geo, ...(referralCode ? { referral_code: referralCode } : {}), ...getStoredUTM() } }
+        // Without emailRedirectTo the confirm link fell back to Supabase's Site URL,
+        // the marketing homepage, which can't sign anyone in or explain a dead link.
+        options: { emailRedirectTo: 'https://www.sproutearnsave.com/app/index.html', data: { name, country, billing_cycle: billingCycle, signup_geo: geo, ...(referralCode ? { referral_code: referralCode } : {}), ...getStoredUTM() } }
     });
     if (error) { track('signup_failed', { reason: error.message }); if (errEl) errEl.textContent = error.message; return; }
     // Supabase never errors for an already-registered email — it silently returns
