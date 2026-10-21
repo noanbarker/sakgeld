@@ -16,6 +16,29 @@ const GIVE_UP_AFTER_DAYS = 10;
 
 const PLAN_AMOUNTS_KOBO = { monthly: 5900, yearly: 59000 };
 
+// The card a retry should charge. A parent fixing a declined card does it on
+// Paystack's own manage page, which swaps the card on the subscription but
+// sends us no webhook we can act on (only the refund of its R1 check) — so the
+// code banked at sign-up would go on charging the card that just failed.
+// Asking Paystack for the subscription's current card each time avoids that.
+// Falls back to the stored code if Paystack can't be reached.
+async function currentAuthorizationCode(meta) {
+  const stored = meta.paystack_authorization_code;
+  if (!meta.paystack_subscription_code) return stored;
+  try {
+    const res = await fetch(`https://api.paystack.co/subscription/${encodeURIComponent(meta.paystack_subscription_code)}`, {
+      headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
+    });
+    const body = await res.json().catch(() => null);
+    const auth = res.ok && body && body.status && body.data && body.data.authorization;
+    if (auth && auth.authorization_code && auth.reusable !== false) return auth.authorization_code;
+    console.error('Retry job: no usable card on subscription', meta.paystack_subscription_code, res.status);
+  } catch (e) {
+    console.error('Retry job: subscription fetch failed', meta.paystack_subscription_code, e && e.message);
+  }
+  return stored;
+}
+
 function daysSince(iso) {
   if (!iso) return null;
   return Math.floor((Date.now() - new Date(iso).getTime()) / (24 * 60 * 60 * 1000));
@@ -91,6 +114,9 @@ module.exports = async (req, res) => {
       if (elapsed < RETRY_DAYS[done]) continue;
 
       const amount = PLAN_AMOUNTS_KOBO[meta.billing_cycle === 'yearly' ? 'yearly' : 'monthly'];
+      const authorizationCode = await currentAuthorizationCode(meta);
+      // Bank a swapped card so the restart flow (lib/paystack-restart.js) offers it too.
+      const cardChanged = authorizationCode !== meta.paystack_authorization_code;
       attempted += 1;
 
       const chargeRes = await fetch('https://api.paystack.co/transaction/charge_authorization', {
@@ -103,7 +129,7 @@ module.exports = async (req, res) => {
           email: user.email,
           amount,
           currency: 'ZAR',
-          authorization_code: meta.paystack_authorization_code,
+          authorization_code: authorizationCode,
         }),
       });
       const chargeBody = await chargeRes.json().catch(() => null);
@@ -117,6 +143,7 @@ module.exports = async (req, res) => {
         await supabaseAdmin.auth.admin.updateUserById(user.id, {
           user_metadata: {
             ...meta,
+            ...(cardChanged ? { paystack_authorization_code: authorizationCode } : {}),
             subscription_status: 'active',
             payment_failed_at: null,
             payment_retry_count: 0,
@@ -128,7 +155,11 @@ module.exports = async (req, res) => {
         await sendLoopsEvent(user.email, 'payment_recovered', { firstName });
       } else {
         await supabaseAdmin.auth.admin.updateUserById(user.id, {
-          user_metadata: { ...meta, payment_retry_count: done + 1 },
+          user_metadata: {
+            ...meta,
+            ...(cardChanged ? { paystack_authorization_code: authorizationCode } : {}),
+            payment_retry_count: done + 1,
+          },
         });
         // Each failed attempt nudges the parent again, with the day their
         // access runs out, so the final cancellation is never a surprise.
