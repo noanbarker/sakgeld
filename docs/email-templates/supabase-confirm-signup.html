@@ -1,0 +1,53 @@
+<!--
+  Supabase > Authentication > Emails > "Confirm signup"
+  Subject: Confirm your email to start your Sprout trial
+  Paste everything below this comment into the Message body (Source view).
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Confirm your email</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f7f2;font-family:Nunito,Arial,Helvetica,sans-serif;color:#1f2937;">
+<div style="display:none;max-height:0;overflow:hidden;">One tap to confirm your email and open your Sprout family account.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f7f2;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;background:#ffffff;border-radius:16px;">
+        <tr>
+          <td align="center" style="padding:32px 32px 8px;">
+            <img src="https://www.sproutearnsave.com/images/Sprout_Logo_400_email.png" width="150" height="100" alt="Sprout" style="display:block;border:0;width:150px;height:auto;">
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 32px 0;">
+            <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:#15803d;text-align:center;">Confirm your email address</h1>
+            <p style="margin:0 0 16px;font-size:16px;line-height:1.6;">Hi there,</p>
+            <p style="margin:0 0 16px;font-size:16px;line-height:1.6;">Thanks for starting your Sprout free trial. Please confirm that <strong>{{ .Email }}</strong> is your email address so we can open your family account.</p>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:8px 32px 24px;">
+            <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#15803d;color:#ffffff;text-decoration:none;font-size:17px;font-weight:700;padding:14px 32px;border-radius:999px;">Confirm my email</a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 32px 24px;">
+            <p style="margin:0 0 16px;font-size:16px;line-height:1.6;">After you confirm, sign in to Sprout to add your children and their first chores.</p>
+            <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#6b7280;">If the button doesn't work, copy this link into your browser:<br><a href="{{ .ConfirmationURL }}" style="color:#15803d;word-break:break-all;">{{ .ConfirmationURL }}</a></p>
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#6b7280;">If you didn't sign up for Sprout, you can ignore this email and nothing will happen.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 32px 28px;border-top:1px solid #e5e7eb;">
+            <p style="margin:0;font-size:13px;line-height:1.6;color:#6b7280;text-align:center;">Sprout, chores and pocket money for kids<br>Questions? Reply to this email or write to <a href="mailto:hello@sproutearnsave.com" style="color:#15803d;">hello@sproutearnsave.com</a><br><a href="https://www.sproutearnsave.com" style="color:#15803d;">sproutearnsave.com</a></p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>
