@@ -5094,11 +5094,21 @@ function goParent(profileId) {
     if (needsPin) { S.parentPin = ''; go('parent-pin'); }
     else { S.activeParentId = p?.id || null; enterParentDashboard(); }
 }
+// The setup wizard is shown once per family, ever: the first time a parent
+// reaches the dashboard. onboarding_started is stamped the moment it opens, so
+// a parent who leaves halfway is never walked through it again (and never
+// thinks they have to re-add their kids). The tutorial covers the rest.
 function enterParentDashboard() {
-    const forcePreview = new URLSearchParams(window.location.search).get('onboarding') === '1';
-    const onboarded = currentUser?.user_metadata?.onboarding_complete;
-    if (forcePreview || (!onboarded && cache.kids.length === 0)) { S.onboardStep = 0; go('parent-onboarding'); }
-    else { go('parent', { tab: 'overview' }); }
+    const m = currentUser?.user_metadata || {};
+    if (!m.onboarding_complete && !m.onboarding_started && cache.kids.length === 0) {
+        S.onboardStep = 0;
+        go('parent-onboarding');
+        sb.auth.updateUser({ data: { onboarding_started: true } })
+            .then(({ data }) => { if (data?.user) currentUser = data.user; })
+            .catch(() => {});
+    } else {
+        go('parent', { tab: 'overview' });
+    }
 }
 
 function vParentPin() {
