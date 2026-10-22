@@ -617,6 +617,42 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 let pushSubscribed = false; // this device, this browser
+let pushEndpoint = null;     // this device's row in push_subscriptions
+// This device's daily approval reminder (columns on its push_subscriptions row;
+// api/push-send.js sends it). Times are the parent's local time.
+let pushReminder = { enabled: false, time: '18:00' };
+const REMINDER_TIMES = Array.from({ length: 35 }, (_, i) => {
+    const mins = 5 * 60 + i * 30; // 05:00 to 22:00, every half hour
+    return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+});
+function deviceTimeZone() {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Johannesburg'; } catch (e) { return 'Africa/Johannesburg'; }
+}
+async function loadPushReminder() {
+    if (!pushEndpoint) return;
+    const { data } = await sb.from('push_subscriptions')
+        .select('reminder_enabled, reminder_time').eq('endpoint', pushEndpoint).maybeSingle();
+    if (data && data.reminder_time) {
+        pushReminder = { enabled: Boolean(data.reminder_enabled), time: String(data.reminder_time).slice(0, 5) };
+    }
+}
+async function savePushReminder(changes) {
+    if (!pushEndpoint) return;
+    const next = { ...pushReminder, ...changes };
+    const { error } = await sb.from('push_subscriptions').update({
+        reminder_enabled: next.enabled,
+        reminder_time: next.time,
+        reminder_tz: deviceTimeZone(),
+    }).eq('endpoint', pushEndpoint);
+    if (error) { toast('Could not save the reminder. Please try again.', 'error'); return; }
+    const switchedOn = next.enabled && !pushReminder.enabled;
+    pushReminder = next;
+    track('push_reminder_updated', { enabled: next.enabled, time: next.time });
+    if (switchedOn) toast(`Daily reminder on for ${next.time}.`, 'success');
+    else if (!next.enabled && 'enabled' in changes) toast('Daily reminder off.');
+    else if ('time' in changes && next.enabled) toast(`Reminder moved to ${next.time}.`, 'success');
+    render();
+}
 async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return null;
     try { return await navigator.serviceWorker.register('/sw.js'); } catch (e) { return null; }
@@ -630,7 +666,11 @@ async function syncPushSubscription() {
         const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.getSubscription();
         pushSubscribed = Boolean(sub) && Notification.permission === 'granted';
-        if (sub && pushSubscribed) await savePushSubscription(sub);
+        if (sub && pushSubscribed) {
+            await savePushSubscription(sub);
+            pushEndpoint = sub.endpoint;
+            await loadPushReminder();
+        }
     } catch (e) { pushSubscribed = false; }
 }
 async function savePushSubscription(sub) {
@@ -663,6 +703,8 @@ function enablePush() {
             const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(PUSH_PUBLIC_KEY) });
             await savePushSubscription(sub);
             pushSubscribed = true;
+            pushEndpoint = sub.endpoint;
+            await loadPushReminder();
             track('push_enabled', { standalone: isStandaloneApp(), ios: isIOSDevice() });
             toast('Notifications on. We\'ll tell you when there\'s something to approve.', 'success');
         } catch (e) {
@@ -682,6 +724,8 @@ async function disablePush() {
         }
     } catch (e) {}
     pushSubscribed = false;
+    pushEndpoint = null;
+    pushReminder = { enabled: false, time: '18:00' };
     track('push_disabled');
     toast('Notifications off for this device.');
     render();
@@ -4978,7 +5022,20 @@ function pSettings() {
         } else if (pushSubscribed) {
             body = `
             <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">This device gets a notification whenever a child marks a chore done or claims a reward. Turn it on separately on each phone or computer you use.</p>
-            <button onclick="disablePush()" class="btn-outline" style="width:auto;padding:10px 28px">Turn off on this device</button>`;
+            <button onclick="disablePush()" class="btn-outline" style="width:auto;padding:10px 28px">Turn off on this device</button>
+            <div style="border-top:1px solid var(--color-border);margin-top:20px;padding-top:18px">
+              <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:14px;margin-bottom:4px">Daily reminder</p>
+              <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:14px">One reminder a day at the time you choose, if any chores or rewards are still waiting for your approval. If nothing is waiting, no reminder is sent.</p>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <label for="reminder-time" style="font-family:var(--font-family);font-size:13px;font-weight:700;color:var(--color-text-primary)">Remind me at</label>
+                <select id="reminder-time" onchange="savePushReminder({ time: this.value })" style="width:auto;min-width:110px">
+                  ${(REMINDER_TIMES.includes(pushReminder.time) ? REMINDER_TIMES : [...REMINDER_TIMES, pushReminder.time].sort())
+                      .map(t => `<option value="${t}" ${t === pushReminder.time ? 'selected' : ''}>${t}</option>`).join('')}
+                </select>
+              </div>
+              <button onclick="savePushReminder({ enabled: ${!pushReminder.enabled} })" class="${pushReminder.enabled ? 'btn-outline' : 'btn-primary'}" style="width:auto;padding:10px 28px;margin-top:14px">${pushReminder.enabled ? 'Turn off daily reminder' : 'Turn on daily reminder'}</button>
+              ${pushReminder.enabled ? `<p style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-green-700);margin-top:10px">On: this device gets a reminder at ${pushReminder.time} each day.</p>` : ''}
+            </div>`;
         } else {
             body = `
             <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">Get a notification the moment a child marks a chore done or claims a reward, so nothing sits waiting for days. Nothing goes to email.</p>
