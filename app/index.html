@@ -2528,7 +2528,18 @@ function pickEmoji(em) {
     // drops the other, so what the parent sees selected is what gets saved.
     const t = S.modal && S.modal.type;
     if (t === 'add-chore' || t === 'edit-chore') resetChorePhotoState();
+    // render() rebuilds the form, which would jump the icon list (and the form)
+    // back to the top. Keep both where the parent left them, so the icon they
+    // just tapped stays in view with its highlight.
+    const sheet = document.querySelector('.modal-sheet');
+    const grid  = document.getElementById('chore-icon-grid');
+    const sheetTop = sheet ? sheet.scrollTop : 0;
+    const gridTop  = grid ? grid.scrollTop : 0;
     render();
+    const newSheet = document.querySelector('.modal-sheet');
+    const newGrid  = document.getElementById('chore-icon-grid');
+    if (newSheet) newSheet.scrollTop = sheetTop;
+    if (newGrid)  newGrid.scrollTop  = gridTop;
 }
 
 function resetChorePhotoState() {
@@ -5687,7 +5698,7 @@ function renderModal() {
         </div>` : '<div style="margin-bottom:14px"></div>'}
         ${photoRow}
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:4px">${usingPhoto ? 'Or Pick An Illustration' : 'Chore Icon'} <span style="font-size:11px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--color-green-700);margin-left:6px">${selIconName}</span></p>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:340px;overflow-y:auto;border:1.5px solid var(--color-border);border-radius:12px;padding:6px;margin-bottom:16px">
+        <div id="chore-icon-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:340px;overflow-y:auto;border:1.5px solid var(--color-border);border-radius:12px;padding:6px;margin-bottom:16px">
           ${iconGrid}
         </div>
         <div style="display:flex;gap:8px">
