@@ -1269,6 +1269,32 @@ async function initApp() {
 
 async function signOut() { track('signed_out'); await sb.auth.signOut(); }
 function toggleHistory() { S.historyOpen = !S.historyOpen; render(); }
+function toggleBonusHistory()  { S.bonusHistoryOpen  = !S.bonusHistoryOpen;  render(); }
+function toggleRewardHistory() { S.rewardHistoryOpen = !S.rewardHistoryOpen; render(); }
+
+// Kid view: section heading with an optional "Show history (n)" toggle beside it.
+// Earned bonuses/rewards live behind the toggle so the list up top is only what's still to earn.
+function kidSectionHeader(label, count, open, toggleFn) {
+    const btn = count > 0
+        ? `<button onclick="${toggleFn}()" style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-text-muted);background:none;border:1.5px solid var(--color-border);border-radius:8px;padding:4px 10px;cursor:pointer">${open ? 'Hide history' : 'Show history'} (${count})</button>`
+        : '';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;margin-top:8px">
+          <p class="pr-section-label" style="margin-bottom:0">${label}</p>${btn}
+        </div>`;
+}
+
+// One compact row in a kid's bonus/reward history list (matches the transaction history rows).
+function kidEarnedRow(icon, name, dateText, amount) {
+    return `
+    <div class="card flex items-center gap-2" style="padding:8px 12px">
+      <div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#dcfce7;color:#16a34a">${icon}</div>
+      <div class="flex-1 min-w-0">
+        <p style="font-family:var(--font-family);font-weight:600;color:var(--color-text-primary);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</p>
+        <p style="font-family:var(--font-family);font-size:11px;color:var(--color-text-secondary)">Earned on ${dateText}</p>
+      </div>
+      <p style="font-family:var(--font-family);font-weight:800;font-size:13px;flex-shrink:0;color:#16a34a">+${amount}</p>
+    </div>`;
+}
 
 // ─── STATE ───────────────────────────────────────────────────────
 // Declared up here, not beside vCardCheck: S reads it while it's being built, and a
@@ -1300,6 +1326,8 @@ const S = {
     activeParentId: null, // the parent profile using the dashboard right now
     resetPinParentId: null, // whose PIN a "Forgot PIN?" email link resets
     historyOpen: false,
+    bonusHistoryOpen: false,
+    rewardHistoryOpen: false,
     settingsSection: null,
     moneySection: null,
     onboardStep: 0,
@@ -5420,24 +5448,20 @@ function vKid() {
                   </p>
                 </div>`;
             }).join('');
-            const achievedCards = achieved.map(m => {
-                const claim = (m.claimedBy || []).find(c => c.kidId === kid.id);
-                const claimDate = claim ? new Date(claim.claimedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-                return `
-                <div class="card flex items-center gap-3" style="background:#f0fdf4;border:1.5px solid #bbf7d0">
-                  <div style="width:40px;height:40px;background:#dcfce7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">${milestoneStarSVG(20)}</div>
-                  <div class="flex-1 min-w-0">
-                    <p style="font-family:var(--font-family);font-weight:800;color:#15803d;font-size:13px">${esc(m.name) || 'Balance Milestone'}</p>
-                    <p style="font-family:var(--font-family);font-size:11px;color:#16a34a;margin-top:1px">Earned on ${claimDate}</p>
-                  </div>
-                  <p style="font-family:var(--font-family);font-weight:900;color:#16a34a;font-size:15px;flex-shrink:0">+${R(m.bonusAmount)}</p>
-                </div>`;
-            }).join('');
+            const claimOf = m => (m.claimedBy || []).find(c => c.kidId === kid.id);
+            const achievedRows = achieved
+                .sort((a, b) => new Date(claimOf(b)?.claimedAt || 0) - new Date(claimOf(a)?.claimedAt || 0))
+                .map(m => {
+                    const claim = claimOf(m);
+                    const claimDate = claim ? new Date(claim.claimedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+                    return kidEarnedRow(milestoneStarSVG(16), esc(m.name) || 'Balance Milestone', claimDate, R(m.bonusAmount));
+                }).join('');
+            const allEarnedNote = `<div class="card" style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);display:flex;align-items:center;gap:8px">${milestoneStarSVG(16)} All bonuses earned. New ones will show here.</div>`;
             return `
-            <p class="pr-section-label mb-3 mt-2">Bonuses</p>
+            ${kidSectionHeader('Bonuses', achieved.length, S.bonusHistoryOpen, 'toggleBonusHistory')}
             <div class="flex flex-col gap-2 mb-6">
-              ${upcomingCards}
-              ${achievedCards}
+              ${upcoming.length ? upcomingCards : allEarnedNote}
+              ${S.bonusHistoryOpen ? achievedRows : ''}
             </div>`;
         })()}
         ${(() => {
@@ -5445,23 +5469,16 @@ function vKid() {
                 !r.archived && (r.assignedTo === 'all' || (Array.isArray(r.assignedTo) && r.assignedTo.includes(kid.id)))
             );
             if (!rewards.length) return '';
-            const cards = rewards.map(r => {
-                const comps = (db.rewardCompletions || []).filter(c => c.rewardId === r.id && c.kidId === kid.id)
-                                                            .sort((a, b) => new Date(b.claimedAt) - new Date(a.claimedAt));
-                const achieved = comps.find(c => c.approved);
-                const pending  = !achieved && comps.find(c => !c.approved && !c.rejected);
-                if (achieved) {
-                    const claimDate = new Date(achieved.approvedAt || achieved.claimedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
-                    return `
-                    <div class="card flex items-center gap-4" style="background:#f0fdf4;border:1.5px solid #bbf7d0">
-                      <div style="flex-shrink:0;width:64px;height:64px;background:#dcfce7;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#16a34a">${uiIcon('trophy', 36, 2)}</div>
-                      <div class="flex-1 min-w-0">
-                        <p style="font-family:var(--font-family);font-weight:800;color:#15803d">${esc(r.name)}</p>
-                        <p style="font-family:var(--font-family);font-size:12px;color:#16a34a;margin-top:2px">Earned on ${claimDate}</p>
-                        <p style="font-family:var(--font-family);font-weight:800;color:#16a34a;margin-top:4px">+ ${R(r.value)}</p>
-                      </div>
-                    </div>`;
-                }
+            const compsOf = r => (db.rewardCompletions || []).filter(c => c.rewardId === r.id && c.kidId === kid.id)
+                                                               .sort((a, b) => new Date(b.claimedAt) - new Date(a.claimedAt));
+            const earnedAt = r => { const a = compsOf(r).find(c => c.approved); return a ? new Date(a.approvedAt || a.claimedAt) : null; };
+            const earned = rewards.filter(r => earnedAt(r)).sort((a, b) => earnedAt(b) - earnedAt(a));
+            const open   = rewards.filter(r => !earnedAt(r));
+            const earnedRows = earned.map(r => kidEarnedRow(uiIcon('trophy', 16, 2), esc(r.name),
+                earnedAt(r).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }), R(r.value))).join('');
+            const cards = open.map(r => {
+                const comps = compsOf(r);
+                const pending  = comps.find(c => !c.approved && !c.rejected);
                 if (pending) {
                     return `
                     <div class="card flex items-center gap-4" style="background:#fffbeb;border:1.5px solid #fde68a">
@@ -5485,11 +5502,14 @@ function vKid() {
                     class="chore-done-btn flex-shrink-0" style="padding:8px 16px;font-size:13px">Done!</button>
                 </div>`;
             }).join('');
+            const allEarnedNote = `<div class="card" style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);display:flex;align-items:center;gap:8px;color:#16a34a">${uiIcon('trophy', 16, 2)}<span style="color:var(--color-text-secondary)">All rewards earned. New ones will show here.</span></div>`;
             return `
-            <p class="pr-section-label mb-3 mt-2">Rewards</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
+            ${kidSectionHeader('Rewards', earned.length, S.rewardHistoryOpen, 'toggleRewardHistory')}
+            ${open.length ? `
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 ${S.rewardHistoryOpen ? 'mb-3' : 'mb-6'}">
               ${cards}
-            </div>`;
+            </div>` : `<div class="${S.rewardHistoryOpen ? 'mb-2' : 'mb-6'}">${allEarnedNote}</div>`}
+            ${S.rewardHistoryOpen ? `<div class="flex flex-col gap-2 mb-6">${earnedRows}</div>` : ''}`;
         })()}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;margin-top:8px">
           <p class="pr-section-label" style="margin-bottom:0">History</p>
