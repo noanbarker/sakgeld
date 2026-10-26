@@ -782,6 +782,65 @@ function maybeOpenApprovals() {
     goParent();
 }
 
+// ─── PICK UP NEW VERSIONS ────────────────────────────────────────
+// A home-screen app can sit in memory for days, still running the version it
+// was opened with. Each time someone comes back to it, ask the server for the
+// page's fingerprint (its ETag, which only changes when the page does) and
+// reload quietly if a new version has gone live. The screen they were on is
+// put back afterwards, so nobody is dropped on the home screen or re-asked
+// for a PIN they already entered.
+const UPDATE_CHECK_GAP = 60000;
+const RESUME_AFTER_UPDATE_KEY = 'sprout_resume_after_update';
+let appVersionTag = null;
+let lastUpdateCheck = 0;
+async function fetchAppVersionTag() {
+    try {
+        const r = await fetch(window.location.pathname, { method: 'HEAD', cache: 'no-store' });
+        return r.ok ? (r.headers.get('etag') || r.headers.get('last-modified')) : null;
+    } catch (e) { return null; }
+}
+function midTask() {
+    const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+    return !!S.modal || S.tourStep >= 0 || typing || !!S.pin || !!S.parentPin || S.view === 'parent-onboarding';
+}
+async function checkForAppUpdate() {
+    if (document.visibilityState !== 'visible' || Date.now() - lastUpdateCheck < UPDATE_CHECK_GAP) return;
+    lastUpdateCheck = Date.now();
+    const tag = await fetchAppVersionTag();
+    if (!tag) return;
+    if (!appVersionTag) { appVersionTag = tag; return; }
+    // Someone mid-task (a box open, a half-typed field) keeps the old version
+    // until they next come back; the new one isn't worth losing their input.
+    if (tag === appVersionTag || midTask()) return;
+    try {
+        sessionStorage.setItem(RESUME_AFTER_UPDATE_KEY, JSON.stringify({
+            at: Date.now(), view: S.view, tab: S.tab, kidId: S.kidId, parentId: S.activeParentId,
+        }));
+    } catch (e) {}
+    track('app_auto_updated', { view: S.view });
+    window.location.reload();
+}
+function maybeResumeAfterUpdate() {
+    let saved = null;
+    try {
+        saved = JSON.parse(sessionStorage.getItem(RESUME_AFTER_UPDATE_KEY) || 'null');
+        sessionStorage.removeItem(RESUME_AFTER_UPDATE_KEY);
+    } catch (e) {}
+    // Only straight after our own reload — never a stale note from long ago.
+    if (!saved || !currentUser || Date.now() - saved.at > 120000) return;
+    if (saved.view === 'parent') {
+        if (saved.parentId && parentProfiles.length && !parentProfiles.some(p => p.id === saved.parentId && !p.removed)) return;
+        S.activeParentId = saved.parentId || null;
+        go('parent', { tab: saved.tab || 'overview' });
+    } else if (saved.view === 'kid' && cache.kids.some(k => k.id === saved.kidId)) {
+        S.kidId = saved.kidId;
+        go('kid');
+    }
+}
+fetchAppVersionTag().then(tag => { if (!appVersionTag) appVersionTag = tag; });
+document.addEventListener('visibilitychange', checkForAppUpdate);
+window.addEventListener('pageshow', e => { if (e.persisted) checkForAppUpdate(); });
+
 // Partner referral codes — a school's code, arriving from a poster, a QR, or
 // the /join/ short link. Codes are letters and digits only, so normalising here
 // means one typed by hand into the signup form matches one that arrived by link
@@ -1294,6 +1353,7 @@ async function initApp() {
                 await checkCycleCloseOut();
                 syncPushSubscription();
                 maybeOpenApprovals();
+                maybeResumeAfterUpdate();
             }
         }
         else { parentProfiles = []; S.activeParentId = null; S.pinParentId = null; cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [] }; S.view = 'home'; }
