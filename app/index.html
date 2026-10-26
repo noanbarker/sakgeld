@@ -245,6 +245,9 @@
       .icon-btn:hover { background:var(--color-green-50); color:var(--color-green-700); }
       .icon-btn.danger:hover { background:var(--color-coral-bg); color:var(--color-coral-text); }
       .pc-opt:has(input[type=radio]:checked) { border-color:var(--color-green-600) !important; background:var(--color-green-50); }
+      /* iOS Safari sizes a native date field to its own content and ignores width:100% unless its native look is switched off. */
+      .pc-date { -webkit-appearance:none; appearance:none; display:block; box-sizing:border-box; width:100%; min-width:0; max-width:100%; padding:8px 10px !important; font-size:14px; text-align:left; }
+      .pc-date::-webkit-date-and-time-value { text-align:left; margin:0; }
       .stat-card {
         background:var(--color-surface); border:1px solid var(--color-border);
         border-radius:var(--radius-md); box-shadow:var(--shadow-sm); padding:16px 18px;
@@ -5868,8 +5871,8 @@ function renderModal() {
         const dateLbl  = 'font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:4px';
         const datesBlock = (from, backOn) => `
           <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin:10px 0 0 26px">
-            <div><p style="${dateLbl}">Pause from</p><input id="pc-from" type="date" min="${today}" value="${from}" onfocus="pickPauseOpt('dates')" oninput="pauseDatesNote()" style="width:100%;min-width:0;padding:8px 10px !important;font-size:14px"></div>
-            <div><p style="${dateLbl}">Back on</p><input id="pc-back" type="date" min="${addDaysStr(today, 1)}" value="${backOn}" onfocus="pickPauseOpt('dates')" oninput="pauseDatesNote()" style="width:100%;min-width:0;padding:8px 10px !important;font-size:14px"></div>
+            <div style="min-width:0"><p style="${dateLbl}">Pause from</p><input id="pc-from" type="date" min="${today}" value="${from}" onfocus="pickPauseOpt('dates')" oninput="pauseDatesNote()" class="pc-date"></div>
+            <div style="min-width:0"><p style="${dateLbl}">Back on</p><input id="pc-back" type="date" min="${addDaysStr(today, 1)}" value="${backOn}" onfocus="pickPauseOpt('dates')" oninput="pauseDatesNote()" class="pc-date"></div>
           </div>
           <p id="pc-dates-note" style="${optNote}">${pauseDatesText(from, backOn)}</p>`;
         const footNote = `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-muted);margin:4px 0 16px">Paused days won't count as missed or affect pocket money.</p>`;
@@ -5906,7 +5909,7 @@ function renderModal() {
             </label>
             <label class="pc-opt" data-opt="dates" style="${optStyle}">
               <div style="display:flex;align-items:center;gap:10px"><input type="radio" name="pc-opt" value="dates" onchange="pickPauseOpt('dates')" style="width:16px;height:16px;accent-color:var(--color-green-600)"><span style="${optTitle}">Resume on a date</span></div>
-              <div style="margin:10px 0 0 26px;width:calc(50% - 17px)"><p style="${dateLbl}">Back on</p><input id="pc-back" type="date" min="${addDaysStr(today, 1)}" value="${open.to || addDaysStr(today, 1)}" onfocus="pickPauseOpt('dates')" style="width:100%;min-width:0;padding:8px 10px !important;font-size:14px"></div>
+              <div style="margin:10px 0 0 26px;width:calc(50% - 17px)"><p style="${dateLbl}">Back on</p><input id="pc-back" type="date" min="${addDaysStr(today, 1)}" value="${open.to || addDaysStr(today, 1)}" onfocus="pickPauseOpt('dates')" class="pc-date"></div>
             </label>
             <p id="pc-error" style="font-family:var(--font-family);font-size:13px;color:var(--color-coral-text);margin:0 0 12px;display:none"></p>
             <div style="display:flex;gap:8px;margin-top:6px">
