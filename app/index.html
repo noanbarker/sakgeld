@@ -5860,6 +5860,17 @@ function renderModal() {
         </div>`;
     }
 
+    if (type === 'whats-new') {
+        body = `
+        <div style="text-align:center">
+          <div style="width:56px;height:56px;margin:0 auto 12px;border-radius:16px;background:var(--color-green-50);color:var(--color-green-700);display:flex;align-items:center;justify-content:center">${uiIcon('pause', 26)}</div>
+          <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-green-600);margin-bottom:4px">New feature</p>
+          <h3 style="font-family:var(--font-family);font-size:19px;font-weight:800;color:var(--color-text-primary);margin-bottom:10px">You can now pause and resume chores</h3>
+          <p style="font-family:var(--font-family);font-size:14px;color:var(--color-text-secondary);line-height:1.5;margin-bottom:20px">Going on holiday, or a chore needs a break? Tap the pause button on any chore in the Chores tab. Pause it from today, or for set dates and it comes back by itself. Paused days never count as missed.</p>
+          <button onclick="dismissWhatsNew()" class="btn-primary" style="width:100%;padding:12px">OK</button>
+        </div>`;
+    }
+
     if (type === 'pause-chore') {
         const c = db.chores.find(x => x.id === data.choreId);
         const today = toLocalDateStr(new Date());
@@ -6315,6 +6326,27 @@ async function saveChore(id) {
     }
     closeModal(); toast('Saved!');
 }
+// ─── WHAT'S NEW ──────────────────────────────────────────────────
+// A one-time announcement on the parent dashboard. Seen-state lives on the
+// account (not the device), so co-parents sharing a login see it once between
+// them. Families who signed up after the launch never get it — for them the
+// feature isn't new. Swap the id and date for the next announcement.
+const WHATS_NEW = { id: 'chore-pause', launchedAt: '2026-10-26T12:00:00+02:00' };
+function whatsNewDue() {
+    const m = currentUser?.user_metadata || {};
+    if (S.whatsNewDismissed || m.whats_new_seen === WHATS_NEW.id) return false;
+    if (!m.onboarding_complete) return false;
+    return !!currentUser.created_at && new Date(currentUser.created_at) < new Date(WHATS_NEW.launchedAt);
+}
+function dismissWhatsNew() {
+    S.whatsNewDismissed = true; // holds for this visit even if the save below fails
+    closeModal();
+    track('whats_new_dismissed', { id: WHATS_NEW.id });
+    sb.auth.updateUser({ data: { whats_new_seen: WHATS_NEW.id } }).then(({ data }) => {
+        if (data?.user) currentUser = data.user;
+    });
+}
+
 // ─── PAUSE / RESUME A CHORE ──────────────────────────────────────
 function pauseChore(id) { openModal('pause-chore', { choreId: id }); }
 function pickPauseOpt(opt) {
@@ -7002,6 +7034,7 @@ function render() {
         document.getElementById('app').innerHTML = (S.cardCheck?.offerToken ? vCardCheck() : vSubscriptionGate()) + toastHtml;
         return;
     }
+    if (S.view === 'parent' && !S.modal && S.tourStep < 0 && whatsNewDue()) S.modal = { type: 'whats-new', data: {} };
     const views = { home: vHome, parent: vParent, 'kid-pin': vKidPin, kid: vKid, 'parent-pin': vParentPin, 'parent-onboarding': vOnboarding };
     const html  = (views[S.view] || vHome)();
     const app = document.getElementById('app');
