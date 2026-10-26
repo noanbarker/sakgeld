@@ -244,6 +244,7 @@
       }
       .icon-btn:hover { background:var(--color-green-50); color:var(--color-green-700); }
       .icon-btn.danger:hover { background:var(--color-coral-bg); color:var(--color-coral-text); }
+      .icon-btn-lg { width:40px; height:40px; border-radius:10px; }
       .pc-opt:has(input[type=radio]:checked) { border-color:var(--color-green-600) !important; background:var(--color-green-50); }
       /* iOS Safari sizes a native date field to its own content and ignores width:100% unless its native look is switched off. */
       .pc-date { -webkit-appearance:none; appearance:none; display:block; box-sizing:border-box; width:100%; min-width:0; max-width:100%; padding:8px 10px !important; font-size:14px; text-align:left; }
@@ -4438,9 +4439,9 @@ function pChores(db) {
                 ${pauseTag ? `<span style="display:inline-block;margin-top:6px;font-family:var(--font-family);font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:99px;background:var(--color-gold-50);color:var(--color-gold-800)">${pauseTag}</span>` : ''}
               </div>
               <div class="flex flex-col gap-1 flex-shrink-0">
-                <button onclick="editChore('${c.id}')" title="Edit" class="icon-btn">${uiIcon('pencil', 15)}</button>
-                ${c.oneOff ? '' : `<button onclick="pauseChore('${c.id}')" title="${paused ? 'Resume' : open ? 'Planned pause' : 'Pause'}" class="icon-btn">${uiIcon(paused ? 'play' : 'pause', 15)}</button>`}
-                <button onclick="deleteChore('${c.id}')" title="Delete" class="icon-btn danger">${uiIcon('trash', 15)}</button>
+                <button onclick="editChore('${c.id}')" title="Edit" class="icon-btn icon-btn-lg">${uiIcon('pencil', 20)}</button>
+                ${c.oneOff ? '' : `<button onclick="pauseChore('${c.id}')" title="${paused ? 'Resume' : open ? 'Planned pause' : 'Pause'}" class="icon-btn icon-btn-lg">${uiIcon(paused ? 'play' : 'pause', 20)}</button>`}
+                <button onclick="deleteChore('${c.id}')" title="Delete" class="icon-btn icon-btn-lg danger">${uiIcon('trash', 20)}</button>
               </div>
             </div>`;
           }).join('')}
