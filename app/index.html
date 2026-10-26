@@ -244,6 +244,7 @@
       }
       .icon-btn:hover { background:var(--color-green-50); color:var(--color-green-700); }
       .icon-btn.danger:hover { background:var(--color-coral-bg); color:var(--color-coral-text); }
+      .pc-opt:has(input[type=radio]:checked) { border-color:var(--color-green-600) !important; background:var(--color-green-50); }
       .stat-card {
         background:var(--color-surface); border:1px solid var(--color-border);
         border-radius:var(--radius-md); box-shadow:var(--shadow-sm); padding:16px 18px;
@@ -1474,6 +1475,8 @@ const UI_ICON_PATHS = {
   help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 4"/><path d="M12 17h.01"/>',
   bag: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
   camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+  pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+  play: '<path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/>',
 };
 function uiIcon(name, size = 16, stroke = 2) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round">${UI_ICON_PATHS[name] || ''}</svg>`;
@@ -2239,9 +2242,12 @@ function weeklyPossible(db, kidId) {
                 const exp = c.expiresOn || '';
                 return (exp >= monStr && exp <= sunStr) ? s + c.value : s;
             }
-            const freq = (!c.schedule || c.schedule === 'daily') ? 7
-                       : c.schedule === 'per_kid' ? choreKidDays(c, kidId).length
-                       : (c.days || []).length;
+            // Counted day by day so paused days drop out of the week's potential.
+            let freq = 0;
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(mon); d.setDate(mon.getDate() + i);
+                if (choreIsForDate(c, d, kidId)) freq++;
+            }
             return s + (c.value * freq);
         }, 0);
 }
@@ -2285,8 +2291,28 @@ function choreScheduleLabel(c, kidId) {
     if (c.days.length === 7) return 'Daily';
     return c.days.join(', ');
 }
+// A paused chore keeps every pause it has ever had ({ from, to }, where `to` is
+// the day it is back on, or null while paused open-ended). Past pauses are
+// never rewritten, so a day that was paused stays paused when missed chores
+// and cycle totals are worked out again later.
+function chorePauses(c) { return Array.isArray(c?.pauses) ? c.pauses : []; }
+function choreIsPausedOn(c, dStr) {
+    return chorePauses(c).some(p => p.from <= dStr && (!p.to || dStr < p.to));
+}
+// The pause a parent can still act on: running now, or planned for later.
+function choreOpenPause(c) {
+    const today = toLocalDateStr(new Date());
+    return chorePauses(c).filter(p => !p.to || p.to > today).sort((a, b) => a.from.localeCompare(b.from))[0] || null;
+}
+function shortDate(dStr) {
+    return new Date(dStr + 'T12:00:00').toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
+}
+function addDaysStr(dStr, n) {
+    const d = new Date(dStr + 'T12:00:00'); d.setDate(d.getDate() + n); return toLocalDateStr(d);
+}
 function choreIsForToday(c, kidId) {
     if (c.oneOff) return c.expiresOn >= toLocalDateStr(new Date());
+    if (choreIsPausedOn(c, toLocalDateStr(new Date()))) return false;
     if (!c.schedule || c.schedule === 'daily') return true;
     const today = DAYS[(new Date().getDay() + 6) % 7];
     if (c.schedule === 'per_kid') return choreKidDays(c, kidId).includes(today);
@@ -2297,6 +2323,7 @@ function toLocalDateStr(d) {
 }
 function choreIsForDate(c, d, kidId) {
     if (c.oneOff) return c.expiresOn === toLocalDateStr(d);
+    if (choreIsPausedOn(c, toLocalDateStr(d))) return false;
     if (!c.schedule || c.schedule === 'daily') return true;
     const day = DAYS[(d.getDay() + 6) % 7];
     if (c.schedule === 'per_kid') return choreKidDays(c, kidId).includes(day);
@@ -4376,6 +4403,9 @@ function pOverview(db) {
 function pChores(db) {
     const todayDate = toLocalDateStr(new Date());
     const visibleChores = db.chores.filter(c => !c.archived && (!c.oneOff || c.expiresOn >= todayDate));
+    // Paused chores sink below the running ones, keeping their order otherwise.
+    const pausedNow = c => !c.oneOff && choreIsPausedOn(c, todayDate);
+    visibleChores.sort((a, b) => pausedNow(a) - pausedNow(b));
     return `
     <div class="flex justify-between items-center mb-4">
       <p class="pr-section-label">Chores</p>
@@ -4390,16 +4420,23 @@ function pChores(db) {
             const valueLine = c.oneOff || !isCycleMode()
                 ? `${who} · ${R(c.value)}${needsValue ? ` <span style="color:var(--color-coral-text);font-weight:700">— needs an amount</span>` : ''}`
                 : `${who} · ${choreWeight(c)}× weighting`;
+            const open = c.oneOff ? null : choreOpenPause(c);
+            const paused = !!open && open.from <= todayDate;
+            const pauseTag = !open ? ''
+                : paused ? (open.to ? `Paused · back on ${shortDate(open.to)}` : 'Paused')
+                : `Pause planned ${shortDate(open.from)}–${shortDate(addDaysStr(open.to, -1))}`;
             return `
             <div class="card flex items-center gap-3">
-              <div style="width:96px;height:96px;background:var(--color-green-50);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${choreIcon(c, 72)}</div>
+              <div style="width:96px;height:96px;background:${paused ? '#f3f4f6' : 'var(--color-green-50)'};border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;${paused ? 'opacity:0.45;filter:grayscale(1)' : ''}">${choreIcon(c, 72)}</div>
               <div class="flex-1 min-w-0">
-                <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary)">${esc(c.name)}</p>
+                <p style="font-family:var(--font-family);font-weight:700;color:${paused ? 'var(--color-text-secondary)' : 'var(--color-text-primary)'}">${esc(c.name)}</p>
                 <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:2px">${valueLine}</p>
-                <p style="font-family:var(--font-family);font-size:12px;color:var(--color-green-600);font-weight:600;margin-top:2px">${c.schedule === 'per_kid' ? esc(chorePerKidLabel(c, db.kids)) : choreScheduleLabel(c)}</p>
+                <p style="font-family:var(--font-family);font-size:12px;color:${paused ? 'var(--color-text-muted)' : 'var(--color-green-600)'};font-weight:600;margin-top:2px">${c.schedule === 'per_kid' ? esc(chorePerKidLabel(c, db.kids)) : choreScheduleLabel(c)}</p>
+                ${pauseTag ? `<span style="display:inline-block;margin-top:6px;font-family:var(--font-family);font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:99px;background:var(--color-gold-50);color:var(--color-gold-800)">${pauseTag}</span>` : ''}
               </div>
               <div class="flex flex-col gap-1 flex-shrink-0">
                 <button onclick="editChore('${c.id}')" title="Edit" class="icon-btn">${uiIcon('pencil', 15)}</button>
+                ${c.oneOff ? '' : `<button onclick="pauseChore('${c.id}')" title="${paused ? 'Resume' : open ? 'Planned pause' : 'Pause'}" class="icon-btn">${uiIcon(paused ? 'play' : 'pause', 15)}</button>`}
                 <button onclick="deleteChore('${c.id}')" title="Delete" class="icon-btn danger">${uiIcon('trash', 15)}</button>
               </div>
             </div>`;
@@ -4840,7 +4877,7 @@ ${faqVideoHTML('android')}` },
     { q: "What are Rewards, and how are they different from chore earnings and bonuses?",
       a: "Rewards are for bigger, one-off goals - an exam mark, a sports achievement, anything worth celebrating - that you set up separately from regular chores. Like chores, a child marks a reward as done and you approve it before the amount is added to their balance. Bonuses, by contrast, are savings milestones that pay out automatically once a child's balance reaches a set amount, with no approval needed." },
     { q: "Can I edit or delete a chore after I've created it?",
-      a: "Yes. Open the Chores tab, tap the pencil icon on any chore to change its name, value, schedule or who it's assigned to, or the trash icon to delete it. Editing a chore doesn't affect chores your child has already completed." },
+      a: "Yes. Open the Chores tab, tap the pencil icon on any chore to change its name, value, schedule or who it's assigned to, the pause icon to take it off the kids' list for a while (now, or for set dates), or the trash icon to delete it. Paused days never count as missed. Editing a chore doesn't affect chores your child has already completed." },
     { q: "What does a chore's weighting (0.5x-2x) mean under Amount per Cycle?",
       a: "Weighting decides how much a chore counts toward a child's overall progress for the cycle, not how much it's worth in money. A chore weighted 2x counts double toward their percentage complete; one weighted 0.5x counts half. It's useful for making bigger or smaller chores count accordingly without assigning them an amount directly." },
     { q: "What happens if I switch from Amount per Cycle to Amount per Chore partway through a cycle?",
@@ -5819,6 +5856,66 @@ function renderModal() {
         </div>`;
     }
 
+    if (type === 'pause-chore') {
+        const c = db.chores.find(x => x.id === data.choreId);
+        const today = toLocalDateStr(new Date());
+        const open = c ? choreOpenPause(c) : null;
+        const planned = open && open.from > today;
+        const who = c ? `${choreAssignmentLabel(c, db.kids)} · ${c.schedule === 'per_kid' ? 'Per kid' : choreScheduleLabel(c)}` : '';
+        const optStyle = 'display:block;border:1.5px solid var(--color-border);border-radius:14px;padding:12px 14px;margin-bottom:10px;cursor:pointer';
+        const optTitle = 'font-family:var(--font-family);font-weight:800;font-size:15px;color:var(--color-text-primary)';
+        const optNote  = 'font-family:var(--font-family);font-size:12.5px;color:var(--color-text-secondary);margin:6px 0 0 26px;line-height:1.45';
+        const dateLbl  = 'font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:4px';
+        const datesBlock = (from, backOn) => `
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin:10px 0 0 26px">
+            <div><p style="${dateLbl}">Pause from</p><input id="pc-from" type="date" min="${today}" value="${from}" onfocus="pickPauseOpt('dates')" oninput="pauseDatesNote()" style="width:100%;min-width:0;padding:8px 10px !important;font-size:14px"></div>
+            <div><p style="${dateLbl}">Back on</p><input id="pc-back" type="date" min="${addDaysStr(today, 1)}" value="${backOn}" onfocus="pickPauseOpt('dates')" oninput="pauseDatesNote()" style="width:100%;min-width:0;padding:8px 10px !important;font-size:14px"></div>
+          </div>
+          <p id="pc-dates-note" style="${optNote}">${pauseDatesText(from, backOn)}</p>`;
+        const footNote = `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-muted);margin:4px 0 16px">Paused days won't count as missed or affect pocket money.</p>`;
+        if (!open || planned) {
+            body = `
+            <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:2px">${planned ? 'Planned pause' : 'Pause'} “${esc(c?.name)}”</h3>
+            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:14px">${esc(who)}</p>
+            ${planned ? '' : `
+            <label class="pc-opt" data-opt="now" style="${optStyle}">
+              <div style="display:flex;align-items:center;gap:10px"><input type="radio" name="pc-opt" value="now" checked onchange="pickPauseOpt('now')" style="width:16px;height:16px;accent-color:var(--color-green-600)"><span style="${optTitle}">Pause from now</span></div>
+              <p style="${optNote}">Comes off the kids' chore list today and stays off until you resume it.</p>
+            </label>`}
+            <label class="pc-opt" data-opt="dates" style="${optStyle}">
+              <div style="display:flex;align-items:center;gap:10px"><input type="radio" name="pc-opt" value="dates" ${planned ? 'checked' : ''} onchange="pickPauseOpt('dates')" style="width:16px;height:16px;accent-color:var(--color-green-600)"><span style="${optTitle}">${planned ? 'Change the dates' : 'Pause for set dates'}</span></div>
+              ${datesBlock(planned ? open.from : addDaysStr(today, 1), planned && open.to ? open.to : addDaysStr(today, 8))}
+            </label>
+            ${footNote}
+            <p id="pc-error" style="font-family:var(--font-family);font-size:13px;color:var(--color-coral-text);margin:-8px 0 12px;display:none"></p>
+            <div style="display:flex;gap:8px">
+              ${planned
+                ? `<button onclick="cancelPlannedPause('${data.choreId}')" class="btn-outline flex-1" style="padding:10px">Cancel pause</button>
+                   <button onclick="savePauseChore('${data.choreId}')" class="btn-primary flex-1" style="padding:10px">Save dates</button>`
+                : `<button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+                   <button onclick="savePauseChore('${data.choreId}')" class="btn-primary flex-1" style="padding:10px">Pause chore</button>`}
+            </div>`;
+        } else {
+            const since = open.from === today ? 'Paused since today' : `Paused since ${shortDate(open.from)}`;
+            body = `
+            <h3 style="font-family:var(--font-family);font-size:18px;font-weight:800;color:var(--color-text-primary);margin-bottom:2px">Resume “${esc(c?.name)}”</h3>
+            <p style="font-family:var(--font-family);font-size:13px;color:var(--color-text-secondary);margin-bottom:14px">${since}${open.to ? ` · back on ${shortDate(open.to)}` : ''}</p>
+            <label class="pc-opt" data-opt="now" style="${optStyle}">
+              <div style="display:flex;align-items:center;gap:10px"><input type="radio" name="pc-opt" value="now" checked onchange="pickPauseOpt('now')" style="width:16px;height:16px;accent-color:var(--color-green-600)"><span style="${optTitle}">Resume now</span></div>
+              <p style="${optNote}">Back on the kids' chore list today.</p>
+            </label>
+            <label class="pc-opt" data-opt="dates" style="${optStyle}">
+              <div style="display:flex;align-items:center;gap:10px"><input type="radio" name="pc-opt" value="dates" onchange="pickPauseOpt('dates')" style="width:16px;height:16px;accent-color:var(--color-green-600)"><span style="${optTitle}">Resume on a date</span></div>
+              <div style="margin:10px 0 0 26px;width:calc(50% - 17px)"><p style="${dateLbl}">Back on</p><input id="pc-back" type="date" min="${addDaysStr(today, 1)}" value="${open.to || addDaysStr(today, 1)}" onfocus="pickPauseOpt('dates')" style="width:100%;min-width:0;padding:8px 10px !important;font-size:14px"></div>
+            </label>
+            <p id="pc-error" style="font-family:var(--font-family);font-size:13px;color:var(--color-coral-text);margin:0 0 12px;display:none"></p>
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+              <button onclick="saveResumeChore('${data.choreId}')" class="btn-primary flex-1" style="padding:10px">Resume chore</button>
+            </div>`;
+        }
+    }
+
     if (type === 'missed-history') {
         const allMissed = db.completions.filter(c => c.missed).sort((a,b) => (b.dueDate||'').localeCompare(a.dueDate||''));
         const rows = allMissed.map(c => missedChoreRow(c, db)).join('');
@@ -6214,6 +6311,87 @@ async function saveChore(id) {
     }
     closeModal(); toast('Saved!');
 }
+// ─── PAUSE / RESUME A CHORE ──────────────────────────────────────
+function pauseChore(id) { openModal('pause-chore', { choreId: id }); }
+function pickPauseOpt(opt) {
+    const r = document.querySelector(`input[name="pc-opt"][value="${opt}"]`);
+    if (r) r.checked = true;
+    const err = document.getElementById('pc-error');
+    if (err) err.style.display = 'none';
+}
+function pauseDatesText(from, backOn) {
+    if (!from || !backOn) return 'Pick both dates.';
+    if (backOn <= from) return 'The “back on” date has to be after the pause starts.';
+    const last = addDaysStr(backOn, -1);
+    const span = last === from ? `on ${shortDate(from)}` : `from ${shortDate(from)} to ${shortDate(last)}`;
+    return `Off the kids' chore list ${span}. Back on ${shortDate(backOn)} by itself.`;
+}
+function pauseDatesNote() {
+    const n = document.getElementById('pc-dates-note');
+    if (n) n.textContent = pauseDatesText(document.getElementById('pc-from')?.value, document.getElementById('pc-back')?.value);
+}
+function pauseError(msg) {
+    const err = document.getElementById('pc-error');
+    if (err) { err.textContent = msg; err.style.display = 'block'; }
+}
+async function writeChorePauses(id, pauses, okMsg) {
+    const { error } = await sb.from('chores').update({ pauses }).eq('id', id).eq('user_id', currentUser.id);
+    if (error) { toast('Could not save. Try again.', 'error'); return false; }
+    const c = cache.chores.find(x => x.id === id);
+    if (c) c.pauses = pauses;
+    closeModal();
+    toast(okMsg, 'success');
+    return true;
+}
+async function savePauseChore(id) {
+    const c = cache.chores.find(x => x.id === id);
+    if (!c) return;
+    const today = toLocalDateStr(new Date());
+    const opt = document.querySelector('input[name="pc-opt"]:checked')?.value;
+    const open = choreOpenPause(c);
+    // Only a planned (not yet started) pause can be here; it's replaced, never added to.
+    const rest = chorePauses(c).filter(p => p !== open);
+    let pause;
+    if (opt === 'now') {
+        pause = { from: today, to: null };
+    } else {
+        const from = document.getElementById('pc-from')?.value;
+        const to   = document.getElementById('pc-back')?.value;
+        if (!from || !to) return pauseError('Pick a start date and a “back on” date.');
+        if (from < today) return pauseError('The pause can’t start in the past.');
+        if (to <= from) return pauseError('The “back on” date has to be after the pause starts.');
+        pause = { from, to };
+    }
+    const ok = await writeChorePauses(id, [...rest, pause],
+        pause.from === today ? 'Chore paused.' : `Pause planned from ${shortDate(pause.from)}.`);
+    if (ok) track('chore_paused', { kind: pause.to ? 'dates' : 'open', starts_today: pause.from === today, replanned: !!open });
+}
+async function cancelPlannedPause(id) {
+    const c = cache.chores.find(x => x.id === id);
+    const open = c && choreOpenPause(c);
+    if (!open) return closeModal();
+    const ok = await writeChorePauses(id, chorePauses(c).filter(p => p !== open), 'Planned pause cancelled.');
+    if (ok) track('chore_pause_cancelled');
+}
+async function saveResumeChore(id) {
+    const c = cache.chores.find(x => x.id === id);
+    const open = c && choreOpenPause(c);
+    if (!open) return closeModal();
+    const today = toLocalDateStr(new Date());
+    const opt = document.querySelector('input[name="pc-opt"]:checked')?.value;
+    let to = today;
+    if (opt === 'dates') {
+        to = document.getElementById('pc-back')?.value;
+        if (!to || to <= today) return pauseError('Pick a date after today, or choose “Resume now”.');
+    }
+    const rest = chorePauses(c).filter(p => p !== open);
+    // Paused and resumed on the same day: nothing was really paused, so drop it
+    // rather than keep an empty pause on record.
+    const pauses = (open.from >= to) ? rest : [...rest, { from: open.from, to }];
+    const ok = await writeChorePauses(id, pauses, to === today ? 'Chore resumed.' : `Chore back on ${shortDate(to)}.`);
+    if (ok) track('chore_resumed', { kind: opt === 'dates' ? 'date' : 'now' });
+}
+
 function deleteChore(id) {
     openModal('confirm-delete', { msg: 'Delete this chore?', onConfirm: `doDeleteChore('${id}')` });
 }
