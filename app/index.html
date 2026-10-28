@@ -1251,18 +1251,32 @@ function byParent(id) {
     const p = parentProfiles.find(x => x.id === id);
     return p ? ` · ${esc(p.name)}` : '';
 }
+// Supabase hands back at most 1,000 rows per request, so a busy family's
+// completions (and later transactions) silently lost their newest rows: ticked
+// chores showed as not done, and tapping Done again hit the duplicate guard.
+// Read the family's rows in pages, ordered by id so no page skips or repeats.
+const PAGE_SIZE = 1000;
+async function selectAllForUser(table, uid) {
+    const rows = [];
+    for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await sb.from(table).select('*').eq('user_id', uid).order('id').range(from, from + PAGE_SIZE - 1);
+        if (error) return { data: rows.length ? rows : null, error };
+        rows.push(...(data || []));
+        if (!data || data.length < PAGE_SIZE) return { data: rows, error: null };
+    }
+}
 async function loadCache() {
     const uid = currentUser.id;
     const [kRes, cRes, compRes, txRes, bmRes, rwRes, rcRes, distRes, chRes, pinRes, profilesOk] = await Promise.all([
         sb.from('kids').select('id,user_id,name,emoji,balance,created_at,color_key,date_of_birth,last_distribution_at,cycle_amount,cycle_amount_pending').eq('user_id', uid),
         sb.from('chores').select('*').eq('user_id', uid),
-        sb.from('completions').select('*').eq('user_id', uid),
-        sb.from('transactions').select('*').eq('user_id', uid),
+        selectAllForUser('completions', uid),
+        selectAllForUser('transactions', uid),
         sb.from('bonus_milestones').select('*').eq('user_id', uid),
         sb.from('rewards').select('*').eq('user_id', uid),
-        sb.from('reward_completions').select('*').eq('user_id', uid),
-        sb.from('distributions').select('*').eq('user_id', uid),
-        sb.from('cycle_history').select('*').eq('user_id', uid),
+        selectAllForUser('reward_completions', uid),
+        selectAllForUser('distributions', uid),
+        selectAllForUser('cycle_history', uid),
         sb.rpc('has_parent_pin'),
         loadParentProfiles(),
     ]);
@@ -2424,7 +2438,15 @@ async function writeMissedChores(kidId) {
         }
     }
     if (inserts.length) {
-        await sb.from('completions').insert(inserts);
+        const { error } = await sb.from('completions').insert(inserts);
+        // One row already on record (e.g. written by another device) fails the
+        // whole batch, so retry row by row and drop only the ones that clash.
+        if (error) {
+            for (const rec of inserts) {
+                const { error: rowError } = await sb.from('completions').insert(rec);
+                if (rowError) cache.completions = cache.completions.filter(c => c.id !== rec.id);
+            }
+        }
         render();
     }
 }
@@ -6787,6 +6809,15 @@ async function markDone(choreId, evt) {
     const { error } = await sb.from('completions').insert({ id, user_id: currentUser.id, chore_id: choreId, kid_id: S.kidId, completed_at: completedAt, due_date: dueDate, approved: false, rejected: false, missed: false });
     if (error) {
         cache.completions = cache.completions.filter(c => c.id !== id);
+        // Already recorded for today (another device, or this one was out of date):
+        // pull that row in and show it as done rather than blaming the connection.
+        if (error.code === '23505') {
+            const { data: existing } = await sb.from('completions').select('*')
+                .eq('user_id', currentUser.id).eq('chore_id', choreId).eq('kid_id', S.kidId).eq('due_date', dueDate).eq('rejected', false).maybeSingle();
+            if (existing) cache.completions.push({ ...existing, choreId: existing.chore_id, kidId: existing.kid_id, completedAt: existing.completed_at, dueDate: existing.due_date || null, missed: existing.missed || false });
+            render();
+            return toast('Already marked as done today.', 'waiting');
+        }
         render();
         return toast('Could not save. Check your connection.', 'error');
     }
