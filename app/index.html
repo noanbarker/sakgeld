@@ -2303,7 +2303,11 @@ function weeklyEarned(db, kidId) {
         // Counted against weeklyPossible, which is built from the chore schedule —
         // so this side has to be keyed on the assigned date too, or a Sunday chore
         // approved on Monday lands in the wrong week's total.
-        .filter(t => t.kidId === kidId && t.type === 'chore' && new Date(txDate(t)) >= mon)
+        // The payout from switching off per-cycle mid-week counts too (it's what
+        // the chores done before the switch earned), or the week reads R0 right
+        // after switching. Only that payout carries a chore_date — a normal cycle
+        // close-out pays for a cycle already over, so it stays out.
+        .filter(t => t.kidId === kidId && (t.type === 'chore' || (t.type === 'cycle_allowance' && t.choreDate)) && new Date(txDate(t)) >= mon)
         .reduce((s, t) => s + t.amount, 0);
 }
 function weeklyPossible(db, kidId) {
@@ -4424,7 +4428,17 @@ function pOverview(db) {
     const missedRows = missed.map(c => missedChoreRow(c, db)).join('');
     const hasMissedHistory = db.completions.some(c => c.missed);
 
+    // Per-cycle kids with no amount set earn R0 when the cycle closes, however
+    // many chores they do — and nothing else on screen says why.
+    const noAmountKids = cycleMode ? db.kids.filter(k => !k.cycle_amount) : [];
+    const noAmountBanner = noAmountKids.length === 0 ? '' : `
+    <div class="card mb-4" style="display:flex;align-items:center;gap:12px;background:var(--color-coral-bg);border-color:var(--color-coral-border)">
+      <p class="flex-1" style="font-family:var(--font-family);font-size:13px;font-weight:600;color:var(--color-coral-text)">${esc(noAmountKids.map(k => k.name).join(', ').replace(/, ([^,]*)$/, ' and $1'))} ${noAmountKids.length === 1 ? 'has' : 'have'} no ${CYCLE_PERIOD_LABELS[getCyclePeriod()].toLowerCase()} amount set, so they'll earn ${R(0)} when this cycle ends.</p>
+      <button onclick="${noAmountKids.length === 1 ? `editKid('${noAmountKids[0].id}')` : `setTab('kids')`}" class="chip-btn" style="flex-shrink:0">Set amount${noAmountKids.length === 1 ? '' : 's'}</button>
+    </div>`;
+
     return `
+    ${noAmountBanner}
     <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
       <button onclick="openModal('quick-task')" class="btn-primary" style="width:auto;padding:9px 18px;font-size:13px;display:flex;align-items:center;gap:6px">
         ${uiIcon('zap', 14)}
@@ -4578,7 +4592,8 @@ function pKids(db) {
                 <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
                   <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">Cycle amount</p>
                   <p style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-primary)">${R(k.cycle_amount)}${k.cycle_amount_pending != null ? ` <span style="color:var(--color-text-muted)">(then ${R(k.cycle_amount_pending)})</span>` : ''}</p>
-                </div>` : ''}
+                </div>
+                ${!k.cycle_amount ? `<p style="font-family:var(--font-family);font-size:12px;font-weight:700;color:var(--color-coral-text);margin:-4px 0 8px">Needs an amount, or ${esc(k.name)} earns nothing this cycle. Tap edit to set it.</p>` : ''}` : ''}
                 <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
                   <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${statLabel}</p>
                   <p style="font-family:var(--font-family);font-size:12px;font-weight:600;color:var(--color-text-primary)">${statValue}</p>
@@ -6276,7 +6291,9 @@ async function addKid() {
     cache.kids.push({ id, name, emoji, color_key, date_of_birth, balance: 0, ...cycleFields });
     trackLoops('child_added', { childrenCount: cache.kids.length });
     track('child_added', { kids_count: cache.kids.length });
-    closeModal(); toast(`${name} added!`, 'success');
+    closeModal();
+    if (isCycleMode() && !cycleFields.cycle_amount) return toast(`${name} added, but their amount is ${R(0)}, so they'll earn nothing this cycle. Tap edit to set it.`, 'warn');
+    toast(`${name} added!`, 'success');
 }
 // Reads the cycle-amount modal fields when in per-cycle mode; {} otherwise so
 // the insert/update below leaves those columns untouched in per-chore mode.
@@ -6309,7 +6326,9 @@ async function saveKid(id) {
     }
     const k = cache.kids.find(x => x.id === id);
     if (k) { k.name = name; k.emoji = emoji; k.color_key = color_key; k.date_of_birth = date_of_birth; Object.assign(k, cycleFields); }
-    closeModal(); toast('Saved!');
+    closeModal();
+    if (isCycleMode() && !cycleFields.cycle_amount) return toast(`Saved, but ${name}'s amount is ${R(0)}, so they'll earn nothing this cycle.`, 'warn');
+    toast('Saved!');
 }
 function deleteKid(id) {
     const k = cache.kids.find(x => x.id === id);
@@ -6981,9 +7000,10 @@ async function confirmSwitchToPerChore() {
             const newBalance = (kid.balance || 0) + amountPaid;
             const txId = uid();
             await sb.from('kids').update({ balance: newBalance }).eq('id', kid.id).eq('user_id', currentUser.id);
-            await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kid.id, amount: amountPaid, type: 'cycle_allowance', description: desc, created_at: createdAt });
+            // chore_date marks this as an early close, so weeklyEarned counts it in this week.
+            await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kid.id, amount: amountPaid, type: 'cycle_allowance', description: desc, created_at: createdAt, chore_date: today });
             kid.balance = newBalance;
-            cache.transactions.push({ actioned_by: actionedBy(), id: txId, kidId: kid.id, amount: amountPaid, type: 'cycle_allowance', description: desc, createdAt });
+            cache.transactions.push({ actioned_by: actionedBy(), id: txId, kidId: kid.id, amount: amountPaid, type: 'cycle_allowance', description: desc, createdAt, choreDate: today });
         }
         await sb.from('cycle_history').insert({ id: historyId, user_id: currentUser.id, kid_id: kid.id, period_type: period, start_date: anchor, end_date: today, weight_completed: completed, weight_assigned: assigned, percent: pct, amount_ceiling: ceiling, amount_paid: amountPaid, created_at: createdAt });
         cache.cycleHistory.push({ id: historyId, kidId: kid.id, periodType: period, startDate: anchor, endDate: today, weightCompleted: completed, weightAssigned: assigned, percent: pct, amountCeiling: ceiling, amountPaid: amountPaid, createdAt });
