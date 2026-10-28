@@ -17,6 +17,7 @@ const { trackSubscriptionChange } = require('../lib/posthog');
 // Meta StartTrial: shared event_id with the browser Pixel, plus match keys.
 const { sendStartTrialConversion } = require('../lib/meta-attribution');
 const { startPaidSubscription, liveSubscription } = require('../lib/paystack-restart');
+const { isCardUpdate, applyCardUpdate } = require('../lib/paystack-card-update');
 
 // South African subscription rail. The rest of the world is billed by Paddle
 // (api/paddle-webhook.js) and nothing here touches those customers.
@@ -276,6 +277,16 @@ async function restartFromNewCard(supabaseAdmin, data) {
   if (!done) throw new Error('restart could not reopen the account');
 }
 
+// The R1 check from Paystack's own manage-subscription page, when a parent
+// adds a new card there. See lib/paystack-card-update.js.
+async function handleCardUpdate(supabaseAdmin, data) {
+  const customerCode = data.customer && data.customer.customer_code;
+  if (!customerCode) return;
+  const userId = await findUserIdByCustomerCode(supabaseAdmin, customerCode);
+  if (!userId) return;
+  await applyCardUpdate(supabaseAdmin, userId, data);
+}
+
 // A subscription charge went through — either the first one at the end of the
 // trial, or a later renewal.
 async function handleSubscriptionCharge(supabaseAdmin, data) {
@@ -430,6 +441,8 @@ module.exports = async (req, res) => {
         await startTrialFromCardSetup(supabaseAdmin, data);
       } else if (purpose === 'restart_card') {
         await restartFromNewCard(supabaseAdmin, data);
+      } else if (isCardUpdate(data)) {
+        await handleCardUpdate(supabaseAdmin, data);
       } else if (data.plan && data.plan.plan_code) {
         await handleSubscriptionCharge(supabaseAdmin, data);
       }

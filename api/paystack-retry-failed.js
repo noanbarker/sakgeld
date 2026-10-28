@@ -22,9 +22,16 @@ const PLAN_AMOUNTS_KOBO = { monthly: 5900, yearly: 59000 };
 // code banked at sign-up would go on charging the card that just failed.
 // Asking Paystack for the subscription's current card each time avoids that.
 // Falls back to the stored code if Paystack can't be reached.
+//
+// In practice that page does NOT swap the card on the subscription, so the
+// webhook banks the new card itself (lib/paystack-card-update.js). A card
+// added since the payment failed is the one to charge, whatever the
+// subscription still says.
 async function currentAuthorizationCode(meta) {
   const stored = meta.paystack_authorization_code;
   if (!meta.paystack_subscription_code) return stored;
+  if (meta.paystack_card_updated_at && meta.payment_failed_at
+    && new Date(meta.paystack_card_updated_at) > new Date(meta.payment_failed_at)) return stored;
   try {
     const res = await fetch(`https://api.paystack.co/subscription/${encodeURIComponent(meta.paystack_subscription_code)}`, {
       headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
