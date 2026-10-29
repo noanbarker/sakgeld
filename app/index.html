@@ -4391,8 +4391,44 @@ function pOverview(db) {
         return s + (cycleMode && !ch.oneOff ? 0 : (ch.value || 0));
     }, 0);
     const ringR = 37, ringC = 2 * Math.PI * ringR, ringOffset = ringC * (1 - weekPct / 100);
+    // Mobile: one tile split by dividers (mirrors the kid dashboard); tablet/desktop keep three tiles.
+    const mRingR = 26, mRingC = 2 * Math.PI * mRingR, mRingOffset = mRingC * (1 - weekPct / 100);
     const weeklyCard  = db.kids.length === 0 ? '' : `
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+    <div class="card md:hidden mb-6" style="background:#dcfce7;border:1.5px solid #16a34a">
+     <div style="display:flex;align-items:stretch;gap:12px">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center">
+        <p class="pr-section-label" style="color:var(--color-green-700)">${statCardLabel}</p>
+        <div style="position:relative;width:64px;height:64px">
+          <svg width="64" height="64" viewBox="0 0 64 64" style="transform:rotate(-90deg)">
+            <circle cx="32" cy="32" r="${mRingR}" fill="none" stroke="#ffffff" stroke-width="8"/>
+            <circle cx="32" cy="32" r="${mRingR}" fill="none" stroke="var(--color-green-500)" stroke-width="8"
+              stroke-linecap="round"
+              stroke-dasharray="${mRingC.toFixed(2)}"
+              stroke-dashoffset="${mRingOffset.toFixed(2)}"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
+            <p style="font-family:var(--font-family);font-size:14px;font-weight:800;color:var(--color-green-700);line-height:1">${weekPct}%</p>
+          </div>
+        </div>
+        <p style="font-family:var(--font-family);font-size:13px;font-weight:800;color:var(--color-green-700)">${statCardFooter}</p>
+      </div>
+      <div style="width:1px;background:rgba(255,255,255,0.9)"></div>
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;text-align:center;min-width:0">
+        <div>
+          <p class="pr-section-label" style="color:#be123c">Pending</p>
+          <p style="font-family:var(--font-family);font-size:22px;font-weight:800;color:#f43f5e;line-height:1.1;margin-top:2px">${pending.length}</p>
+          <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">${pendingValue > 0 ? `Worth ${R(pendingValue)}` : 'Waiting for review'}</p>
+        </div>
+        <div style="height:1px;background:rgba(255,255,255,0.9);margin:10px 0"></div>
+        <div>
+          <p class="pr-section-label" style="color:#1d4ed8">Balances</p>
+          <p style="font-family:var(--font-family);font-size:20px;font-weight:800;color:var(--color-text-primary);line-height:1.1;margin-top:2px">${R(totalBalances)}</p>
+          <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary)">Held for the kids</p>
+        </div>
+      </div>
+     </div>
+    </div>
+    <div class="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
       <div class="stat-card" style="grid-column: span 2 / span 2; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center; background:#dcfce7; border-color:#16a34a">
         <p class="pr-section-label">${statCardLabel}</p>
         <div style="position:relative;width:88px;height:88px">
