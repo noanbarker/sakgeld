@@ -456,6 +456,7 @@
 
         /* Card padding */
         .card { padding: 14px !important; }
+        .card.card-flush { padding: 0 !important; }
 
         /* Weekly summary card: full width on mobile */
         .sp-weekly-card { max-width: 100% !important; }
@@ -4317,7 +4318,7 @@ function pOverview(db) {
             </div>`;
         }).join('');
         return `
-        <div class="card" style="padding:0;overflow:hidden">
+        <div class="card card-flush" style="padding:0;overflow:hidden;border:1.5px solid ${ac.border}">
           <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:${ac.bg};border-bottom:1.5px solid ${ac.border}">
             <div style="width:48px;height:48px;background:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;border:1.5px solid ${ac.border}">${kidIcon(k)}</div>
             <div class="flex-1">
@@ -4355,7 +4356,7 @@ function pOverview(db) {
             </div>`;
         }).join('');
         return `
-        <div class="card" style="padding:0;overflow:hidden">
+        <div class="card card-flush" style="padding:0;overflow:hidden;border:1.5px solid ${ac.border}">
           <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:${ac.bg};border-bottom:1.5px solid ${ac.border}">
             <div style="width:48px;height:48px;background:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;border:1.5px solid ${ac.border}">${kidIcon(k)}</div>
             <div class="flex-1">
