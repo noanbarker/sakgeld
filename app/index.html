@@ -2363,6 +2363,7 @@ function choreScheduleLabel(c, kidId) {
         return `Until ${d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}`;
     }
     if (!c.schedule || c.schedule === 'daily') return 'Daily';
+    if (c.schedule === 'repeat') return c.repeat ? repeatLabel(c, kidId) : 'No days set';
     if (c.schedule === 'per_kid') {
         if (!kidId) return 'Per kid';
         const kd = sortDays(choreKidDays(c, kidId));
@@ -2393,8 +2394,124 @@ function shortDate(dStr) {
 function addDaysStr(dStr, n) {
     const d = new Date(dStr + 'T12:00:00'); d.setDate(d.getDate() + n); return toLocalDateStr(d);
 }
+// ─── REPEATING CHORES ────────────────────────────────────────────
+// A 'repeat' chore keeps its settings in c.repeat (shape in the
+// add_chore_repeat migration). Its periods are Mon–Sun weeks, fortnights
+// counted from the Monday of repeat.start, or calendar months.
+// A set-day chore is on one day of each period. An anytime chore is on every
+// day until it's ticked off: its record is dated the day it was done, or — if
+// nobody gets to it — the period's last day, which is when it turns missed.
+// That keeps the one-record-per-day model every total is built on: weekly
+// potential, missed chores and cycle progress all just ask "is it on this day?".
+const REPEAT_NTH_LABELS = { 1: 'First', 2: 'Second', 3: 'Third', 4: 'Fourth', '-1': 'Last' };
+function mondayOf(dStr) { return addDaysStr(dStr, -((new Date(dStr + 'T12:00:00').getDay() + 6) % 7)); }
+function daysBetween(aStr, bStr) { return Math.round((new Date(bStr + 'T12:00:00') - new Date(aStr + 'T12:00:00')) / 86400000); }
+// The period dStr falls in, or null before the chore's first period.
+function repeatPeriod(r, dStr) {
+    let p;
+    if (r.every === 'month') {
+        const d = new Date(dStr + 'T12:00:00');
+        p = { start: toLocalDateStr(new Date(d.getFullYear(), d.getMonth(), 1)), end: toLocalDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 0)) };
+    } else if (r.every === '2weeks') {
+        const anchor = mondayOf(r.start), gap = daysBetween(anchor, dStr);
+        if (gap < 0) return null;
+        const start = addDaysStr(anchor, Math.floor(gap / 14) * 14);
+        return { start, end: addDaysStr(start, 13) };
+    } else {
+        const start = mondayOf(dStr);
+        p = { start, end: addDaysStr(start, 6) };
+    }
+    return p.end < r.start ? null : p;
+}
+// "Sun 1 Nov" — the browser's en-ZA style pads the day and adds a comma.
+function dayDateLabel(dStr) {
+    const d = new Date(dStr + 'T12:00:00');
+    return `${DAYS[(d.getDay() + 6) % 7]} ${d.getDate()} ${d.toLocaleDateString('en-ZA', { month: 'short' })}`;
+}
+function repeatNextPeriod(r, p) { return repeatPeriod(r, addDaysStr(p.end, 1)); }
+// The set day inside a period: that weekday in a week (the first week of a
+// fortnight), or the nth / last such weekday of a month.
+function repeatDayIn(r, p) {
+    const wd = DAYS.indexOf(r.day);
+    if (r.every !== 'month') return addDaysStr(p.start, wd);
+    if (+r.nth === -1) {
+        const back = ((new Date(p.end + 'T12:00:00').getDay() + 6) % 7 - wd + 7) % 7;
+        return addDaysStr(p.end, -back);
+    }
+    const ahead = (wd - (new Date(p.start + 'T12:00:00').getDay() + 6) % 7 + 7) % 7;
+    return addDaysStr(p.start, ahead + 7 * ((+r.nth || 1) - 1));
+}
+function repeatRecords(c, p, kidId) {
+    return cache.completions.filter(x => x.choreId === c.id && !x.rejected && (kidId == null || x.kidId === kidId) && x.dueDate >= p.start && x.dueDate <= p.end);
+}
+// A period a pause swallows: the set day was paused, or an anytime chore was
+// still paused when its period ended without anyone having done it.
+function repeatSkipped(c, p) {
+    if (c.repeat.when === 'day') return choreIsPausedOn(c, repeatDayIn(c.repeat, p));
+    return choreIsPausedOn(c, p.end) && repeatRecords(c, p).length === 0;
+}
+// Rotation order: the saved order, limited to who's still assigned, with any
+// newly assigned kid joining at the back.
+function repeatOrder(c) {
+    const assigned = cache.kids.filter(k => choreAssignedTo(c, k.id)).map(k => k.id);
+    const saved = (c.repeat.order || []).filter(id => assigned.includes(id));
+    return [...saved, ...assigned.filter(id => !saved.includes(id))];
+}
+// Whose turn a period is, or null when everyone assigned does it. Skipped
+// periods don't use up a turn, so after a pause the kid who was up is still up;
+// a missed period does, so missing it never gets anyone out of their turn.
+function repeatTurnKid(c, p) {
+    const order = repeatOrder(c);
+    if (!c.repeat.turns || order.length < 2) return null;
+    let n = 0;
+    for (let q = repeatPeriod(c.repeat, c.repeat.start); q && q.start < p.start; q = repeatNextPeriod(c.repeat, q)) {
+        if (!repeatSkipped(c, q)) n++;
+    }
+    return order[n % order.length];
+}
+function repeatIsForDate(c, dStr, kidId) {
+    const r = c.repeat, p = repeatPeriod(r, dStr);
+    if (!p) return false;
+    const turn = repeatTurnKid(c, p);
+    if (turn && turn !== kidId) return false;
+    if (r.when === 'day') return dStr === repeatDayIn(r, p) && !choreIsPausedOn(c, dStr);
+    const rec = repeatRecords(c, p, kidId)[0];
+    if (rec) return rec.dueDate === dStr;
+    return dStr === p.end && !choreIsPausedOn(c, p.end);
+}
+function repeatIsForToday(c, kidId) {
+    const r = c.repeat, today = toLocalDateStr(new Date()), p = repeatPeriod(r, today);
+    if (!p || choreIsPausedOn(c, today)) return false;
+    const turn = repeatTurnKid(c, p);
+    if (turn && turn !== kidId) return false;
+    if (r.when === 'day') return today === repeatDayIn(r, p);
+    const rec = repeatRecords(c, p, kidId)[0];
+    return !rec || rec.dueDate === today;
+}
+function repeatLabel(c, kidId) {
+    const r = c.repeat;
+    let s;
+    if (r.when === 'anytime') {
+        s = r.every === 'month' ? 'Once a month' : r.every === '2weeks' ? 'Once every 2 weeks' : 'Once a week';
+        const p = kidId && repeatPeriod(r, toLocalDateStr(new Date()));
+        if (p) s += ` · due ${dayDateLabel(p.end)}`;
+    } else {
+        s = r.every === 'month' ? `Monthly · ${REPEAT_NTH_LABELS[r.nth] || 'First'} ${r.day}`
+          : r.every === '2weeks' ? `Every 2 weeks · ${r.day}` : `Every ${r.day}`;
+    }
+    if (r.turns && repeatOrder(c).length > 1) {
+        if (kidId) s += ' · your turn';
+        else {
+            const p = repeatPeriod(r, toLocalDateStr(new Date())) || repeatPeriod(r, r.start);
+            const kid = p && cache.kids.find(k => k.id === repeatTurnKid(c, p));
+            s += kid ? ` · ${kid.name}'s turn` : ' · taking turns';
+        }
+    }
+    return s;
+}
 function choreIsForToday(c, kidId) {
     if (c.oneOff) return c.expiresOn >= toLocalDateStr(new Date());
+    if (c.schedule === 'repeat' && c.repeat) return repeatIsForToday(c, kidId);
     if (choreIsPausedOn(c, toLocalDateStr(new Date()))) return false;
     if (!c.schedule || c.schedule === 'daily') return true;
     const today = DAYS[(new Date().getDay() + 6) % 7];
@@ -2406,6 +2523,7 @@ function toLocalDateStr(d) {
 }
 function choreIsForDate(c, d, kidId) {
     if (c.oneOff) return c.expiresOn === toLocalDateStr(d);
+    if (c.schedule === 'repeat' && c.repeat) return repeatIsForDate(c, toLocalDateStr(d), kidId);
     if (choreIsPausedOn(c, toLocalDateStr(d))) return false;
     if (!c.schedule || c.schedule === 'daily') return true;
     const day = DAYS[(d.getDay() + 6) % 7];
@@ -2641,6 +2759,8 @@ function openModal(type, data = {}) {
                        ? Object.fromEntries(Object.entries(data.days).map(([k, v]) => [k, [...v]]))
                        : {};
     S.selectedWeight   = data.weight == null ? 1 : (+data.weight || 1);
+    S.selectedRepeat   = data.repeat ? { ...data.repeat, order: [...(data.repeat.order || [])] }
+                       : { every: 'week', when: 'day', day: 'Sat', nth: 1, start: mondayOf(toLocalDateStr(new Date())), turns: false, order: [] };
     if (type === 'quick-task') {
         S.selectedKids = [];
     } else if (type === 'add-bonus') {
@@ -2760,6 +2880,99 @@ async function pickChorePhoto(input) {
 function clearChorePhoto() { snapModalInputs(); resetChorePhotoState(); render(); }
 function setSchedule(s) { snapModalInputs(); S.selectedSchedule = s; render(); }
 function setWeight(w) { snapModalInputs(); S.selectedWeight = w; render(); }
+function setRepeat(field, value) { snapModalInputs(); S.selectedRepeat = { ...S.selectedRepeat, [field]: value }; render(); }
+// Moves a kid one place up the take-turns order (the first kid goes first).
+function moveRepeatKid(kidId) {
+    snapModalInputs();
+    const order = repeatFormOrder(DB.load().kids);
+    const i = order.indexOf(kidId);
+    if (i > 0) [order[i - 1], order[i]] = [order[i], order[i - 1]];
+    S.selectedRepeat = { ...S.selectedRepeat, order };
+    render();
+}
+// The take-turns order as the form shows it: the saved order for kids still
+// picked under "Assigned to", then anyone newly picked.
+function repeatFormOrder(kids) {
+    const ids = choreRotaKids(kids).map(k => k.id);
+    const saved = (S.selectedRepeat.order || []).filter(id => ids.includes(id));
+    return [...saved, ...ids.filter(id => !saved.includes(id))];
+}
+function repeatFormSection(db) {
+    const r = S.selectedRepeat;
+    const label = t => `<p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:6px">${t}</p>`;
+    const opt = (on, click, text) => `<button onclick="${click}" type="button"
+            style="flex:1;padding:7px 4px;border-radius:12px;font-size:12px;font-weight:700;font-family:var(--font-family);border:2px solid ${on?'var(--color-green-600)':'var(--color-border)'};background:${on?'var(--color-green-100)':'white'};color:${on?'var(--color-green-700)':'#6b7280'};cursor:pointer">${text}</button>`;
+    const row = inner => `<div style="display:flex;gap:6px;margin-bottom:12px">${inner}</div>`;
+    const periodWord = r.every === 'month' ? 'month' : r.every === '2weeks' ? 'fortnight' : 'week';
+    const kids = choreRotaKids(db.kids);
+    const order = repeatFormOrder(db.kids).map(id => db.kids.find(k => k.id === id)).filter(Boolean);
+    let next = '';
+    if (r.when === 'day') {
+        const probe = { ...r, start: r.every === '2weeks' ? mondayOf(r.start || toLocalDateStr(new Date())) : toLocalDateStr(new Date()) };
+        const today = toLocalDateStr(new Date());
+        for (let p = repeatPeriod(probe, today) || repeatPeriod(probe, probe.start), i = 0; p && i < 4; p = repeatNextPeriod(probe, p), i++) {
+            const d = repeatDayIn(probe, p);
+            if (d >= today) { next = d; break; }
+        }
+    }
+    return `
+        <div style="border:1.5px solid var(--color-border);border-radius:14px;padding:12px 10px 4px;margin-bottom:14px">
+          ${label('Every')}
+          ${row(opt(r.every==='week', "setRepeat('every','week')", 'Week') + opt(r.every==='2weeks', "setRepeat('every','2weeks')", '2 weeks') + opt(r.every==='month', "setRepeat('every','month')", 'Month'))}
+          ${label('When')}
+          ${row(opt(r.when==='day', "setRepeat('when','day')", 'On a set day') + opt(r.when==='anytime', "setRepeat('when','anytime')", `Anytime in the ${periodWord}`))}
+          ${r.when === 'day' ? `
+          ${label('Day')}
+          ${r.every === 'month' ? `
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <select onchange="setRepeat('nth', +this.value)" style="flex:1">
+              ${[1, 2, 3, 4, -1].map(n => `<option value="${n}" ${+r.nth === n ? 'selected' : ''}>${REPEAT_NTH_LABELS[n]}</option>`).join('')}
+            </select>
+            <select onchange="setRepeat('day', this.value)" style="flex:1">
+              ${DAYS.map(d => `<option value="${d}" ${r.day === d ? 'selected' : ''}>${d}</option>`).join('')}
+            </select>
+          </div>` : `
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px">
+            ${DAYS.map(d => `<button onclick="setRepeat('day','${d}')" type="button"
+              style="padding:6px 0;border-radius:10px;font-size:11px;font-weight:700;font-family:var(--font-family);border:2px solid ${r.day===d?'var(--color-green-600)':'var(--color-border)'};background:${r.day===d?'var(--color-green-100)':'white'};color:${r.day===d?'var(--color-green-700)':'#6b7280'};cursor:pointer">${d}</button>`).join('')}
+          </div>`}
+          ${next ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-bottom:12px">Next: ${dayDateLabel(next)}</p>` : '<div style="margin-bottom:12px"></div>'}` : `
+          <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin:-4px 0 12px">Shows every day until it's done. If it isn't done by the end of the ${periodWord}, it's marked missed.</p>`}
+          ${r.every === '2weeks' ? `
+          ${label('Starting week of')}
+          <input type="date" value="${mondayOf(r.start || toLocalDateStr(new Date()))}" onchange="if (this.value) setRepeat('start', mondayOf(this.value))" style="margin-bottom:4px">
+          <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-bottom:12px">Then every second week after that.</p>` : ''}
+          ${kids.length > 1 ? `
+          ${label('Who does it')}
+          ${row(opt(!r.turns, "setRepeat('turns',false)", 'Everyone') + opt(!!r.turns, "setRepeat('turns',true)", 'Take turns'))}
+          ${r.turns ? `
+          <div style="display:flex;flex-direction:column;gap:4px;margin:-4px 0 6px">
+            ${order.map((k, i) => `
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1.5px solid var(--color-border);border-radius:10px">
+              <span style="font-family:var(--font-family);font-size:12px;font-weight:800;color:var(--color-text-muted);width:12px">${i + 1}</span>
+              ${kidIcon(k, 22)}
+              <span style="font-family:var(--font-family);font-size:13px;font-weight:700;color:var(--color-text-primary);flex:1">${esc(k.name)}</span>
+              ${i === 0 ? `<span style="font-family:var(--font-family);font-size:11px;font-weight:700;color:var(--color-green-700)">goes first</span>`
+                : `<button onclick="moveRepeatKid('${k.id}')" type="button" title="Move up" style="font-family:var(--font-family);font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;border:1.5px solid var(--color-border);background:white;color:var(--color-text-secondary);cursor:pointer">Move up</button>`}
+            </div>`).join('')}
+          </div>
+          <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-bottom:12px">One kid per ${periodWord}, in this order. A paused ${periodWord} doesn't use up anyone's turn.</p>` : ''}` : kids.length === 1 ? `
+          <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-bottom:12px">Only ${esc(kids[0].name)} does this.</p>` : ''}
+        </div>`;
+}
+// What gets saved. A fortnight counts from the Monday of the week picked; week
+// and month chores start this period, and so does a new take-turns order, so
+// the kid now at the top goes first.
+function repeatPayload(kids, prev) {
+    const r = S.selectedRepeat, order = repeatFormOrder(kids);
+    const turns = !!r.turns && order.length > 1;
+    const out = { every: r.every, when: r.when, turns, order };
+    if (r.when === 'day') { out.day = r.day; if (r.every === 'month') out.nth = +r.nth || 1; }
+    const same = prev && ['every', 'when', 'day', 'nth', 'turns'].every(k => prev[k] === out[k]) && JSON.stringify(prev.order || []) === JSON.stringify(order);
+    out.start = r.every === '2weeks' ? mondayOf(r.start || toLocalDateStr(new Date()))
+              : same ? prev.start : toLocalDateStr(new Date());
+    return out;
+}
 function setAllKids() { snapModalInputs(); S.selectedKids = 'all'; render(); }
 function toggleKidAssignment(id) {
     snapModalInputs();
@@ -5479,6 +5692,17 @@ function vKid() {
     const doneTodayIds = doneToday.map(c => c.choreId);
     const pending   = doneToday.filter(c => !c.approved);
     const ready     = allChores.filter(c => !doneTodayIds.includes(c.id));
+    // Set-day repeating chores due in the next six days, so a Saturday job
+    // isn't a surprise on Saturday.
+    const comingUp = [];
+    for (let i = 1; i <= 6; i++) {
+        const d = new Date(); d.setDate(d.getDate() + i);
+        for (const c of db.chores) {
+            if (c.archived || c.schedule !== 'repeat' || !c.repeat || c.repeat.when !== 'day' || !choreAssignedTo(c, kid.id)) continue;
+            if (comingUp.some(u => u.id === c.id) || !choreIsForDate(c, d, kid.id)) continue;
+            comingUp.push({ id: c.id, name: c.name, when: i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-ZA', { weekday: 'short' }) });
+        }
+    }
     const txns      = db.transactions.filter(t => t.kidId === kid.id)
                         .sort((a,b) => new Date(txDate(b))-new Date(txDate(a)));
     const typeIcon  = { payout: faIcon('money-bill-wave'), weekly: faIcon('calendar-day'), chore: faIcon('circle-check'),
@@ -5636,6 +5860,11 @@ function vKid() {
                     class="chore-done-btn flex-shrink-0" style="padding:8px 16px;font-size:13px">Done!</button>
                 </div>`).join('')}
               </div>`}
+        ${comingUp.length ? `
+          <p style="font-family:var(--font-family);font-size:13px;font-weight:700;color:var(--color-text-secondary);margin:-12px 0 20px">
+            <span style="font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-right:6px">Coming up</span>
+            ${comingUp.map(u => `${esc(u.name)} · ${u.when}`).join('<span style="color:var(--color-text-muted)"> &nbsp;|&nbsp; </span>')}
+          </p>` : ''}
         ${pending.length > 0 ? `
           <p class="pr-section-label mb-3 mt-2">Waiting for Approval</p>
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
@@ -5903,7 +6132,7 @@ function renderModal() {
           }).join('')}
         </div>
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Schedule</p>
-        <div style="display:flex;gap:6px;margin-bottom:12px">
+        <div class="grid grid-cols-2 md:grid-cols-4" style="gap:6px;margin-bottom:12px">
           <button onclick="setSchedule('daily')" type="button"
             style="flex:1;padding:8px 4px;border-radius:12px;font-size:12px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedSchedule==='daily'?'var(--color-green-600)':'var(--color-border)'};background:${S.selectedSchedule==='daily'?'var(--color-green-100)':'white'};color:${S.selectedSchedule==='daily'?'var(--color-green-700)':'#6b7280'};cursor:pointer">
             ${faIcon('calendar-day')} Daily
@@ -5914,7 +6143,11 @@ function renderModal() {
           </button>
           <button onclick="setSchedule('per_kid')" type="button"
             style="flex:1;padding:8px 4px;border-radius:12px;font-size:12px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedSchedule==='per_kid'?'var(--color-green-600)':'var(--color-border)'};background:${S.selectedSchedule==='per_kid'?'var(--color-green-100)':'white'};color:${S.selectedSchedule==='per_kid'?'var(--color-green-700)':'#6b7280'};cursor:pointer">
-            ${faIcon('arrows-rotate')} Per kid
+            ${faIcon('children')} Per kid
+          </button>
+          <button onclick="setSchedule('repeat')" type="button"
+            style="flex:1;padding:8px 4px;border-radius:12px;font-size:12px;font-weight:700;font-family:var(--font-family);border:2px solid ${S.selectedSchedule==='repeat'?'var(--color-green-600)':'var(--color-border)'};background:${S.selectedSchedule==='repeat'?'var(--color-green-100)':'white'};color:${S.selectedSchedule==='repeat'?'var(--color-green-700)':'#6b7280'};cursor:pointer">
+            ${faIcon('arrows-rotate')} Repeating
           </button>
         </div>
         ${S.selectedSchedule === 'weekly' ? `
@@ -5948,7 +6181,7 @@ function renderModal() {
           </div>`).join('')}
           <p style="font-family:var(--font-family);font-size:12px;color:var(--color-text-secondary);margin-top:8px">Tap a square to give that kid that day. A day nobody has is skipped.</p>
           ${choreRotaKids(db.kids).length === 0 ? `<p style="font-family:var(--font-family);font-size:12px;color:var(--color-coral-text);font-weight:700;margin-top:4px">Pick at least one kid above first.</p>` : ''}
-        </div>` : '<div style="margin-bottom:14px"></div>'}
+        </div>` : S.selectedSchedule === 'repeat' ? repeatFormSection(db) : '<div style="margin-bottom:14px"></div>'}
         ${photoRow}
         <p style="font-family:var(--font-family);font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:4px">${usingPhoto ? 'Or Pick An Illustration' : 'Chore Icon'} <span style="font-size:11px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--color-green-700);margin-left:6px">${selIconName}</span></p>
         <div id="chore-icon-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:340px;overflow-y:auto;border:1.5px solid var(--color-border);border-radius:12px;padding:6px;margin-bottom:16px">
@@ -6395,6 +6628,7 @@ async function addChore() {
     if (schedule === 'weekly' && days.length === 0) return toast('Please select at least one day.', 'warn');
     if (schedule === 'per_kid' && Object.keys(days).length === 0) return toast('Please give at least one kid a day.', 'warn');
     if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('Please select at least one kid.', 'warn');
+    const repeat = schedule === 'repeat' ? repeatPayload(DB.load().kids, null) : null;
     const id = uid();
     const now = new Date().toISOString();
     let imagePath = null;
@@ -6406,11 +6640,11 @@ async function addChore() {
     // only if the photo ever fails to load. "Custom" is the honest stand-in;
     // leaving the default would put a picture of a bed on the dog's dinner.
     const icon = imagePath ? '37' : emoji;
-    const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: desc, value: val, weight, assigned_to: assignedTo, emoji: icon, image_path: imagePath, schedule, days, created_at: now, schedule_updated_at: now });
+    const { error } = await sb.from('chores').insert({ id, user_id: currentUser.id, name, description: desc, value: val, weight, assigned_to: assignedTo, emoji: icon, image_path: imagePath, schedule, days, repeat, created_at: now, schedule_updated_at: now });
     // The row is what makes the photo reachable, so a failed insert has to take
     // the just-uploaded file with it rather than leaving it orphaned in the bucket.
     if (error) { await removeChorePhoto(imagePath); return toast('Could not save. Check your connection.', 'error'); }
-    cache.chores.push({ id, name, description: desc, value: val, weight, assignedTo, emoji: icon, image_path: imagePath, schedule, days, created_at: now, schedule_updated_at: now });
+    cache.chores.push({ id, name, description: desc, value: val, weight, assignedTo, emoji: icon, image_path: imagePath, schedule, days, repeat, created_at: now, schedule_updated_at: now });
     trackLoops(cache.chores.length === 1 ? 'first_chore_created' : null, { choreCount: cache.chores.length });
     track('chore_created', { chores_count: cache.chores.length, schedule, has_photo: Boolean(imagePath), mode: isCycleMode() ? 'cycle' : 'per_chore' });
     closeModal(); toast('Chore added!');
@@ -6435,7 +6669,8 @@ async function saveChore(id) {
     if (schedule === 'per_kid' && Object.keys(days).length === 0) return toast('Please give at least one kid a day.', 'warn');
     if (Array.isArray(assignedTo) && assignedTo.length === 0) return toast('Please select at least one kid.', 'warn');
     const c = cache.chores.find(x => x.id === id);
-    const scheduleChanged = c && (c.schedule !== schedule || JSON.stringify(c.days || []) !== JSON.stringify(days));
+    const repeat = schedule === 'repeat' ? repeatPayload(DB.load().kids, c?.schedule === 'repeat' ? c.repeat : null) : null;
+    const scheduleChanged = c && (c.schedule !== schedule || JSON.stringify(c.days || []) !== JSON.stringify(days) || JSON.stringify(c.repeat || null) !== JSON.stringify(repeat));
     const oldPath = c ? (c.image_path || null) : null;
     // Null when the parent removed the photo or picked an illustration instead.
     let imagePath = S.chorePhotoPath || null;
@@ -6446,8 +6681,8 @@ async function saveChore(id) {
     // See addChore: the illustration is the fallback if the photo won't load.
     const icon = imagePath ? '37' : emoji;
     const update = isCycleMode()
-        ? { name, description: desc, weight, assigned_to: assignedTo, emoji: icon, image_path: imagePath, schedule, days }
-        : { name, description: desc, value: val, assigned_to: assignedTo, emoji: icon, image_path: imagePath, schedule, days };
+        ? { name, description: desc, weight, assigned_to: assignedTo, emoji: icon, image_path: imagePath, schedule, days, repeat }
+        : { name, description: desc, value: val, assigned_to: assignedTo, emoji: icon, image_path: imagePath, schedule, days, repeat };
     if (scheduleChanged) update.schedule_updated_at = new Date().toISOString();
     const { error } = await sb.from('chores').update(update).eq('id', id).eq('user_id', currentUser.id);
     if (error) {
@@ -6458,7 +6693,7 @@ async function saveChore(id) {
     if (oldPath && oldPath !== imagePath) await removeChorePhoto(oldPath);
     if (c) {
         c.image_path = imagePath;
-        c.name = name; c.description = desc; c.assignedTo = assignedTo; c.emoji = icon; c.schedule = schedule; c.days = days;
+        c.name = name; c.description = desc; c.assignedTo = assignedTo; c.emoji = icon; c.schedule = schedule; c.days = days; c.repeat = repeat;
         if (isCycleMode()) c.weight = weight; else c.value = val;
         if (scheduleChanged) c.schedule_updated_at = update.schedule_updated_at;
     }
