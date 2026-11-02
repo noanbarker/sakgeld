@@ -335,7 +335,19 @@
         text-align:left; cursor:pointer; font-family:var(--font-family);
       }
       .sp-list-row:first-child { border-top:none; }
-      .sp-list-row:hover { background:var(--color-green-50); }
+      .sp-list-row:hover, .sp-list-row.active { background:var(--color-green-50); }
+      .sp-list-row.active .sp-list-title { color:var(--color-green-800); }
+      .sp-list-chevron { color:var(--color-text-muted); display:flex; }
+      .sp-page { max-width:1100px; margin:0 auto; }
+      .sp-section-list { max-width:600px; }
+      .sp-split { display:grid; grid-template-columns:300px minmax(0,1fr); gap:24px; align-items:start; }
+      .sp-split .sp-section-list { position:sticky; top:24px; }
+      .sp-split .sp-list-chevron { display:none; }
+      .sp-back-link {
+        display:inline-flex; align-items:center; gap:2px; margin:0 0 12px -6px; padding:6px 8px 6px 2px;
+        background:none; border:none; border-radius:var(--radius-sm); cursor:pointer;
+        font-family:var(--font-family); font-size:var(--text-base); font-weight:600; color:var(--color-green-700);
+      }
       .sp-list-icon {
         width:40px; height:40px; flex-shrink:0; border-radius:var(--radius-sm);
         display:flex; align-items:center; justify-content:center;
@@ -1609,6 +1621,7 @@ const UI_ICON_PATHS = {
   camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
   menu: '<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>',
   chevron: '<path d="M9 6l6 6-6 6"/>',
+  back: '<path d="M15 18l-6-6 6-6"/>',
   pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
   play: '<path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/>',
 };
@@ -4422,6 +4435,7 @@ function vParent() {
       <div style="flex:1;display:flex;flex-direction:column;min-width:0">
         ${mobileHeader}
         <div class="sp-tab-content ${tutorialNudgeVisible() ? 'sp-has-nudge ' : ''}${S.tabAnim === 'fwd' ? 'sp-tab-anim-fwd' : S.tabAnim === 'back' ? 'sp-tab-anim-back' : ''}" style="flex:1;overflow:auto;padding:24px 28px;background-color:var(--color-background)">
+         <div class="sp-page">
           ${paymentFailedBanner()}
           ${cancelScheduledBanner()}
           ${S.tab === 'overview'  ? pOverview(db) :
@@ -4433,6 +4447,7 @@ function vParent() {
             S.tab === 'faq'       ? pFAQ() :
             S.tab === 'more'      ? pMore(db) :
                                     pSettings()}
+         </div>
         </div>
       </div>
     </div>
@@ -4914,34 +4929,50 @@ function owedSinceDistribution(db, kid) {
 
 function openMoneySection(id) { S.moneySection = id; render(); }
 
+// Desktop layout (sidebar visible). Matches Tailwind's md breakpoint.
+function isWideScreen() { return window.matchMedia('(min-width: 768px)').matches; }
+// Settings and Money switch between side-by-side and tap-in when the window
+// crosses the breakpoint, so re-render when it does.
+window.matchMedia('(min-width: 768px)').addEventListener('change', () => { if (S.view === 'parent') render(); });
+
+// A titled list of sub-sections (Settings, Money): one card, hairline rows.
+function sectionList(title, sections, activeId, openFn) {
+    return `
+    <div class="sp-section-list">
+      <p class="pr-section-label mb-5">${title}</p>
+      <div class="sp-list">
+        ${sections.map(s => `
+        <button onclick="${openFn}('${s.id}')" class="sp-list-row ${s.id === activeId ? 'active' : ''}">
+          <span style="flex:1;min-width:0">
+            <span class="sp-list-title">${s.title}</span>
+            <span class="sp-list-sub">${s.subtitle}</span>
+          </span>
+          <span class="sp-list-chevron">${uiIcon('chevron', 18)}</span>
+        </button>`).join('')}
+      </div>
+    </div>`;
+}
+function splitView(list, detail) {
+    return `<div class="sp-split"><div class="sp-split-list">${list}</div><div class="sp-split-detail">${detail}</div></div>`;
+}
+function backLink(label, onclick) {
+    return `<button onclick="${onclick}" class="sp-back-link">${uiIcon('back', 18)}${label}</button>`;
+}
+
 function pMoney(db) {
-    if (!S.moneySection) {
-        const sections = [
-            { id: 'distributions', title: 'Distributions', subtitle: 'What you still owe each kid since you last squared up' },
-            { id: 'expenditure',   title: 'Expenditure',   subtitle: 'A record of cash your kids have actually spent' },
-            { id: 'recon',         title: 'Reconciliation', subtitle: 'Compare each kid\'s expected balance against their actual bank or piggy bank' },
-        ];
-        const chevron = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex-shrink:0"><path d="M7 5l4 4-4 4" stroke="var(--color-text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-        return `
-        <div style="max-width:600px">
-          <p class="pr-section-label mb-5">Money Management</p>
-          ${sections.map(s => `
-          <button onclick="openMoneySection('${s.id}')" class="card mb-3" style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;cursor:pointer">
-            <div>
-              <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-base);margin-bottom:2px">${s.title}</p>
-              <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary)">${s.subtitle}</p>
-            </div>
-            ${chevron}
-          </button>`).join('')}
-        </div>`;
-    }
-
-    const backBtn = `<button onclick="openMoneySection(null)" style="color:var(--color-text-secondary);font-size:var(--text-sm);font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:16px;background:none;border:none;cursor:pointer">← Back to Money Management</button>`;
-
-    if (S.moneySection === 'distributions') return `${backBtn}${pDistributions(db)}`;
-    if (S.moneySection === 'expenditure')   return `${backBtn}${pExpenditure(db)}`;
-    if (S.moneySection === 'recon')         return `${backBtn}${pRecon(db)}`;
-    return '';
+    const sections = [
+        { id: 'distributions', title: 'Distributions',  subtitle: 'What you still owe each kid since you last squared up' },
+        { id: 'expenditure',   title: 'Expenditure',    subtitle: 'A record of cash your kids have actually spent' },
+        { id: 'recon',         title: 'Reconciliation', subtitle: 'Compare each kid\'s expected balance against their actual bank or piggy bank' },
+    ];
+    const wide = isWideScreen();
+    if (wide && !S.moneySection) S.moneySection = 'distributions';
+    const list = sectionList('Money', sections, S.moneySection, 'openMoneySection');
+    if (!S.moneySection) return list;
+    const detail = S.moneySection === 'distributions' ? pDistributions(db)
+                 : S.moneySection === 'expenditure'   ? pExpenditure(db)
+                 : pRecon(db);
+    return wide ? splitView(list, detail) : `${backLink('Money', 'openMoneySection(null)')}${detail}`;
 }
 
 function pDistributions(db) {
@@ -5385,25 +5416,15 @@ function pSettings() {
         { id: 'pin',      title: 'Parents & PINs',           subtitle: coParent() ? `${esc(ownerProfile()?.name)} and ${esc(coParent().name)}` : (hasParentPin ? 'A PIN is set · add a co-parent' : 'No PIN set') },
         { id: 'notifications', title: 'Notifications',       subtitle: pushSubscribed ? 'On for this device' : 'Get told when a chore needs approving' },
     ];
-    const chevron = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex-shrink:0"><path d="M7 5l4 4-4 4" stroke="var(--color-text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    // Desktop shows the list and the open section side by side, so a section
+    // is always open there; phones tap in and back out.
+    const wide = isWideScreen();
+    if (wide && !S.settingsSection) S.settingsSection = 'allowance';
+    const list = sectionList('Settings', sections, S.settingsSection, 'openSettingsSection');
+    if (!S.settingsSection) return list;
+    const backBtn = wide ? '' : backLink('Settings', 'openSettingsSection(null)');
 
-    if (!S.settingsSection) {
-        return `
-        <div style="max-width:600px">
-          <p class="pr-section-label mb-5">Settings</p>
-          ${sections.map(s => `
-          <button onclick="openSettingsSection('${s.id}')" class="card mb-3" style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;cursor:pointer">
-            <div>
-              <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-base);margin-bottom:2px">${s.title}</p>
-              <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary)">${s.subtitle}</p>
-            </div>
-            ${chevron}
-          </button>`).join('')}
-        </div>`;
-    }
-
-    const backBtn = `<button onclick="openSettingsSection(null)" style="color:var(--color-text-secondary);font-size:var(--text-sm);font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:16px;background:none;border:none;cursor:pointer">← Back to Settings</button>`;
-
+    const detail = (() => {
     if (S.settingsSection === 'allowance') {
         const mode = getAllowanceMode();
         const period = getCyclePeriod();
@@ -5615,6 +5636,8 @@ function pSettings() {
           </div>
         </div>`;
     }
+    })();
+    return wide ? splitView(list, detail) : detail;
 }
 function openSettingsSection(id) { S.settingsSection = id; render(); }
 
