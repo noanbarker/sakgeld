@@ -7561,6 +7561,20 @@ function trackScreen() {
     track('screen_viewed', { screen, subscription_status: currentUser?.user_metadata?.subscription_status || 'signed_out' });
 }
 
+// Arriving on a different screen by any route (Family Portal → parent PIN →
+// dashboard, a tab, a kid, a Settings or Money section) always starts at the
+// top. Re-renders on the same screen (opening a form, ticking a chore) keep
+// the scroll position.
+let lastScrollScreen = null;
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+function screenKey() {
+    if (!currentUser) return 'auth:' + S.authMode;
+    if (S.view === 'parent') return ['parent', S.tab, S.settingsSection, S.moneySection].join('|');
+    if (S.view === 'kid' || S.view === 'kid-pin') return S.view + '|' + (S.kidId || S.pinKidId);
+    if (S.view === 'parent-onboarding') return 'onboarding|' + S.onboardStep;
+    return S.view;
+}
+
 function render() {
     trackScreen();
     document.title = currentUser ? 'Sprout' : 'Sign In or Start Your Free Trial | Sprout';
@@ -7608,6 +7622,8 @@ function render() {
     if (S.view === 'parent' && S.tourStep >= 0) positionTourSpotlight();
     S.tabAnim = null;
     updateAppBadge();
+    const key = screenKey();
+    if (key !== lastScrollScreen) { lastScrollScreen = key; scrollPageToTop(false); }
 }
 
 initApp();
