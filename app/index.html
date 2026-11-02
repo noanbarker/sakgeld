@@ -368,6 +368,13 @@
       .sp-item-row.is-paused .sp-list-title { color:var(--color-text-secondary); }
       .sp-tag { display:inline-block; margin-top:6px; font-family:var(--font-family); font-size:var(--text-xs); font-weight:700; padding:2px 10px; border-radius:var(--radius-full); }
       .sp-tag-amber { background:var(--color-gold-50); color:var(--color-gold-800); }
+      /* Reconciliation: one row per kid, same four columns every time */
+      .sp-recon-row { display:grid; grid-template-columns:minmax(150px,1fr) 1fr 1fr 1.3fr; gap:16px; align-items:start; padding:16px 20px; }
+      .sp-recon-kid { display:flex; align-items:center; gap:12px; align-self:center; }
+      .sp-recon-label { font-family:var(--font-family); font-size:var(--text-xs); font-weight:600; color:var(--color-text-secondary); margin-bottom:4px; }
+      .sp-recon-input { display:flex; align-items:center; gap:6px; max-width:140px; border:1.5px solid var(--color-border); border-radius:var(--radius-sm); padding:0 10px; background:var(--color-surface); }
+      .sp-recon-input span { font-family:var(--font-family); font-size:var(--text-sm); color:var(--color-text-secondary); }
+      .sp-recon-input input { border:none !important; padding:8px 0 !important; font-weight:700; background:transparent; }
       .sp-tag-grey  { background:#f1f5f9; color:var(--color-text-secondary); }
       /* Kid screen: same rules, bigger and friendlier */
       .sp-kid-exit { display:inline-flex; align-items:center; gap:6px; flex-shrink:0; padding:8px 14px; border:none; border-radius:var(--radius-full); background:rgba(255,255,255,.2); color:#fff; cursor:pointer; font-family:var(--font-family); font-size:var(--text-sm); font-weight:700; }
@@ -586,9 +593,9 @@
         .modal-sheet { --sheet-px:16px; padding: 20px 16px 0 !important; }
 
         /* Reconciliation rows: stack instead of squashing the difference column */
-        .sp-recon-row { grid-template-columns: 1fr !important; gap: 4px !important; }
-        .sp-recon-row > div:nth-child(2) { border-top: 1px solid var(--color-border); padding-top: 12px; margin-top: 8px; }
-        .sp-recon-row > div:nth-child(3) { border-top: 1px solid var(--color-border); padding-top: 12px; margin-top: 8px; text-align: left !important; }
+        .sp-recon-row { grid-template-columns: 1fr 1fr; }
+        .sp-recon-kid, .sp-recon-row > div:last-child { grid-column: 1 / -1; }
+        .sp-recon-row > div:last-child { border-top:1px solid var(--color-border); padding-top:12px; }
       }
 
       /* ── Modal sheet: scrolls, but without the visible outer scrollbar ── */
@@ -2238,7 +2245,7 @@ function tutorialNudgeVisible() {
 function renderTutorialNudge() {
     return `
     <div class="sp-tutorial-nudge">
-      <button onclick="startTour()" style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.14);border:none;color:#fff;cursor:pointer;padding:8px 16px;border-radius:var(--radius-full);white-space:nowrap;font-size:var(--text-sm);font-weight:800;font-family:var(--font-family)">Quick Tutorial</button>
+      <button onclick="startTour()" style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.14);border:none;color:#fff;cursor:pointer;padding:8px 16px;border-radius:var(--radius-full);white-space:nowrap;font-size:var(--text-sm);font-weight:800;font-family:var(--font-family)">Take the tour</button>
       <button onclick="dismissTutorialNudge()" style="background:rgba(255,255,255,.14);border:none;color:rgba(255,255,255,.85);cursor:pointer;font-size:var(--text-xs);font-weight:700;padding:10px 14px;border-radius:var(--radius-full);white-space:nowrap;font-family:var(--font-family)">Don't show again</button>
     </div>`;
 }
@@ -3239,7 +3246,7 @@ function vLogin() {
             ${pwField('l-pass', 'Password', draft.pass, 'mb-1', 'doSignIn()')}
             <div style="text-align:right;margin-bottom:12px"><button type="button" onclick="setAuthMode('forgot')" style="background:none;border:none;cursor:pointer;font-family:var(--font-family);font-size:var(--text-sm);font-weight:600;color:#15803d;padding:0">Forgot password?</button></div>
             <p id="l-err" style="color:#f43f5e;font-size:var(--text-sm);margin:4px 0 12px;min-height:20px"></p>
-            <button onclick="doSignIn()" class="btn-primary">Sign In</button>
+            <button onclick="doSignIn()" class="btn-primary">Sign in</button>
             ${S.linkExpired ? `<button type="button" id="l-resend" onclick="resendConfirmation()" style="margin-top:10px;width:100%;padding:12px;border-radius:var(--radius-full);border:2px solid #15803d;background:white;color:#15803d;font-family:var(--font-family);font-size:var(--text-base);font-weight:700;cursor:pointer">Send a new link</button>` : ''}
             <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-muted);text-align:center;margin-top:16px">
               New to Sprout? <button type="button" onclick="setAuthMode('signup')" style="background:none;border:none;cursor:pointer;color:#15803d;font-weight:700;font-family:var(--font-family);font-size:var(--text-sm);padding:0">Start your free trial</button>
@@ -3568,7 +3575,7 @@ function vSubscriptionGate() {
                 ? 'There’s an issue with your payment method or subscription. Please update your details to keep using Sprout.'
                 : 'Your account is set up, but your subscription was never completed. Finish checkout to start your 14-day free trial.'}</p>
             ${!needsAttention && (currentUser?.user_metadata?.signup_geo || getGeoPref()) === 'ZA' ? cardCheckPoints(currentUser?.user_metadata?.billing_cycle) : ''}
-            <button onclick="${needsAttention ? 'openManageSubscription()' : 'resumeCheckout()'}" class="btn-primary ${needsAttention ? 'manage-sub-btn' : ''}" style="margin-bottom:14px">${needsAttention ? 'Manage Subscription' : 'Continue to Checkout'}</button>
+            <button onclick="${needsAttention ? 'openManageSubscription()' : 'resumeCheckout()'}" class="btn-primary ${needsAttention ? 'manage-sub-btn' : ''}" style="margin-bottom:14px">${needsAttention ? 'Manage subscription' : 'Continue to checkout'}</button>
             <div>
               <button onclick="signOut()" style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:600;color:var(--color-text-muted);background:none;border:none;cursor:pointer">Sign out</button>
             </div>
@@ -3610,7 +3617,7 @@ function vRestartGate() {
             : 'The next page asks for your payment details.';
         body = `
             <p style="${font};font-size:var(--text-sm);line-height:1.5;color:var(--color-text-secondary);margin-bottom:22px">${note}</p>
-            <button onclick="resumeCheckout()" class="btn-primary" style="margin-bottom:14px">Restart Subscription</button>`;
+            <button onclick="resumeCheckout()" class="btn-primary" style="margin-bottom:14px">Restart subscription</button>`;
     }
     return `
     <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
@@ -4047,7 +4054,7 @@ function vOnboarding() {
     if (step === 'currency') {
         const currCode = getCurrencyCode();
         body = `
-        <h2 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:6px">Welcome to <span style="color:#16a34a">Sprout</span></h2>
+        <h2 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:6px">Welcome to Sprout</h2>
         <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:20px">Let's get your family set up — it only takes a minute. First, what currency should we use?</p>
         <select onchange="saveCurrency(this.value)" class="mb-5">
           ${CURRENCIES.map(c => `<option value="${c.code}" ${c.code === currCode ? 'selected' : ''}>${c.name}</option>`).join('')}
@@ -4096,7 +4103,7 @@ function vOnboarding() {
         <h2 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:6px">Add your first kid</h2>
         <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:20px">You can add more any time from the Kids tab — let's start with one.</p>
         ${db.kids.length > 0 ? `<div class="flex flex-col gap-2 mb-4">${kidRows}</div>` : ''}
-        <button onclick="openModal('add-kid')" class="btn-outline mb-3" style="width:100%">+ Add Kid</button>
+        <button onclick="openModal('add-kid')" class="btn-outline mb-3" style="width:100%">+ Add another kid</button>
         <div style="display:flex;gap:8px">
           <button onclick="onboardBack()" class="btn-outline flex-1">Back</button>
           <button onclick="onboardNext()" class="btn-primary flex-1">Continue</button>
@@ -4114,7 +4121,7 @@ function vOnboarding() {
         <h2 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:6px">Add a chore or two</h2>
         <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:20px">Chores are what your kids earn money for. Add one or two to get going.</p>
         ${db.chores.length > 0 ? `<div class="flex flex-col gap-2 mb-4">${choreRows}</div>` : ''}
-        <button onclick="openModal('add-chore')" class="btn-outline mb-3" style="width:100%">+ Add Chore</button>
+        <button onclick="openModal('add-chore')" class="btn-outline mb-3" style="width:100%">+ Add another chore</button>
         <div style="display:flex;gap:8px">
           <button onclick="onboardBack()" class="btn-outline flex-1">Back</button>
           <button onclick="onboardNext()" class="btn-primary flex-1">Continue</button>
@@ -4132,7 +4139,7 @@ function vOnboarding() {
         <h2 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:6px">Reward saving with a bonus? (optional)</h2>
         <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:20px">Bonuses pay out automatically when a kid's balance hits a threshold you set. You can skip this and add one later from the Bonuses tab.</p>
         ${(db.bonusMilestones || []).length > 0 ? `<div class="flex flex-col gap-2 mb-4">${bonusRows}</div>` : ''}
-        <button onclick="openModal('add-bonus')" class="btn-outline mb-3" style="width:100%">+ Add Bonus Milestone</button>
+        <button onclick="openModal('add-bonus')" class="btn-outline mb-3" style="width:100%">+ Add a bonus</button>
         <div style="display:flex;gap:8px">
           <button onclick="onboardBack()" class="btn-outline flex-1">Back</button>
           <button onclick="onboardNext()" class="btn-primary flex-1">Continue</button>
@@ -4250,37 +4257,26 @@ function pRecon(db) {
         const bankVal = saved[k.id] !== undefined ? saved[k.id] : '';
 
         return `
-        <div class="card sp-recon-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;gap:12px;padding:16px 20px">
-          <!-- Kid -->
-          <div style="display:flex;align-items:center;gap:10px">
-            <div style="width:54px;height:54px;background:var(--color-surface);border:2px solid ${ac.header};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-2xl);flex-shrink:0">${kidIcon(k)}</div>
-            <div>
-              <p style="font-family:var(--font-family);font-weight:800;font-size:var(--text-sm);color:${ac.text}">${esc(k.name)}</p>
-              <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">Expected vs. bank</p>
+        <div class="card sp-recon-row">
+          <div class="sp-recon-kid">
+            <div style="width:48px;height:48px;background:var(--color-surface);border:2px solid ${ac.header};border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">${kidIcon(k)}</div>
+            <p style="font-family:var(--font-family);font-weight:800;font-size:var(--text-base);color:${ac.text}">${esc(k.name)}</p>
+          </div>
+          <div>
+            <p class="sp-recon-label">Expected in bank</p>
+            <p style="font-family:var(--font-family);font-weight:800;font-size:var(--text-base);color:var(--color-text-primary)">${R(expected)}</p>
+            <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:2px">${R(appBal)} balance − ${R(owed)} owed</p>
+          </div>
+          <div>
+            <p class="sp-recon-label">Actually in bank</p>
+            <div class="sp-recon-input">
+              <span>${currSymbol()}</span>
+              <input type="number" step="0.01" placeholder="0.00" value="${bankVal}" oninput="reconUpdate('${k.id}', this.value)">
             </div>
           </div>
-          <!-- Expected in bank + bank input -->
-          <div style="display:flex;align-items:center;gap:10px">
-            <div style="text-align:right;min-width:78px">
-              <p style="font-family:var(--font-family);font-weight:800;font-size:var(--text-base);color:var(--color-text-primary)">${R(expected)}</p>
-              <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-muted)">Expected in bank</p>
-              <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-muted);margin-top:2px">${R(appBal)} app − ${R(owed)} owed</p>
-            </div>
-            <div style="color:#cbd5e1;font-size:var(--text-lg);font-weight:300">↔</div>
-            <div>
-              <div style="display:flex;align-items:center;gap:4px;border:1.5px solid #e2e8f0;border-radius:var(--radius-sm);padding:6px 10px;background:white;width:110px">
-                <span style="font-family:var(--font-family);font-size:var(--text-sm);color:#94a3b8;flex-shrink:0">R</span>
-                <input type="number" step="0.01" placeholder="0.00"
-                  value="${bankVal}"
-                  oninput="reconUpdate('${k.id}', this.value)"
-                  style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);border:none;outline:none;width:100%;background:transparent"/>
-              </div>
-              <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-muted);margin-top:3px;padding-left:2px">Actual bank balance</p>
-            </div>
-          </div>
-          <!-- Difference -->
-          <div id="recon-diff-${k.id}" style="text-align:right">
-            ${reconDiffHTML(db, k, bankVal)}
+          <div>
+            <p class="sp-recon-label">Difference</p>
+            <div id="recon-diff-${k.id}">${reconDiffHTML(db, k, bankVal)}</div>
           </div>
         </div>`;
     }).join('');
@@ -4310,7 +4306,7 @@ function pRecon(db) {
     <div style="max-width:760px">
       <div style="margin-bottom:24px">
         <h2 class="sp-section-title">Reconciliation</h2>
-        <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-top:4px">"Expected in bank" is each kid's app balance minus whatever's still an outstanding distribution — in other words, what should realistically be sitting in their bank or piggy bank right now. Enter their actual balance to compare. A shortfall usually means money's been spent — you can log it straight from here.</p>
+        <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-top:4px">Check the app against real life. Expected in bank is each kid's balance minus what you still owe them. Type in what's actually in their bank or piggy bank; if it's short, the money was probably spent, and you can record it here.</p>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
         ${rows}
@@ -4932,7 +4928,7 @@ function pKids(db) {
                 <div style="width:72px;height:72px;background:var(--color-surface);border:2px solid ${ac.header};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px">${kidIcon(k)}</div>
                 <div style="flex:1;min-width:0">
                   <p style="font-family:var(--font-family);font-weight:800;color:${ac.text}">${esc(k.name)}</p>
-                  <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">PIN protected - tap edit to change</p>
+                  <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary)">${k.date_of_birth ? `Age ${kidAgeYears(k.date_of_birth)}` : 'No birthday set'}</p>
                 </div>
                 ${moreMenu('kid-' + k.id, [
                     { label: 'Edit', icon: 'pencil', onclick: `editKid('${k.id}')` },
@@ -4977,6 +4973,10 @@ function openMoneySection(id) { S.moneySection = id; render(); }
 
 // One "⋯" button per item (chore, kid, bonus, reward) instead of a row of
 // icons. Tapping anywhere else closes it.
+function kidAgeYears(dob) {
+    const b = new Date(dob + 'T12:00:00'), t = new Date();
+    return t.getFullYear() - b.getFullYear() - ((t.getMonth() < b.getMonth() || (t.getMonth() === b.getMonth() && t.getDate() < b.getDate())) ? 1 : 0);
+}
 function moreMenu(key, items) {
     const open = S.openMenu === key;
     return `
@@ -5054,7 +5054,7 @@ function pDistributions(db) {
           <div class="text-right">
             <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-base)">${R(owed)}</p>
             <div style="display:flex;justify-content:flex-end;margin-top:6px">
-              <button onclick="runDistribution('${k.id}')" class="chip-btn">Distribution Made</button>
+              <button onclick="runDistribution('${k.id}')" class="chip-btn">Mark as paid</button>
             </div>
           </div>
         </div>`;
@@ -5083,7 +5083,7 @@ function pDistributions(db) {
     return `
     <div style="margin-bottom:20px">
       <h2 class="sp-section-title">Distributions</h2>
-      <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-top:4px">Shows what you still owe each kid in cash since you last squared up with them. "Distribution Made" doesn't touch their balance, it just confirms you've handed it over or transferred it to their bank accounts, and starts the count fresh as soon as you click "Distribution Made".</p>
+      <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-top:4px">What you still owe each kid since you last paid them. Tap Mark as paid once you've handed over the cash or made the transfer: their balance stays the same and the count starts again.</p>
     </div>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div>
@@ -5338,7 +5338,7 @@ ${faqVideoHTML('android')}` },
     { q: "How do I approve or reject a chore my child has marked as done?",
       a: `When a child marks a chore as done, it shows up under "Pending Chore Approvals" on your dashboard. Tap the checkmark to approve it or the cross to reject it - you can also use "Approve all" to clear every pending chore for one child at once.` },
     { q: "Does approving a chore send real money to my child?",
-      a: `No. Sprout is a ledger, not a payment system - approving a chore adds to your child's balance inside the app only. When you're ready to hand over real money, use "Distribution Made" in Money Management to record that you've paid them and reset the amount owed.` },
+      a: `No. Sprout is a ledger, not a payment system - approving a chore adds to your child's balance inside the app only. When you're ready to hand over real money, use "Mark as paid" in Money Management to record that you've paid them and reset the amount owed.` },
     { q: "What's the difference between Amount per Chore and Amount per Cycle, and can I switch between them?",
       a: "With Amount per Chore, each chore has its own value and pays out the moment it's approved. With Amount per Cycle, you set one total amount for the week, fortnight or month, and each child's share is worked out from the percentage of chores they complete by the end of that cycle. You can switch between the two anytime in Settings." },
     { q: "Can I add more than one child, and can each one have different chores and amounts?",
@@ -5346,7 +5346,7 @@ ${faqVideoHTML('android')}` },
     { q: "What happens if my child misses a chore?",
       a: `If a chore's due date passes without it being marked done, it's automatically logged as missed at the end of that day. For a repeating chore that can be done anytime, this happens at the end of its week, fortnight or month instead. Missed chores don't pay out, and they show up under "Missed Chores" on your dashboard so you can see the full history. If however you know they did the chore and forgot to mark it as done, you can still approve it in the "Missed Chores" section.` },
     { q: "What are Distributions and Expenditure in Money Management?",
-      a: `Distributions show how much you still owe each child since you last paid them out - tap "Distribution Made" once you've handed over the cash or made a bank transfer, and the amount owed resets to zero. Expenditure is a separate record of money your kids have actually spent from their bank account or piggy bank, which you can capture manually to keep the app's balance matching reality - recorded expenses don't count against what you still owe.` },
+      a: `Distributions show how much you still owe each child since you last paid them out - tap "Mark as paid" once you've handed over the cash or made a bank transfer, and the amount owed resets to zero. Expenditure is a separate record of money your kids have actually spent from their bank account or piggy bank, which you can capture manually to keep the app's balance matching reality - recorded expenses don't count against what you still owe.` },
     { q: "What are Quick Chores, and how are they different from regular chores?",
       a: "Quick Chores are one-off tasks you can assign on the spot - say, helping wash the car - with their own reward and an expiry date you choose. If you're on the Amount per Cycle system, a Quick Chore's reward is added to your child's balance as soon as it's approved, unlike regular chores, which are only added to their balance at the end of the cycle." },
     { q: "What are bonuses and milestones, and how do my kids earn them?",
@@ -5499,11 +5499,6 @@ function pSettings() {
                 <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:2px">Set a total amount for the week, fortnight, or month. A kid's share is worked out from the percentage of their chores they complete by the end of the cycle, nothing is added to their balance until then.</p>
               </button>
             </div>
-          </div>
-          <div class="card mb-4" style="background:var(--color-background);border-style:dashed">
-            <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">What is the difference between the two allowance systems?</p>
-            <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:6px">For the Amount per Chore system, you set the value per chore.</p>
-            <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary)">For the Amount per Cycle system, you decide on a fixed amount that's assigned per kid for each cycle, whether that's a week, fortnight, or a month. The value of each chore is then determined by the number of chores in the cycle. We've also added a weighting system to the chores, so you're able to make some chores more "valuable" than others.</p>
           </div>
           ${mode === 'per_cycle' ? `
           <div class="card">
@@ -5681,7 +5676,7 @@ function pSettings() {
                 </div>
               </div>`).join('')}
             </div>
-            <button onclick="saveTreeThresholdsFromUI()" class="btn-primary" style="width:auto;padding:10px 28px">Save Thresholds</button>
+            <button onclick="saveTreeThresholdsFromUI()" class="btn-primary" style="width:auto;padding:10px 28px">Save thresholds</button>
             <button onclick="resetTreeThresholds()" style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:600;color:var(--color-text-muted);background:none;border:none;cursor:pointer;margin-left:16px">Reset to defaults</button>
           </div>
         </div>`;
