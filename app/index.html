@@ -346,6 +346,42 @@
       .sp-list-row.active .sp-list-title { color:var(--color-green-800); }
       .sp-list-chevron { color:var(--color-text-muted); display:flex; }
       .sp-page { max-width:1100px; margin:0 auto; }
+      /* Pop-up forms: bottom sheet on phones, centred dialog on desktop; Save/Cancel pinned in view */
+      .sp-modal-overlay { position:fixed; inset:0; z-index:50; display:flex; align-items:flex-end; justify-content:center; background:rgba(15,23,42,0.45); }
+      .modal-sheet { --sheet-px:24px; background:var(--color-surface); border-radius:var(--radius-lg) var(--radius-lg) 0 0; padding:24px 24px 0; width:100%; max-width:480px; max-height:90vh; overflow-y:auto; overflow-x:hidden; box-shadow:var(--shadow-overlay); }
+      .modal-sheet::after { content:''; display:block; height:24px; }
+      .sp-modal-actions { position:sticky; bottom:0; z-index:2; display:flex; gap:8px; margin:20px calc(-1 * var(--sheet-px)) 0; padding:12px var(--sheet-px) calc(12px + env(safe-area-inset-bottom)); background:var(--color-surface); border-top:1px solid var(--color-border); }
+      .modal-sheet:has(.sp-modal-actions)::after { display:none; }
+      @media (min-width:768px) {
+        .sp-modal-overlay { align-items:center; padding:24px; }
+        .modal-sheet { border-radius:var(--radius-lg); max-height:calc(100vh - 48px); }
+      }
+      /* Item rows (chores) and the ⋯ action menu */
+      .sp-list-wide { max-width:860px; overflow:visible; }
+      .sp-list-wide .sp-list-row:first-child { border-radius:var(--radius-lg) var(--radius-lg) 0 0; }
+      .sp-list-wide .sp-list-row:last-child { border-radius:0 0 var(--radius-lg) var(--radius-lg); }
+      .sp-item-row { cursor:default; padding:10px 8px 10px 12px; gap:8px; }
+      .sp-item-row:hover { background:none; }
+      .sp-row-main { display:flex; align-items:center; gap:14px; flex:1; min-width:0; background:none; border:none; padding:0; text-align:left; cursor:pointer; font-family:var(--font-family); }
+      .sp-chore-thumb { width:64px; height:64px; flex-shrink:0; border-radius:var(--radius-sm); background:var(--color-green-50); display:flex; align-items:center; justify-content:center; }
+      .sp-item-row.is-paused .sp-chore-thumb { background:#f3f4f6; opacity:.5; filter:grayscale(1); }
+      .sp-item-row.is-paused .sp-list-title { color:var(--color-text-secondary); }
+      .sp-tag { display:inline-block; margin-top:6px; font-family:var(--font-family); font-size:var(--text-xs); font-weight:700; padding:2px 10px; border-radius:var(--radius-full); }
+      .sp-tag-amber { background:var(--color-gold-50); color:var(--color-gold-800); }
+      .sp-menu-wrap { position:relative; flex-shrink:0; }
+      .sp-faq + .sp-faq { border-top:1px solid var(--color-border); }
+      .sp-faq-q { display:flex; align-items:center; justify-content:space-between; gap:16px; width:100%; padding:16px; background:none; border:none; cursor:pointer; text-align:left; font-family:var(--font-family); font-size:var(--text-base); font-weight:600; color:var(--color-text-primary); }
+      .sp-faq-q:hover { background:var(--color-green-50); }
+      .sp-faq-chevron { display:flex; color:var(--color-text-muted); transition:transform .2s ease; }
+      .sp-faq.open .sp-faq-chevron { transform:rotate(90deg); color:var(--color-green-700); }
+      .sp-faq.open .sp-faq-q { color:var(--color-green-800); }
+      .sp-faq-a { padding:0 16px 18px; font-family:var(--font-family); font-size:var(--text-sm); line-height:1.6; color:var(--color-text-secondary); white-space:pre-line; max-width:65ch; }
+      .sp-menu { position:absolute; right:0; top:calc(100% + 4px); z-index:40; min-width:180px; padding:6px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-sm); box-shadow:var(--shadow-overlay); animation:menuIn 140ms ease-out; transform-origin:top right; }
+      @keyframes menuIn { from { opacity:0; transform:scale(.96) translateY(-4px); } to { opacity:1; transform:none; } }
+      .sp-menu-item { display:flex; align-items:center; gap:10px; width:100%; padding:10px 12px; border:none; background:none; border-radius:8px; cursor:pointer; font-family:var(--font-family); font-size:var(--text-base); font-weight:600; color:var(--color-text-primary); text-align:left; }
+      .sp-menu-item:hover { background:var(--color-green-50); }
+      .sp-menu-item.danger { color:var(--color-coral-text); }
+      .sp-menu-item.danger:hover { background:var(--color-coral-bg); }
       .sp-section-list { max-width:600px; }
       .sp-split { display:grid; grid-template-columns:300px minmax(0,1fr); gap:24px; align-items:start; }
       .sp-split .sp-section-list { position:sticky; top:24px; }
@@ -534,7 +570,7 @@
         .sp-weekly-card { max-width: 100% !important; }
 
         /* Modals */
-        .modal-sheet { padding: 20px 16px 28px !important; }
+        .modal-sheet { --sheet-px:16px; padding: 20px 16px 0 !important; }
 
         /* Reconciliation rows: stack instead of squashing the difference column */
         .sp-recon-row { grid-template-columns: 1fr !important; gap: 4px !important; }
@@ -2090,7 +2126,7 @@ function setTab(t) {
         }
     }
     S.tabAnim = dir;
-    S.tab = t; S.settingsSection = null; S.moneySection = null; render();
+    S.tab = t; S.settingsSection = null; S.moneySection = null; S.openMenu = null; render();
 
     // render() rebuilds the bar, so the pill is a new element already sitting
     // on the new tab and a CSS transition would never play. Put it back on the
@@ -4821,7 +4857,7 @@ function pChores(db) {
     <div class="sp-page-head"><h1 class="sp-page-title">Chores</h1><button onclick="openModal('add-chore')" class="btn-primary sp-head-btn">${uiIcon('plus', 16, 2.5)}Add chore</button></div>
     ${visibleChores.length === 0
         ? `<div class="card text-center py-12" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:var(--text-sm)">📋<br><br>No chores yet. Add one above.</div>`
-        : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        : `<div class="sp-list sp-list-wide">
           ${visibleChores.map(c => {
             const who = choreAssignmentLabel(c, db.kids);
             const needsValue = !isCycleMode() && !c.oneOff && !c.value;
@@ -4833,20 +4869,22 @@ function pChores(db) {
             const pauseTag = !open ? ''
                 : paused ? (open.to ? `Paused · back on ${shortDate(open.to)}` : 'Paused')
                 : `Pause planned ${shortDate(open.from)}–${shortDate(addDaysStr(open.to, -1))}`;
+            const sched = c.schedule === 'per_kid' ? esc(chorePerKidLabel(c, db.kids)) : choreScheduleLabel(c);
             return `
-            <div class="card flex items-center gap-3">
-              <div style="width:96px;height:96px;background:${paused ? '#f3f4f6' : 'var(--color-green-50)'};border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;flex-shrink:0;${paused ? 'opacity:0.45;filter:grayscale(1)' : ''}">${choreIcon(c, 72)}</div>
-              <div class="flex-1 min-w-0">
-                <p style="font-family:var(--font-family);font-weight:700;color:${paused ? 'var(--color-text-secondary)' : 'var(--color-text-primary)'}">${esc(c.name)}</p>
-                <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:2px">${valueLine}</p>
-                <p style="font-family:var(--font-family);font-size:var(--text-xs);color:${paused ? 'var(--color-text-muted)' : 'var(--color-green-600)'};font-weight:600;margin-top:2px">${c.schedule === 'per_kid' ? esc(chorePerKidLabel(c, db.kids)) : choreScheduleLabel(c)}</p>
-                ${pauseTag ? `<span style="display:inline-block;margin-top:6px;font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;padding:3px 10px;border-radius:var(--radius-full);background:var(--color-gold-50);color:var(--color-gold-800)">${pauseTag}</span>` : ''}
-              </div>
-              <div class="flex flex-col gap-1 flex-shrink-0">
-                <button onclick="editChore('${c.id}')" title="Edit" class="icon-btn icon-btn-lg">${uiIcon('pencil', 20)}</button>
-                ${c.oneOff ? '' : `<button onclick="pauseChore('${c.id}')" title="${paused ? 'Resume' : open ? 'Planned pause' : 'Pause'}" class="icon-btn icon-btn-lg">${uiIcon(paused ? 'play' : 'pause', 20)}</button>`}
-                <button onclick="deleteChore('${c.id}')" title="Delete" class="icon-btn icon-btn-lg danger">${uiIcon('trash', 20)}</button>
-              </div>
+            <div class="sp-list-row sp-item-row ${paused ? 'is-paused' : ''}">
+              <button onclick="editChore('${c.id}')" class="sp-row-main" title="Edit">
+                <span class="sp-chore-thumb">${choreIcon(c, 54)}</span>
+                <span style="flex:1;min-width:0">
+                  <span class="sp-list-title">${esc(c.name)}</span>
+                  <span class="sp-list-sub">${valueLine} · ${sched}</span>
+                  ${pauseTag ? `<span class="sp-tag sp-tag-amber">${pauseTag}</span>` : ''}
+                </span>
+              </button>
+              ${moreMenu('chore-' + c.id, [
+                  { label: 'Edit', icon: 'pencil', onclick: `editChore('${c.id}')` },
+                  c.oneOff ? null : { label: paused ? 'Resume' : open ? 'Planned pause' : 'Pause', icon: paused ? 'play' : 'pause', onclick: `pauseChore('${c.id}')` },
+                  { label: 'Delete', icon: 'trash', danger: true, onclick: `deleteChore('${c.id}')` },
+              ])}
             </div>`;
           }).join('')}
         </div>`}`;
@@ -4883,10 +4921,10 @@ function pKids(db) {
                   <p style="font-family:var(--font-family);font-weight:800;color:${ac.text}">${esc(k.name)}</p>
                   <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">PIN protected - tap edit to change</p>
                 </div>
-                <div style="display:flex;gap:4px">
-                  <button onclick="editKid('${k.id}')" title="Edit" class="icon-btn">${uiIcon('pencil', 15)}</button>
-                  <button onclick="deleteKid('${k.id}')" title="Delete" class="icon-btn danger">${uiIcon('trash', 15)}</button>
-                </div>
+                ${moreMenu('kid-' + k.id, [
+                    { label: 'Edit', icon: 'pencil', onclick: `editKid('${k.id}')` },
+                    { label: 'Delete', icon: 'trash', danger: true, onclick: `deleteKid('${k.id}')` },
+                ])}
               </div>
               <div style="border-top:1px solid var(--color-border);padding-top:12px">
                 <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
@@ -4923,6 +4961,22 @@ function owedSinceDistribution(db, kid) {
 }
 
 function openMoneySection(id) { S.moneySection = id; render(); }
+
+// One "⋯" button per item (chore, kid, bonus, reward) instead of a row of
+// icons. Tapping anywhere else closes it.
+function moreMenu(key, items) {
+    const open = S.openMenu === key;
+    return `
+    <div class="sp-menu-wrap">
+      <button onclick="event.stopPropagation();toggleMenu('${key}')" class="icon-btn icon-btn-lg" title="More actions" aria-haspopup="menu" aria-expanded="${open}">${uiIcon('menu', 20, 2.5)}</button>
+      ${open ? `<div class="sp-menu" role="menu" onclick="event.stopPropagation()">
+        ${items.filter(Boolean).map(i => `<button role="menuitem" onclick="closeMenu();${i.onclick}" class="sp-menu-item ${i.danger ? 'danger' : ''}">${uiIcon(i.icon, 18)}${i.label}</button>`).join('')}
+      </div>` : ''}
+    </div>`;
+}
+function toggleMenu(key) { S.openMenu = S.openMenu === key ? null : key; render(); }
+function closeMenu() { if (S.openMenu) { S.openMenu = null; render(); } }
+document.addEventListener('click', () => { if (S.openMenu) closeMenu(); });
 
 // Desktop layout (sidebar visible). Matches Tailwind's md breakpoint.
 function isWideScreen() { return window.matchMedia('(min-width: 768px)').matches; }
@@ -5121,10 +5175,10 @@ function pBonuses(db) {
             <div class="flex-1 min-w-0">
               <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-sm)">${esc(m.name) || 'Balance Milestone'}</p>
             </div>
-            <div style="display:flex;gap:2px;flex-shrink:0">
-              <button onclick="openModal('edit-bonus',{milestoneId:'${m.id}'})" title="Edit" class="icon-btn">${uiIcon('pencil', 15)}</button>
-              <button onclick="deleteBonusMilestone('${m.id}')" title="Delete" class="icon-btn danger">${uiIcon('trash', 15)}</button>
-            </div>
+            ${moreMenu('bonus-' + m.id, [
+                  { label: 'Edit', icon: 'pencil', onclick: `openModal('edit-bonus',{milestoneId:'${m.id}'})` },
+                  { label: 'Delete', icon: 'trash', danger: true, onclick: `deleteBonusMilestone('${m.id}')` },
+              ])}
           </div>
           <div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">
             <span style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">Reach</span>
@@ -5210,10 +5264,10 @@ function pRewards(db) {
                 <span style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;color:#f97316;background:#fff7ed;padding:2px 8px;border-radius:var(--radius-full)">reward</span>
               </div>
             </div>
-            <div style="display:flex;gap:2px;flex-shrink:0">
-              <button onclick="editReward('${r.id}')" title="Edit" class="icon-btn">${uiIcon('pencil', 15)}</button>
-              <button onclick="deleteReward('${r.id}')" title="Delete" class="icon-btn danger">${uiIcon('trash', 15)}</button>
-            </div>
+            ${moreMenu('reward-' + r.id, [
+                  { label: 'Edit', icon: 'pencil', onclick: `editReward('${r.id}')` },
+                  { label: 'Delete', icon: 'trash', danger: true, onclick: `deleteReward('${r.id}')` },
+              ])}
           </div>
           ${affectedKids.length > 0 ? `
           <div style="border-top:1px solid var(--color-border);margin-top:12px;padding-top:8px">
@@ -5337,16 +5391,16 @@ function pFAQ() {
     return `
     <div style="max-width:680px">
       <div class="sp-page-head"><h1 class="sp-page-title">Help &amp; FAQ</h1></div>
-      <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="sp-list">
         ${FAQ_ITEMS.map((item, i) => {
           const open = S.faqOpen === i;
           return `
-          <div style="background:var(--color-background);border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden">
-            <button onclick="toggleFaq(${i})" type="button" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:var(--font-family);padding:16px 18px;display:flex;align-items:center;gap:16px;justify-content:space-between">
-              <span style="font-size:var(--text-sm);font-weight:800;color:var(--color-green-700)">${item.q}</span>
-              <span style="font-size:var(--text-lg);font-weight:800;color:var(--color-green-600);flex:none;line-height:1">${open ? '−' : '+'}</span>
+          <div class="sp-faq ${open ? 'open' : ''}">
+            <button onclick="toggleFaq(${i})" type="button" class="sp-faq-q" aria-expanded="${open}">
+              <span>${item.q}</span>
+              <span class="sp-faq-chevron">${uiIcon('chevron', 18)}</span>
             </button>
-            ${open ? `<div style="padding:0 18px 18px;font-size:var(--text-sm);line-height:1.6;color:var(--color-text-secondary);white-space:pre-line">${typeof item.a === 'function' ? item.a() : item.a}</div>` : ''}
+            ${open ? `<div class="sp-faq-a">${typeof item.a === 'function' ? item.a() : item.a}</div>` : ''}
           </div>`;
         }).join('')}
       </div>
@@ -6093,9 +6147,9 @@ function renderModal() {
     if (type === 'add-kid' || type === 'edit-kid') {
         const e = type === 'edit-kid';
         body = `
-        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:16px">${e ? 'Edit' : 'Add'} Kid</h3>
+        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:16px">${e ? 'Edit' : 'Add'} kid</h3>
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Name</p>
-        <input id="k-name" placeholder="Name" value="${esc(data.name)}" class="mb-3">
+        <input id="k-name" placeholder="e.g. Mia" value="${esc(data.name)}" class="mb-3">
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">PIN</p>
         <input id="k-pin" placeholder="${e ? 'Leave blank to keep current PIN' : '4-digit PIN'}" maxlength="4" inputmode="numeric" value="${esc(data.pin || '')}" class="mb-3">
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Date of birth</p>
@@ -6143,7 +6197,7 @@ function renderModal() {
               ${avatarIMG(n)}</button>`;
           }).join('')}
         </div>
-        <div style="display:flex;gap:8px;margin-top:4px">
+        <div class="sp-modal-actions">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
           <button onclick="${e ? `saveKid('${data.id}')` : 'addKid()'}" class="btn-primary flex-1" style="padding:10px">${e ? 'Save' : 'Add'}</button>
         </div>`;
@@ -6182,9 +6236,11 @@ function renderModal() {
             </button>`;
         }).join('');
         body = `
-        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:12px">${e ? 'Edit' : 'Add'} Chore</h3>
-        <input id="c-name" placeholder="Chore name" value="${esc(data.name)}" class="mb-3">
-        <input id="c-desc" placeholder="Description (optional)" value="${esc(data.description)}" class="mb-3">
+        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:12px">${e ? 'Edit' : 'Add'} chore</h3>
+        <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Chore name</p>
+        <input id="c-name" placeholder="e.g. Make your bed" value="${esc(data.name)}" class="mb-3">
+        <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Description <span style="font-weight:400;color:var(--color-text-secondary)">(optional)</span></p>
+        <input id="c-desc" placeholder="Anything your kids should know" value="${esc(data.description)}" class="mb-3">
         ${isCycleMode() ? `
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Weighting</p>
         <div style="display:flex;gap:8px;margin-bottom:6px">
@@ -6196,9 +6252,10 @@ function renderModal() {
         </div>
         <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:16px">This doesn't set an amount — it decides how much this chore counts toward the cycle's overall progress. 2× counts double, 0.5× counts half.</p>
         ` : `
+        <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Amount</p>
         <div class="relative mb-3">
           <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:var(--text-base);line-height:1;pointer-events:none">${currSymbol()}</span>
-          <input id="c-val" type="number" placeholder="Value" value="${data.value||''}" step="0.01" min="0" style="padding-left:38px !important">
+          <input id="c-val" type="number" placeholder="0.00" value="${data.value||''}" step="0.01" min="0" style="padding-left:38px !important">
         </div>
         `}
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Assigned to</p>
@@ -6271,7 +6328,7 @@ function renderModal() {
         <div id="chore-icon-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:340px;overflow-y:auto;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);padding:6px;margin-bottom:16px">
           ${iconGrid}
         </div>
-        <div style="display:flex;gap:8px">
+        <div class="sp-modal-actions">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
           <button onclick="${e ? `saveChore('${data.id}')` : 'addChore()'}" class="btn-primary flex-1" style="padding:10px">${e ? 'Save' : 'Add'}</button>
         </div>`;
@@ -6285,7 +6342,7 @@ function renderModal() {
         });
         const total = rows.reduce((s, r) => s + r.amountPaid, 0);
         body = `
-        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:12px">Switch to Amount per Chore?</h3>
+        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:12px">Switch to amount per chore?</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">You're partway through a cycle that started ${dateStr(anchor)}. Switching now closes it early — each child gets their share for the days completed so far, worked out the usual way.</p>
         <div class="flex flex-col gap-2 mb-4">
           ${rows.length === 0 ? `<p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-muted)">No kids yet.</p>` : rows.map(r => `
@@ -6295,9 +6352,9 @@ function renderModal() {
           </div>`).join('')}
         </div>
         <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:16px">Total added to balances: <strong>${R(total)}</strong>. After switching, every chore needs its own amount before it pays out again — we'll flag the ones that still need one.</p>
-        <div style="display:flex;gap:8px">
+        <div class="sp-modal-actions">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
-          <button onclick="confirmSwitchToPerChore()" class="btn-primary flex-1" style="padding:10px">Switch Now</button>
+          <button onclick="confirmSwitchToPerChore()" class="btn-primary flex-1" style="padding:10px">Switch now</button>
         </div>`;
     }
 
@@ -6305,7 +6362,7 @@ function renderModal() {
         body = `
         <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:12px">Are you sure?</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:20px">${data.msg}</p>
-        <div style="display:flex;gap:8px">
+        <div class="sp-modal-actions">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
           <button onclick="${data.onConfirm}" style="flex:1;padding:10px;font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;background:var(--color-coral);color:white;border:none;border-radius:var(--radius-lg);cursor:pointer">${data.confirmLabel || 'Delete'}</button>
         </div>`;
@@ -6354,7 +6411,7 @@ function renderModal() {
             </label>
             ${footNote}
             <p id="pc-error" style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-coral-text);margin:-8px 0 12px;display:none"></p>
-            <div style="display:flex;gap:8px">
+            <div class="sp-modal-actions">
               ${planned
                 ? `<button onclick="cancelPlannedPause('${data.choreId}')" class="btn-outline flex-1" style="padding:10px">Cancel pause</button>
                    <button onclick="savePauseChore('${data.choreId}')" class="btn-primary flex-1" style="padding:10px">Save dates</button>`
@@ -6375,7 +6432,7 @@ function renderModal() {
               <div style="margin:10px 0 0 26px;width:calc(50% - 17px)"><p style="${dateLbl}">Back on</p><input id="pc-back" type="date" min="${addDaysStr(today, 1)}" value="${open.to || addDaysStr(today, 1)}" onfocus="pickPauseOpt('dates')" class="pc-date"></div>
             </label>
             <p id="pc-error" style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-coral-text);margin:0 0 12px;display:none"></p>
-            <div style="display:flex;gap:8px;margin-top:6px">
+            <div class="sp-modal-actions">
               <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
               <button onclick="saveResumeChore('${data.choreId}')" class="btn-primary flex-1" style="padding:10px">Resume chore</button>
             </div>`;
@@ -6387,7 +6444,7 @@ function renderModal() {
         const rows = allMissed.map(c => missedChoreRow(c, db)).join('');
         body = `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-          <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:0">Missed chores History</h3>
+          <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:0">Missed chores history</h3>
           <button onclick="closeModal()" style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);padding:4px;display:inline-flex" title="Close">${uiIcon('cross', 18, 2.5)}</button>
         </div>
         <div class="flex flex-col gap-2" style="max-height:60vh;overflow-y:auto;padding-right:2px">
@@ -6410,7 +6467,7 @@ function renderModal() {
           ? `Set a temporary PIN for ${esc(p.name)}. They can change it from Settings once they're in.`
           : hasPin ? faIcon('lock') + ' A PIN is currently set.' : faIcon('triangle-exclamation') + ' No PIN set — anyone can access the parent dashboard.'}</p>
         <input id="pp-pin" placeholder="New 4-digit PIN" maxlength="4" inputmode="numeric" class="mb-4">
-        <div style="display:flex;gap:8px">
+        <div class="sp-modal-actions">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
           ${canRemove ? `<button onclick="removeParentPin()" style="flex:1;padding:10px;font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;border:1.5px solid var(--color-coral-border);color:var(--color-coral-text);border-radius:var(--radius-lg);background:var(--color-coral-bg);cursor:pointer">Remove</button>` : ''}
           <button onclick="saveParentPin()" class="btn-primary flex-1" style="padding:10px">Save PIN</button>
@@ -6423,7 +6480,7 @@ function renderModal() {
         <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Rename parent</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">This is the name on the home screen button and in history, e.g. "Mom" or "Dad".</p>
         <input id="rn-name" placeholder="Name" maxlength="30" value="${esc(p?.name || '')}" class="mb-4">
-        <div style="display:flex;gap:8px">
+        <div class="sp-modal-actions">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
           <button onclick="saveParentName('${p?.id || ''}')" class="btn-primary flex-1" style="padding:10px">Save</button>
         </div>`;
@@ -6441,7 +6498,7 @@ function renderModal() {
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin:8px 0">Co-parent</p>
         <input id="cp-name" placeholder="Their name, e.g. Dad" maxlength="30" value="${esc(data.name || '')}" class="mb-3">
         <input id="cp-pin" placeholder="Their 4-digit PIN" maxlength="4" inputmode="numeric" value="${esc(data.pin || '')}" class="mb-4">
-        <div style="display:flex;gap:8px">
+        <div class="sp-modal-actions">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
           <button onclick="addCoParent()" class="btn-primary flex-1" style="padding:10px">Add co-parent</button>
         </div>`;
@@ -6451,7 +6508,7 @@ function renderModal() {
         const kid = db.kids.find(k => k.id === data.kidId);
         const isAdd = (data.adjustType || 'add') === 'add';
         body = `
-        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Adjust Balance</h3>
+        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Adjust balance</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">${esc(kid?.name)} · Current balance: <strong>${R(kid?.balance)}</strong></p>
         <div style="display:flex;gap:8px;margin-bottom:16px">
           <button onclick="setAdjustType('add')" type="button"
@@ -6468,15 +6525,15 @@ function renderModal() {
           <input id="ma-amount" type="number" placeholder="Amount" value="${data.amount||''}" step="0.01" min="0" style="padding-left:38px !important">
         </div>
         <input id="ma-desc" placeholder="Reason (e.g. Birthday gift, Correction)" value="${esc(data.description)}" class="mb-4">
-        <div style="display:flex;gap:8px">
+        <div class="sp-modal-actions">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
-          <button onclick="saveManualAdjustment('${data.kidId}')" class="btn-primary flex-1" style="padding:10px">${isAdd ? 'Add to Balance' : 'Deduct from Balance'}</button>
+          <button onclick="saveManualAdjustment('${data.kidId}')" class="btn-primary flex-1" style="padding:10px">${isAdd ? 'Add to balance' : 'Deduct from balance'}</button>
         </div>`;
     }
 
     if (type === 'quick-task') {
         body = `
-        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Quick Chore</h3>
+        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Quick chore</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">Assign a one-off task to a kid. Choose how many days it stays available before it expires.</p>
         <input id="qt-name" placeholder="Task name (e.g. Help wash the car)" value="${esc(data.name)}" class="mb-3">
         <div class="relative mb-4">
@@ -6507,9 +6564,9 @@ function renderModal() {
                 }).join('');
               })()}
         </div>
-        <div style="display:flex;gap:8px">
+        <div class="sp-modal-actions">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
-          <button onclick="addQuickTask()" class="btn-primary flex-1" style="padding:10px">Assign Task</button>
+          <button onclick="addQuickTask()" class="btn-primary flex-1" style="padding:10px">Add quick chore</button>
         </div>`;
     }
 
@@ -6525,9 +6582,10 @@ function renderModal() {
             </button>`;
         }).join('');
         body = `
-        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${isEdit ? 'Edit' : 'Add'} Bonus Milestone</h3>
+        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${isEdit ? 'Edit' : 'Add'} bonus</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">Set a savings milestone and the bonus a kid earns when they reach it.</p>
-        <input id="bm-name" placeholder="Name (optional, e.g. Milestone 1)" value="${esc(m?.name ?? data.name)}" class="mb-3">
+        <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Name <span style="font-weight:400;color:var(--color-text-secondary)">(optional)</span></p>
+        <input id="bm-name" placeholder="e.g. First R100" value="${esc(m?.name ?? data.name)}" class="mb-3">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
           <div>
             <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Balance milestone (${currSymbol()})</p>
@@ -6546,9 +6604,9 @@ function renderModal() {
           </button>
           ${kidBtns}
         </div>
-        <div style="display:flex;gap:8px">
+        <div class="sp-modal-actions">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
-          <button onclick="saveBonusMilestone(${isEdit ? `'${m.id}'` : 'null'})" class="btn-primary flex-1" style="padding:10px">${isEdit ? 'Save Changes' : 'Add Milestone'}</button>
+          <button onclick="saveBonusMilestone(${isEdit ? `'${m.id}'` : 'null'})" class="btn-primary flex-1" style="padding:10px">${isEdit ? 'Save changes' : 'Add bonus'}</button>
         </div>`;
     }
 
@@ -6563,13 +6621,16 @@ function renderModal() {
             </button>`;
         }).join('');
         body = `
-        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${isEdit ? 'Edit' : 'Add'} Reward</h3>
+        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${isEdit ? 'Edit' : 'Add'} reward</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">For longer-term goals — an exam mark, a sports achievement, anything worth celebrating.</p>
-        <input id="rw-name" placeholder="Goal (e.g. 90% in Maths exam)" value="${esc(data.name)}" class="mb-3">
-        <input id="rw-desc" placeholder="Description (optional)" value="${esc(data.description)}" class="mb-3">
+        <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Goal</p>
+        <input id="rw-name" placeholder="e.g. 90% in Maths exam" value="${esc(data.name)}" class="mb-3">
+        <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Description <span style="font-weight:400;color:var(--color-text-secondary)">(optional)</span></p>
+        <input id="rw-desc" placeholder="Anything your kids should know" value="${esc(data.description)}" class="mb-3">
+        <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Reward amount</p>
         <div class="relative mb-4">
           <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:var(--text-base);line-height:1;pointer-events:none">${currSymbol()}</span>
-          <input id="rw-val" type="number" placeholder="Reward amount" value="${data.value ?? ''}" step="0.01" min="0" style="padding-left:38px !important">
+          <input id="rw-val" type="number" placeholder="0.00" value="${data.value ?? ''}" step="0.01" min="0" style="padding-left:38px !important">
         </div>
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Assign to</p>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
@@ -6579,9 +6640,9 @@ function renderModal() {
           </button>
           ${kidBtns}
         </div>
-        <div style="display:flex;gap:8px">
+        <div class="sp-modal-actions">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
-          <button onclick="saveReward(${isEdit ? `'${data.id}'` : 'null'})" class="btn-primary flex-1" style="padding:10px">${isEdit ? 'Save Changes' : 'Add Reward'}</button>
+          <button onclick="saveReward(${isEdit ? `'${data.id}'` : 'null'})" class="btn-primary flex-1" style="padding:10px">${isEdit ? 'Save changes' : 'Add reward'}</button>
         </div>`;
     }
 
@@ -6596,7 +6657,7 @@ function renderModal() {
         }).join('');
         const todayStr = toLocalDateStr(new Date());
         body = `
-        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Capture Money Spent</h3>
+        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Record spending</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">Log cash a kid has spent so their app balance stays accurate.</p>
 
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Kid</p>
@@ -6614,15 +6675,15 @@ function renderModal() {
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Date</p>
         <input type="date" id="exp-date" value="${data.date || todayStr}" max="${todayStr}" class="mb-5">
 
-        <div style="display:flex;gap:8px">
+        <div class="sp-modal-actions">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
-          <button onclick="captureExpense()" class="btn-primary flex-1" style="padding:10px">Capture</button>
+          <button onclick="captureExpense()" class="btn-primary flex-1" style="padding:10px">Record</button>
         </div>`;
     }
 
     return `
-    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;justify-content:center;z-index:50" onclick="if(event.target===this)closeModal()">
-      <div class="modal-sheet" style="background:var(--color-surface);border-radius:var(--radius-lg) var(--radius-lg) 0 0;padding:28px 24px 36px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;overflow-x:hidden">${body}</div>
+    <div class="sp-modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal-sheet">${body}</div>
     </div>`;
 }
 
