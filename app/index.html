@@ -184,8 +184,13 @@
         -moz-osx-font-smoothing: grayscale;
       }
 
+      /* The brand stripe. Sticky rather than fixed: on a home-screen iPhone a
+         sticky element at the top counts as the app's own top bar, so iOS
+         doesn't fade it with its frosted top-edge effect (it did on screens
+         without a sticky header, e.g. the Family Portal). The negative margin
+         keeps it from pushing the page down. */
       body::before {
-        content:''; position:fixed; top:0; left:0; right:0; height:4px;
+        content:''; display:block; position:sticky; top:0; height:4px; margin-bottom:-4px;
         background:var(--gradient-stripe); z-index:200; pointer-events:none;
       }
 
