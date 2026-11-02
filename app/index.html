@@ -5032,8 +5032,11 @@ function sectionList(title, sections, activeId, openFn) {
       </div>
     </div>`;
 }
+// Desktop: the page title runs across the top, so the list and the open
+// section below it start on the same line.
 function splitView(list, detail) {
-    return `<div class="sp-split"><div class="sp-split-list">${list}</div><div class="sp-split-detail">${detail}</div></div>`;
+    const head = list.match(/<div class="sp-page-head">[\s\S]*?<\/div>/)[0];
+    return `${head}<div class="sp-split"><div class="sp-split-list">${list.replace(head, '')}</div><div class="sp-split-detail">${detail}</div></div>`;
 }
 function backLink(label, onclick) {
     return `<button onclick="${onclick}" class="sp-back-link">${uiIcon('back', 18)}${label}</button>`;
