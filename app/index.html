@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     <title>Sign In or Start Your Free Trial | Sprout</title>
     <meta name="description" content="Sign in to your Sprout account or start your 14-day free trial. Manage chores, pocket money and savings for your kids in one place.">
     <meta name="robots" content="noindex, nofollow">
@@ -173,6 +173,10 @@
 
       * { -webkit-tap-highlight-color: transparent; }
       body {
+        /* With viewport-fit=cover, keep content clear of the notch when an
+           iPhone is turned sideways (both are 0 when upright). */
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
         font-family: var(--font-family);
         background: var(--color-background);
         color: var(--color-text-primary);
@@ -301,10 +305,12 @@
       }
       .sp-bottom-nav {
         position:fixed; left:0; right:0; bottom:0; z-index:30; display:flex;
-        padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+        /* On a home-screen iPhone the bar reaches the rounded screen corners and
+           the home indicator: keep the labels above and inside them. */
+        padding:6px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
         background:var(--color-surface); border-top:1px solid var(--color-border);
       }
-      .sp-bnav-track { position:absolute; top:6px; bottom:calc(6px + env(safe-area-inset-bottom)); left:4px; right:4px; pointer-events:none; }
+      .sp-bnav-track { position:absolute; top:6px; bottom:max(8px, env(safe-area-inset-bottom)); left:max(8px, env(safe-area-inset-left)); right:max(8px, env(safe-area-inset-right)); pointer-events:none; }
       .sp-bnav-pill {
         position:absolute; top:0; bottom:0; left:0; width:20%;
         border-radius:var(--radius-lg); background:var(--color-green-100);
