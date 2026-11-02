@@ -6,7 +6,7 @@ Agreed with Noan on 2026-11-02 as the basis of the `app-redesign` branch.
 ## Principles
 
 1. **One rulebook.** Text sizes, colours, corners, shadows and spacing come from the tokens below. No one-off values.
-2. **Every colour has one job.** Green = actions and good news. Red = problems, rejecting, deleting. Gold = money earned. A child's colour = identifies that child, nothing else.
+2. **Every colour has one job.** Green = actions, selection and good news. Red = problems, rejecting, deleting. Amber/gold = bonuses, rewards and things waiting on you (badges). Money amounts are dark ink; money added shows as green "+R". A child's colour = identifies that child, nothing else.
 3. **Calm surfaces, illustrations carry the personality.** Faint flat green background, white cards, thin borders, minimal decoration. The mascot, avatars and chore pictures are the fun.
 4. **Hierarchy from size and weight, not decoration.** Real sentence-case headings, not small all-caps labels.
 5. **Same thing, same look, everywhere.** One button style, one form style, one card style, one list-row style.

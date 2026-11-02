@@ -67,23 +67,15 @@
         --color-text-primary:   #1e293b;
         --color-text-secondary: #64748b;
         --color-text-muted:     #64748b;
-        --color-background:     #f6faf7;
+        --color-background:     #f2f7f3; /* faint flat green — the only page background */
         --color-surface:        #ffffff;
         --color-border:         #e5ece7;
         --color-success:        #16a34a;
         --color-danger:         #f43f5e;
         --color-warning:        #fbbf24;
         /* Gradients */
-        --gradient-primary:    linear-gradient(132deg, #16a34a 0%, #15803d 100%);
+        --gradient-primary:    var(--color-green-600); /* flat; name kept for existing uses */
         --gradient-stripe:     linear-gradient(90deg,#16a34a 0%,#16a34a 33.333%,#fbbf24 33.333%,#fbbf24 66.666%,#f43f5e 66.666%,#f43f5e 100%);
-        --gradient-blob-green: linear-gradient(135deg, #dcfce7, #bbf7d0 50%, #d1fae5);
-        --gradient-blob-gold:  linear-gradient(135deg, #fef9c3, #fde68a 50%, #fef3c7);
-        --gradient-page:       linear-gradient(170deg, #f0fdf4 0%, #ecfdf5 45%, #f0f9ff 100%);
-        --gradient-dashboard:
-          radial-gradient(at 12% 8%,  rgba(187,247,208,.75) 0px, transparent 45%),
-          radial-gradient(at 88% 12%, rgba(191,219,254,.60) 0px, transparent 42%),
-          radial-gradient(at 78% 92%, rgba(253,230,138,.50) 0px, transparent 45%),
-          radial-gradient(at 30% 95%, rgba(209,250,229,.70) 0px, transparent 50%);
         --font-family:         'Nunito', system-ui, sans-serif;
         /* Type scale, corners and shadows — see docs/design-principles.md.
            Use these tokens; don't introduce one-off sizes. */
@@ -182,11 +174,15 @@
       * { -webkit-tap-highlight-color: transparent; }
       body {
         font-family: var(--font-family);
-        background: var(--gradient-page);
-        background-color: var(--color-background);
+        background: var(--color-background);
         color: var(--color-text-primary);
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+      }
+
+      body::before {
+        content:''; position:fixed; top:0; left:0; right:0; height:4px;
+        background:var(--gradient-stripe); z-index:200; pointer-events:none;
       }
 
       /* ── Component classes ────────────────────────────────────── */
@@ -196,26 +192,6 @@
         box-shadow: var(--shadow-card);
         overflow: hidden;
         position: relative;
-      }
-      .pr-stripe {
-        position: absolute; top:0; left:0; right:0;
-        height: 5px; background: var(--gradient-stripe); z-index: 2;
-      }
-      .pr-blob-top {
-        position:absolute; top:-75px; right:-75px;
-        width:195px; height:195px;
-        background: var(--gradient-blob-green);
-        opacity:0.6; pointer-events:none;
-        border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
-        animation: blobMorph var(--anim-blob-duration) var(--anim-easing) infinite;
-      }
-      .pr-blob-bottom {
-        position:absolute; bottom:-70px; left:-70px;
-        width:220px; height:220px;
-        background: var(--gradient-blob-gold);
-        opacity:0.5; pointer-events:none;
-        border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
-        animation: blobMorph var(--anim-blob-duration-2) var(--anim-easing) infinite 3s;
       }
       .sp-tree-logo {
         animation: treeSway 4.5s var(--anim-easing) infinite;
@@ -234,8 +210,8 @@
         transition: transform var(--anim-transition-fast), box-shadow var(--anim-transition-fast);
         display:flex; align-items:center; gap:11px;
       }
-      .pr-btn-primary:hover  { transform:translateY(-1px); box-shadow:var(--shadow-button-hover); }
-      .pr-btn-primary:active { transform:translateY(0);    box-shadow:var(--shadow-button); }
+      .pr-btn-primary:hover  { background:var(--color-green-700); }
+      .pr-btn-primary:active { background:var(--color-green-800); }
       .pr-section-label {
         font-family: var(--font-family);
         font-size:var(--text-xs); font-weight:800;
@@ -349,7 +325,7 @@
       }
       .btn-primary:active { opacity:0.85; }
       .chore-done-btn {
-        background:linear-gradient(132deg,#38bdf8 0%,#0284c7 100%); color:white;
+        background:var(--color-green-600); color:white;
         border-radius:var(--radius-lg); font-weight:800; font-family:var(--font-family);
         border:none; box-shadow:none; cursor:pointer;
         transition:transform 0.15s ease, opacity 0.15s;
@@ -3085,9 +3061,6 @@ function vLogin() {
       <div style="width:100%;max-width:440px">
         <a href="../index.html" style="display:inline-flex;align-items:center;gap:6px;font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:#15803d;text-decoration:none;margin-bottom:16px">&larr; Back to website</a>
         <div class="pr-card" style="padding:52px 40px 44px">
-          <div class="pr-stripe"></div>
-          <div class="pr-blob-top"></div>
-          <div class="pr-blob-bottom"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;justify-content:center;margin-bottom:28px">
               <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:130px;width:auto;display:block;transform:translateX(-10.75%)"></picture>
@@ -3157,7 +3130,6 @@ function vSignupPage() {
       <div style="width:100%;max-width:1000px">
         <a href="../index.html" style="display:inline-flex;align-items:center;gap:6px;font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:#15803d;text-decoration:none;margin-bottom:16px">&larr; Back to website</a>
         <div class="pr-card">
-          <div class="pr-stripe"></div>
           <div style="position:relative;z-index:1;padding:clamp(24px,4vw,40px)">
             <div style="display:flex;justify-content:center;margin-bottom:28px">
               <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:130px;width:auto;display:block;transform:translateX(-10.75%)"></picture>
@@ -3327,9 +3299,6 @@ function vResetPassword() {
     <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
       <div style="width:100%;max-width:440px">
         <div class="pr-card" style="padding:52px 40px 44px">
-          <div class="pr-stripe"></div>
-          <div class="pr-blob-top"></div>
-          <div class="pr-blob-bottom"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;justify-content:center;margin-bottom:28px">
               <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture>
@@ -3363,9 +3332,6 @@ function vResetParentPin() {
     <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
       <div style="width:100%;max-width:440px">
         <div class="pr-card" style="padding:52px 40px 44px">
-          <div class="pr-stripe"></div>
-          <div class="pr-blob-top"></div>
-          <div class="pr-blob-bottom"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;justify-content:center;margin-bottom:28px">
               <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture>
@@ -3443,7 +3409,6 @@ function vSubscriptionGate() {
     <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
       <div style="width:100%;max-width:440px">
         <div class="pr-card" style="padding:52px 40px 44px;text-align:center">
-          <div class="pr-stripe"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;justify-content:center;margin-bottom:20px"><picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture></div>
             <h2 style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:#14532d;margin-bottom:10px">${needsAttention ? 'Your subscription needs attention' : "You're almost there!"}</h2>
@@ -3499,7 +3464,6 @@ function vRestartGate() {
     <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
       <div style="width:100%;max-width:440px">
         <div class="pr-card" style="padding:52px 40px 44px;text-align:center">
-          <div class="pr-stripe"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;justify-content:center;margin-bottom:20px"><picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture></div>
             <h2 style="${font};font-size:var(--text-xl);font-weight:800;color:#14532d;margin-bottom:10px">Welcome back!</h2>
@@ -3808,7 +3772,6 @@ function vCardCheck() {
     <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
       <div style="width:100%;max-width:440px">
         <div class="pr-card" style="padding:44px 32px 36px;text-align:center">
-          <div class="pr-stripe"></div>
           <div style="position:relative;z-index:1">
             <div style="display:flex;justify-content:center;margin-bottom:16px"><picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:84px;width:auto;display:block"></picture></div>
             <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-green-600);margin:0 0 6px">${isOffer ? `Your ${c.trialDays}-day free trial` : 'Account created · Step 2 of 2'}</p>
@@ -3855,9 +3818,6 @@ function vHome() {
     <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
       <div style="width:100%;max-width:440px">
         <div class="pr-card" style="padding:52px 40px 44px">
-          <div class="pr-stripe"></div>
-          <div class="pr-blob-top"></div>
-          <div class="pr-blob-bottom"></div>
           <div style="position:relative;z-index:1">
             <!-- Logo block -->
             <div style="display:flex;justify-content:center;margin-bottom:20px">
@@ -3882,7 +3842,7 @@ function vHome() {
                   const ac    = kidAccent(k);
                   const stage = getTreeStage(k.balance);
                   return `<button onclick="go('kid-pin',{pinKidId:'${k.id}'})"
-                    style="padding:16px 8px 14px;border-radius:var(--radius-lg);border:1.5px solid ${ac.border};background:${ac.bg};cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:filter 0.15s,transform 0.15s"
+                    style="padding:16px 8px 14px;border-radius:var(--radius-lg);border:1px solid var(--color-border);border-top:4px solid ${ac.header};background:var(--color-surface);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:filter 0.15s,transform 0.15s"
                     onmouseenter="this.style.filter='brightness(0.96)';this.style.transform='scale(0.98)'"
                     onmouseleave="this.style.filter='';this.style.transform=''">
                     ${kidIcon(k, 56)}
@@ -4101,9 +4061,6 @@ function vOnboarding() {
     <div class="min-h-screen flex items-center justify-center p-6" style="background:var(--color-background)">
       <div style="width:100%;max-width:480px">
         <div class="pr-card" style="padding:44px 36px">
-          <div class="pr-stripe"></div>
-          <div class="pr-blob-top"></div>
-          <div class="pr-blob-bottom"></div>
           <div style="position:relative;z-index:1">
             ${progress}
             ${body}
@@ -4144,16 +4101,16 @@ function pRecon(db) {
         <div class="card sp-recon-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;gap:12px;padding:16px 20px">
           <!-- Kid -->
           <div style="display:flex;align-items:center;gap:10px">
-            <div style="width:54px;height:54px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-2xl);flex-shrink:0">${kidIcon(k)}</div>
+            <div style="width:54px;height:54px;background:var(--color-surface);border:2px solid ${ac.header};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-2xl);flex-shrink:0">${kidIcon(k)}</div>
             <div>
-              <p style="font-family:var(--font-family);font-weight:800;font-size:var(--text-sm);color:var(--color-text-primary)">${esc(k.name)}</p>
+              <p style="font-family:var(--font-family);font-weight:800;font-size:var(--text-sm);color:${ac.text}">${esc(k.name)}</p>
               <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">Expected vs. bank</p>
             </div>
           </div>
           <!-- Expected in bank + bank input -->
           <div style="display:flex;align-items:center;gap:10px">
             <div style="text-align:right;min-width:78px">
-              <p style="font-family:var(--font-family);font-weight:800;font-size:var(--text-base);color:${ac.text}">${R(expected)}</p>
+              <p style="font-family:var(--font-family);font-weight:800;font-size:var(--text-base);color:var(--color-text-primary)">${R(expected)}</p>
               <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.08em">Expected in bank</p>
               <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-muted);margin-top:2px">${R(appBal)} app − ${R(owed)} owed</p>
             </div>
@@ -4182,7 +4139,7 @@ function pRecon(db) {
     const totalDiff = totalBank !== null ? totalBank - totalExpected : null;
 
     const summary = allEntered ? `
-        <div class="card" style="background:linear-gradient(132deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;padding:16px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:center">
+        <div class="card" style="background:var(--color-green-50);border:1px solid var(--color-green-200);padding:16px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:center">
           <div>
             <p style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total expected</p>
             <p style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:#14532d">${R(totalExpected)}</p>
@@ -4234,7 +4191,7 @@ function reconUpdate(kidId, value) {
             const totalExpected = sortedKids.reduce((s, k) => s + (k.balance || 0) - owedSinceDistribution(db, k), 0);
             const totalBank = sortedKids.reduce((s, k) => s + parseFloat(saved[k.id] || 0), 0);
             const totalDiff = totalBank - totalExpected;
-            summaryEl.innerHTML = `<div class="card" style="background:linear-gradient(132deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;padding:16px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:center"><div><p style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total expected</p><p style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:#14532d">${R(totalExpected)}</p></div><div><p style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total in bank</p><p style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:#14532d">${R(totalBank)}</p></div><div style="text-align:right"><p style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Difference</p><p style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:${totalDiff === 0 ? '#16a34a' : '#f43f5e'}">${totalDiff === 0 ? '✓ All balanced' : R(totalDiff)}</p></div></div>`;
+            summaryEl.innerHTML = `<div class="card" style="background:var(--color-green-50);border:1px solid var(--color-green-200);padding:16px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:center"><div><p style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total expected</p><p style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:#14532d">${R(totalExpected)}</p></div><div><p style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Total in bank</p><p style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:#14532d">${R(totalBank)}</p></div><div style="text-align:right"><p style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">Difference</p><p style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:${totalDiff === 0 ? '#16a34a' : '#f43f5e'}">${totalDiff === 0 ? '✓ All balanced' : R(totalDiff)}</p></div></div>`;
         } else {
             summaryEl.innerHTML = '';
         }
@@ -4329,7 +4286,6 @@ function vParent() {
     ];
     const sidebar = `
     <aside style="width:220px;min-height:100vh;background:#f6faf7;flex-direction:column;flex-shrink:0;border-right:1px solid var(--color-border)" class="hidden md:flex">
-      <div style="height:5px;background:var(--gradient-stripe);flex-shrink:0"></div>
       <div style="padding:28px 20px 16px;display:flex;flex-direction:column;align-items:flex-start;gap:2px">
         <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture>
         <p style="color:var(--color-green);font-size:var(--text-lg);font-weight:700;font-family:var(--font-family);margin-left:9px">Parent Dashboard</p>
@@ -4358,7 +4314,6 @@ function vParent() {
 
     const mobileHeader = `
     <div class="md:hidden" style="position:sticky;top:0;z-index:20">
-    <div style="height:5px;background:var(--gradient-stripe)"></div>
     <div class="pl-2 pr-5 pt-0 pb-0 flex justify-between items-center" style="background:var(--color-surface);border-bottom:1px solid var(--color-green-border)">
       <div style="display:flex;align-items:flex-start;gap:10px;height:88px;overflow:hidden">
         <picture class="sp-mobile-logo"><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block;flex-shrink:0"></picture>
@@ -4390,7 +4345,7 @@ function vParent() {
       ${sidebar}
       <div style="flex:1;display:flex;flex-direction:column;min-width:0">
         ${mobileHeader}
-        <div class="sp-tab-content ${tutorialNudgeVisible() ? 'sp-has-nudge ' : ''}${S.tabAnim === 'fwd' ? 'sp-tab-anim-fwd' : S.tabAnim === 'back' ? 'sp-tab-anim-back' : ''}" style="flex:1;overflow:auto;padding:24px 28px;background-color:#f4faf6;background-image:var(--gradient-dashboard);background-attachment:local">
+        <div class="sp-tab-content ${tutorialNudgeVisible() ? 'sp-has-nudge ' : ''}${S.tabAnim === 'fwd' ? 'sp-tab-anim-fwd' : S.tabAnim === 'back' ? 'sp-tab-anim-back' : ''}" style="flex:1;overflow:auto;padding:24px 28px;background-color:var(--color-background)">
           ${paymentFailedBanner()}
           ${cancelScheduledBanner()}
           ${S.tab === 'overview'  ? pOverview(db) :
@@ -4503,14 +4458,14 @@ function pOverview(db) {
             ? `Cycle amount: ${R(k.cycle_amount)}`
             : `Weekly potential: ${R(weeklyPossible(db, k.id))}`;
         return `
-        <div class="card flex items-center gap-3" style="border-color:${ac.border}">
-          <div style="width:60px;height:60px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-2xl);flex-shrink:0">${kidIcon(k)}</div>
+        <div class="card flex items-center gap-3" style="border-left:4px solid ${ac.header}">
+          <div style="width:60px;height:60px;background:var(--color-surface);border:2px solid ${ac.header};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-2xl);flex-shrink:0">${kidIcon(k)}</div>
           <div class="flex-1">
-            <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:var(--text-sm)">${esc(k.name)}</p>
+            <p style="font-family:var(--font-family);font-weight:700;color:${ac.text};font-size:var(--text-sm)">${esc(k.name)}</p>
             <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">${subtitle}</p>
           </div>
           <div class="text-right">
-            <p style="font-family:var(--font-family);font-weight:800;color:${ac.text};font-size:var(--text-base)">${R(kBalance)}</p>
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-base)">${R(kBalance)}</p>
             <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px">
               <button onclick="openModal('manual-adjustment',{kidId:'${k.id}',adjustType:'add'})" class="chip-btn">Adjust</button>
             </div>
@@ -4543,14 +4498,14 @@ function pOverview(db) {
             </div>`;
         }).join('');
         return `
-        <div class="card card-flush" style="padding:0;overflow:hidden;border:1.5px solid ${ac.border}">
-          <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:${ac.bg};border-bottom:1.5px solid ${ac.border}">
-            <div style="width:48px;height:48px;background:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-xl);flex-shrink:0;border:1.5px solid ${ac.border}">${kidIcon(k)}</div>
+        <div class="card card-flush" style="padding:0;overflow:hidden;border-left:4px solid ${ac.header}">
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--color-surface);border-bottom:1px solid var(--color-border)">
+            <div style="width:48px;height:48px;background:var(--color-surface);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-xl);flex-shrink:0;border:2px solid ${ac.header}">${kidIcon(k)}</div>
             <div class="flex-1">
               <p style="font-family:var(--font-family);font-weight:800;color:${ac.text};font-size:var(--text-sm)">${esc(k.name)}</p>
-              <p style="font-family:var(--font-family);font-size:var(--text-xs);color:${ac.text};opacity:0.75">${comps.length} task${comps.length > 1 ? 's' : ''}${cycleMode ? (total > 0 ? ` · ${R(total)} from quick chores` : '') : ` · ${R(total)} total`}</p>
+              <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">${comps.length} task${comps.length > 1 ? 's' : ''}${cycleMode ? (total > 0 ? ` · ${R(total)} from quick chores` : '') : ` · ${R(total)} total`}</p>
             </div>
-            <button onclick="approveAllForKid('${k.id}')" style="background:${ac.header};color:white;padding:6px 12px;border-radius:var(--radius-sm);font-family:var(--font-family);font-size:var(--text-xs);font-weight:800;border:none;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;gap:5px">${uiIcon('check', 11, 3)} Approve all</button>
+            <button onclick="approveAllForKid('${k.id}')" style="background:var(--color-green-600);color:white;padding:6px 12px;border-radius:var(--radius-sm);font-family:var(--font-family);font-size:var(--text-xs);font-weight:800;border:none;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;gap:5px">${uiIcon('check', 11, 3)} Approve all</button>
           </div>
           <div style="display:flex;flex-direction:column;gap:2px;padding:6px">
             ${rows}
@@ -4581,12 +4536,12 @@ function pOverview(db) {
             </div>`;
         }).join('');
         return `
-        <div class="card card-flush" style="padding:0;overflow:hidden;border:1.5px solid ${ac.border}">
-          <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:${ac.bg};border-bottom:1.5px solid ${ac.border}">
-            <div style="width:48px;height:48px;background:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-xl);flex-shrink:0;border:1.5px solid ${ac.border}">${kidIcon(k)}</div>
+        <div class="card card-flush" style="padding:0;overflow:hidden;border-left:4px solid ${ac.header}">
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--color-surface);border-bottom:1px solid var(--color-border)">
+            <div style="width:48px;height:48px;background:var(--color-surface);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-xl);flex-shrink:0;border:2px solid ${ac.header}">${kidIcon(k)}</div>
             <div class="flex-1">
               <p style="font-family:var(--font-family);font-weight:800;color:${ac.text};font-size:var(--text-sm)">${esc(k.name)}</p>
-              <p style="font-family:var(--font-family);font-size:var(--text-xs);color:${ac.text};opacity:0.75">${comps.length} reward${comps.length > 1 ? 's' : ''} · ${R(total)} total</p>
+              <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">${comps.length} reward${comps.length > 1 ? 's' : ''} · ${R(total)} total</p>
             </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:2px;padding:6px">
@@ -4620,13 +4575,13 @@ function pOverview(db) {
     // Mobile: one tile split by dividers (mirrors the kid dashboard); tablet/desktop keep three tiles.
     const mRingR = 26, mRingC = 2 * Math.PI * mRingR, mRingOffset = mRingC * (1 - weekPct / 100);
     const weeklyCard  = db.kids.length === 0 ? '' : `
-    <div class="card md:hidden mb-6" style="background:#dcfce7;border:1.5px solid #16a34a">
+    <div class="card md:hidden mb-6">
      <div style="display:flex;align-items:stretch;gap:12px">
       <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center">
-        <p class="pr-section-label" style="color:var(--color-green-700)">${statCardLabel}</p>
+        <p class="pr-section-label">${statCardLabel}</p>
         <div style="position:relative;width:64px;height:64px">
           <svg width="64" height="64" viewBox="0 0 64 64" style="transform:rotate(-90deg)">
-            <circle cx="32" cy="32" r="${mRingR}" fill="none" stroke="#ffffff" stroke-width="8"/>
+            <circle cx="32" cy="32" r="${mRingR}" fill="none" stroke="var(--color-green-100)" stroke-width="8"/>
             <circle cx="32" cy="32" r="${mRingR}" fill="none" stroke="var(--color-green-500)" stroke-width="8"
               stroke-linecap="round"
               stroke-dasharray="${mRingC.toFixed(2)}"
@@ -4638,16 +4593,16 @@ function pOverview(db) {
         </div>
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:800;color:var(--color-green-700)">${statCardFooter}</p>
       </div>
-      <div style="width:1px;background:rgba(255,255,255,0.9)"></div>
+      <div style="width:1px;background:var(--color-border)"></div>
       <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;text-align:center;min-width:0">
         <div>
-          <p class="pr-section-label" style="color:#be123c">Pending</p>
-          <p style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:#f43f5e;line-height:1.1;margin-top:2px">${pending.length}</p>
+          <p class="pr-section-label">Pending</p>
+          <p style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:var(--color-text-primary);line-height:1.1;margin-top:2px">${pending.length}</p>
           <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">${pendingValue > 0 ? `Worth ${R(pendingValue)}` : 'Waiting for review'}</p>
         </div>
-        <div style="height:1px;background:rgba(255,255,255,0.9);margin:10px 0"></div>
+        <div style="height:1px;background:var(--color-border);margin:10px 0"></div>
         <div>
-          <p class="pr-section-label" style="color:#1d4ed8">Balances</p>
+          <p class="pr-section-label">Balances</p>
           <p style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);line-height:1.1;margin-top:2px">${R(totalBalances)}</p>
           <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">Held for the kids</p>
         </div>
@@ -4655,11 +4610,11 @@ function pOverview(db) {
      </div>
     </div>
     <div class="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-      <div class="stat-card" style="grid-column: span 2 / span 2; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center; background:#dcfce7; border-color:#16a34a">
+      <div class="stat-card" style="grid-column: span 2 / span 2; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center">
         <p class="pr-section-label">${statCardLabel}</p>
         <div style="position:relative;width:88px;height:88px">
           <svg width="88" height="88" viewBox="0 0 88 88" style="transform:rotate(-90deg)">
-            <circle cx="44" cy="44" r="${ringR}" fill="none" stroke="#ffffff" stroke-width="10"/>
+            <circle cx="44" cy="44" r="${ringR}" fill="none" stroke="var(--color-green-100)" stroke-width="10"/>
             <circle cx="44" cy="44" r="${ringR}" fill="none" stroke="var(--color-green-500)" stroke-width="10"
               stroke-linecap="round"
               stroke-dasharray="${ringC.toFixed(2)}"
@@ -4671,12 +4626,12 @@ function pOverview(db) {
         </div>
         <p style="font-family:var(--font-family);font-size:var(--text-base);font-weight:800;color:var(--color-green-700);margin-top:2px">${statCardFooter}</p>
       </div>
-      <div class="stat-card" style="background:rgba(244,63,94,0.22);border-color:#f43f5e">
+      <div class="stat-card">
         <p class="pr-section-label">Pending approvals</p>
-        <p style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:#f43f5e;margin-top:4px">${pending.length}</p>
+        <p style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:var(--color-text-primary);margin-top:4px">${pending.length}</p>
         <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:8px">${pendingValue > 0 ? `Worth ${R(pendingValue)}` : 'Waiting for review'}</p>
       </div>
-      <div class="stat-card" style="background:rgba(37,99,235,0.22);border-color:#2563eb">
+      <div class="stat-card">
         <p class="pr-section-label">Total balances</p>
         <p style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:var(--color-text-primary);margin-top:4px">${R(totalBalances)}</p>
         <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:8px">Held for the kids</p>
@@ -4835,9 +4790,9 @@ function pKids(db) {
             return `
             <div class="card">
               <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-                <div style="width:72px;height:72px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px">${kidIcon(k)}</div>
+                <div style="width:72px;height:72px;background:var(--color-surface);border:2px solid ${ac.header};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px">${kidIcon(k)}</div>
                 <div style="flex:1;min-width:0">
-                  <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary)">${esc(k.name)}</p>
+                  <p style="font-family:var(--font-family);font-weight:800;color:${ac.text}">${esc(k.name)}</p>
                   <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">PIN protected - tap edit to change</p>
                 </div>
                 <div style="display:flex;gap:4px">
@@ -4848,7 +4803,7 @@ function pKids(db) {
               <div style="border-top:1px solid var(--color-border);padding-top:12px">
                 <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
                   <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">Balance</p>
-                  <p style="font-family:var(--font-family);font-weight:800;color:${ac.text}">${R(k.balance)}</p>
+                  <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary)">${R(k.balance)}</p>
                 </div>
                 ${cycleMode ? `
                 <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
@@ -4860,7 +4815,7 @@ function pKids(db) {
                   <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">${statLabel}</p>
                   <p style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:600;color:var(--color-text-primary)">${statValue}</p>
                 </div>
-                <div style="background:${ac.bg};border-radius:var(--radius-full);height:6px;overflow:hidden">
+                <div style="background:var(--color-border);border-radius:var(--radius-full);height:6px;overflow:hidden">
                   <div style="background:${ac.header};width:${pct}%;height:100%;border-radius:var(--radius-full)"></div>
                 </div>
               </div>
@@ -4919,14 +4874,14 @@ function pDistributions(db) {
         const owed = owedSinceDistribution(db, k);
         const sinceLabel = k.last_distribution_at ? `Since ${dateStr(k.last_distribution_at)}` : 'Since the beginning';
         return `
-        <div class="card flex items-center gap-3" style="border-color:${ac.border}">
-          <div style="width:60px;height:60px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-2xl);flex-shrink:0">${kidIcon(k)}</div>
+        <div class="card flex items-center gap-3" style="border-left:4px solid ${ac.header}">
+          <div style="width:60px;height:60px;background:var(--color-surface);border:2px solid ${ac.header};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-2xl);flex-shrink:0">${kidIcon(k)}</div>
           <div class="flex-1">
-            <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:var(--text-sm)">${esc(k.name)}</p>
+            <p style="font-family:var(--font-family);font-weight:700;color:${ac.text};font-size:var(--text-sm)">${esc(k.name)}</p>
             <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">${sinceLabel}</p>
           </div>
           <div class="text-right">
-            <p style="font-family:var(--font-family);font-weight:800;color:${ac.text};font-size:var(--text-base)">${R(owed)}</p>
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-base)">${R(owed)}</p>
             <div style="display:flex;justify-content:flex-end;margin-top:6px">
               <button onclick="runDistribution('${k.id}')" class="chip-btn">Distribution Made</button>
             </div>
@@ -5049,8 +5004,8 @@ function pBonuses(db) {
             const claimDate = claim ? new Date(claim.claimedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : null;
             return `
             <div style="display:flex;align-items:center;gap:8px;padding:5px 0">
-              <div style="width:48px;height:48px;background:${ac.bg};border:1px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-xl);flex-shrink:0">${kidIcon(k)}</div>
-              <span style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:600;color:var(--color-text-primary);flex:1">${esc(k.name)}</span>
+              <div style="width:48px;height:48px;background:var(--color-surface);border:2px solid ${ac.header};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-xl);flex-shrink:0">${kidIcon(k)}</div>
+              <span style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:600;color:${ac.text};flex:1">${esc(k.name)}</span>
               ${claim
                 ? `<span style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;background:#dcfce7;color:#16a34a;padding:3px 9px;border-radius:var(--radius-full)">✓ Claimed ${claimDate}</span>`
                 : `<span style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:600;color:var(--color-text-muted);background:var(--color-background);padding:3px 9px;border-radius:var(--radius-full)">Not reached</span>`}
@@ -5090,7 +5045,7 @@ function pBonuses(db) {
         const ac = kid ? kidAccent(kid) : { bg: '#f1f5f9', border: '#e2e8f0', text: '#64748b' };
         return `
         <div class="card flex items-center gap-3">
-          ${kid ? `<div style="width:54px;height:54px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-2xl);flex-shrink:0">${kidIcon(kid)}</div>` : ''}
+          ${kid ? `<div style="width:54px;height:54px;background:var(--color-surface);border:2px solid ${ac.header};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-2xl);flex-shrink:0">${kidIcon(kid)}</div>` : ''}
           <div class="flex-1 min-w-0">
             <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:var(--text-sm)">${esc(t.description)}</p>
             <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:1px">${esc(kid?.name) || '?'} · ${dateStr(t.createdAt)}${byParent(t.actioned_by)}</p>
@@ -5135,8 +5090,8 @@ function pRewards(db) {
             const claimDate = achieved ? new Date(achieved.approvedAt || achieved.claimedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : null;
             return `
             <div style="display:flex;align-items:center;gap:8px;padding:5px 0">
-              <div style="width:48px;height:48px;background:${ac.bg};border:1px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-xl);flex-shrink:0">${kidIcon(k)}</div>
-              <span style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:600;color:var(--color-text-primary);flex:1">${esc(k.name)}</span>
+              <div style="width:48px;height:48px;background:var(--color-surface);border:2px solid ${ac.header};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-xl);flex-shrink:0">${kidIcon(k)}</div>
+              <span style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:600;color:${ac.text};flex:1">${esc(k.name)}</span>
               ${achieved
                 ? `<span style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;background:#dcfce7;color:#16a34a;padding:3px 9px;border-radius:var(--radius-full)">✓ Claimed ${claimDate}</span>`
                 : pendingComp
@@ -5176,7 +5131,7 @@ function pRewards(db) {
         const ac = kid ? kidAccent(kid) : { bg: '#f1f5f9', border: '#e2e8f0', text: '#64748b' };
         return `
         <div class="card flex items-center gap-3">
-          ${kid ? `<div style="width:54px;height:54px;background:${ac.bg};border:1.5px solid ${ac.border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-2xl);flex-shrink:0">${kidIcon(kid)}</div>` : ''}
+          ${kid ? `<div style="width:54px;height:54px;background:var(--color-surface);border:2px solid ${ac.header};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-2xl);flex-shrink:0">${kidIcon(kid)}</div>` : ''}
           <div class="flex-1 min-w-0">
             <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:var(--text-sm)">${esc(t.description)}</p>
             <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:1px">${esc(kid?.name) || '?'} · ${dateStr(t.createdAt)}${byParent(t.actioned_by)}</p>
@@ -5533,7 +5488,7 @@ function pSettings() {
             <!-- Stage cards -->
             <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px">
               ${tiers.map(tier => `
-              <div style="display:flex;align-items:center;gap:16px;padding:14px 16px;border-radius:var(--radius-lg);background:${tier.stage === 4 ? 'linear-gradient(135deg,#f0fdf4,#dcfce7)' : 'var(--color-background)'};border:1.5px solid ${tier.stage === 4 ? 'var(--color-green-border)' : 'var(--color-border)'}">
+              <div style="display:flex;align-items:center;gap:16px;padding:14px 16px;border-radius:var(--radius-lg);background:${tier.stage === 4 ? 'var(--color-green-50)' : 'var(--color-background)'};border:1.5px solid ${tier.stage === 4 ? 'var(--color-green-border)' : 'var(--color-border)'}">
                 <div style="flex-shrink:0">${treeStageSVG(tier.stage, 52)}</div>
                 <div style="flex:1;min-width:0">
                   <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
@@ -6468,7 +6423,7 @@ function renderModal() {
             const sel = S.selectedKids === 'all' || (Array.isArray(S.selectedKids) && S.selectedKids.includes(k.id));
             const ac = kidAccent(k);
             return `<button onclick="pickBonusKid('${k.id}')" type="button"
-              style="padding:8px 14px;border-radius:var(--radius-sm);font-size:var(--text-sm);font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? ac.border : 'var(--color-border)'};background:${sel ? ac.bg : 'white'};color:${sel ? ac.text : '#6b7280'};cursor:pointer;display:flex;align-items:center;gap:6px">
+              style="padding:8px 14px;border-radius:var(--radius-sm);font-size:var(--text-sm);font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? 'var(--color-green-600)' : 'var(--color-border)'};background:${sel ? 'var(--color-green-50)' : 'var(--color-surface)'};color:${sel ? 'var(--color-green-800)' : 'var(--color-text-secondary)'};cursor:pointer;display:flex;align-items:center;gap:6px">
               ${kidIcon(k, 36)}${esc(k.name)}
             </button>`;
         }).join('');
@@ -6506,7 +6461,7 @@ function renderModal() {
             const sel = S.selectedKids === 'all' || (Array.isArray(S.selectedKids) && S.selectedKids.includes(k.id));
             const ac = kidAccent(k);
             return `<button onclick="toggleKidAssignment('${k.id}')" type="button"
-              style="padding:8px 14px;border-radius:var(--radius-sm);font-size:var(--text-sm);font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? ac.border : 'var(--color-border)'};background:${sel ? ac.bg : 'white'};color:${sel ? ac.text : '#6b7280'};cursor:pointer;display:flex;align-items:center;gap:6px">
+              style="padding:8px 14px;border-radius:var(--radius-sm);font-size:var(--text-sm);font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? 'var(--color-green-600)' : 'var(--color-border)'};background:${sel ? 'var(--color-green-50)' : 'var(--color-surface)'};color:${sel ? 'var(--color-green-800)' : 'var(--color-text-secondary)'};cursor:pointer;display:flex;align-items:center;gap:6px">
               ${kidIcon(k, 36)}${esc(k.name)}
             </button>`;
         }).join('');
@@ -6538,7 +6493,7 @@ function renderModal() {
             const ac = kidAccent(k);
             const sel = data.kidId === k.id;
             return `<button onclick="pickExpenseKid('${k.id}')" type="button"
-              style="padding:8px 14px;border-radius:var(--radius-sm);font-size:var(--text-sm);font-weight:700;font-family:var(--font-family);border:2px solid ${ac.border};background:${sel ? ac.bg : 'white'};color:${sel ? ac.text : '#6b7280'};cursor:pointer;display:flex;align-items:center;gap:6px">
+              style="padding:8px 14px;border-radius:var(--radius-sm);font-size:var(--text-sm);font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? 'var(--color-green-600)' : 'var(--color-border)'};background:${sel ? 'var(--color-green-50)' : 'var(--color-surface)'};color:${sel ? 'var(--color-green-800)' : 'var(--color-text-secondary)'};cursor:pointer;display:flex;align-items:center;gap:6px">
               ${kidIcon(k, 36)}${esc(k.name)}
             </button>`;
         }).join('');
