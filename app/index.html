@@ -5243,7 +5243,7 @@ function pBonuses(db) {
     }).join('');
 
     return `
-    <div class="sp-page-head"><h1 class="sp-page-title">Bonuses</h1><button onclick="openModal('add-bonus')" class="btn-primary sp-head-btn">${uiIcon('plus', 16, 2.5)}Add milestone</button></div><p class="sp-page-intro">When a kid's balance reaches a threshold, they automatically receive the bonus - once per milestone.</p>
+    <div class="sp-page-head"><h1 class="sp-page-title">Bonuses</h1><button onclick="openModal('add-bonus')" class="btn-primary sp-head-btn">${uiIcon('plus', 16, 2.5)}Add milestone</button></div><p class="sp-page-intro">When a kid's balance reaches a savings milestone, they automatically receive the bonus - once per milestone.</p>
     ${milestones.length === 0
         ? `<div class="card text-center py-12" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:var(--text-sm)"><div style="display:flex;justify-content:center;margin-bottom:12px">${milestoneStarSVG(40)}</div>No milestones yet.<br>Add one to reward your kids for saving!</div>`
         : `<div class="sp-narrow-list flex flex-col gap-3 mb-6">${milestoneCards}</div>`}
