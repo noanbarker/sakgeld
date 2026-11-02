@@ -12,6 +12,7 @@ Agreed with Noan on 2026-11-02 as the basis of the `app-redesign` branch.
 5. **Same thing, same look, everywhere.** One button style, one form style, one card style, one list-row style.
 6. **Phone first, desktop deliberate.** Desktop uses its width (centred content, larger text, side-by-side layouts) instead of stretching the phone layout.
 7. **Plain words.** Sentence case, short, written from the parent's or child's side.
+8. **Names are never shortened.** A child's (or parent's) name is never cut off with "…". If space is tight, the name wraps onto a second line, steps down a text size, or something next to it gives up room (e.g. a button drops its label and keeps its icon).
 
 ## Decisions
 
