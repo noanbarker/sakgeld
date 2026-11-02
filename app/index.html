@@ -193,6 +193,14 @@
         content:''; display:block; position:sticky; top:0; height:4px; margin-bottom:-4px;
         background:var(--gradient-stripe); z-index:200; pointer-events:none;
       }
+      /* Screens without their own sticky header (Family Portal, sign-in, PIN
+         pads, onboarding): a thin solid band under the stripe, in the page
+         colour. A 4px stripe alone is too thin for a home-screen iPhone to
+         treat as the app's top bar, so iOS faded it with its frosted top edge. */
+      body.sp-no-header::before {
+        height:28px; margin-bottom:-28px;
+        background:var(--gradient-stripe) top / 100% 4px no-repeat, var(--color-background);
+      }
 
       /* ── Component classes ────────────────────────────────────── */
       .pr-card {
@@ -7585,6 +7593,8 @@ function screenKey() {
 
 function render() {
     trackScreen();
+    // Screens with their own sticky header (dashboard, kid screen) don't need the band under the stripe.
+    document.body.classList.toggle('sp-no-header', !(currentUser && hasAppAccess(currentUser.user_metadata) && (S.view === 'parent' || S.view === 'kid')));
     document.title = currentUser ? 'Sprout' : 'Sign In or Start Your Free Trial | Sprout';
     const toastHtml = S.toast
         ? `<div class="sp-toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:6px;background:#1e293b;color:white;font-family:var(--font-family);font-size:var(--text-sm);font-weight:600;padding:10px 20px;border-radius:var(--radius-full);box-shadow:var(--shadow-overlay);z-index:99;max-width:320px;text-align:center">${S.toastIcon || ''}${esc(S.toast)}</div>`
