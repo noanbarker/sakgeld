@@ -1981,7 +1981,7 @@ function renderCelebration() {
     const sub = item.type !== 'tree'
         ? `You hit ${R(item.milestone.threshold)} in savings, ${esc(kid.name)}. Your bonus is already in your balance.`
         : item.to >= TREE_STAGES.length - 1
-            ? `Nice saving, ${esc(kid.name)} — you've grown a whole forest. That's the very top!`
+            ? `Nice saving, ${esc(kid.name)} - you've grown a whole forest. That's the very top!`
             : `Nice saving, ${esc(kid.name)}! Keep it up and your tree grows again.`;
 
     const dots = c.items.length > 1
@@ -2180,7 +2180,7 @@ const TOUR_STEPS = [
     { id: 'settings', tab: 'settings', title: 'Settings',
       body: `This is where you set the basics for your family:
       <ul style="list-style:disc;margin:10px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px">
-        <li><strong>Allowance system:</strong> Choose between Amount per Chore or Amount per Cycle.</li>
+        <li><strong>Allowance system:</strong> Choose between Amount per chore or Amount per cycle.</li>
         <li><strong>Currency:</strong> Choose the currency you want to operate in.</li>
         <li><strong>Tree Growth Stages:</strong> Set the balance thresholds for each stage.</li>
         <li>Parent PIN.</li>
@@ -2195,8 +2195,8 @@ const TOUR_STEPS = [
       </ul>
       <div style="margin-top:14px">Depending on the allowance system you chose, chores get assigned values as follows:</div>
       <ul style="list-style:disc;margin:10px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px">
-        <li><strong>Amount per Chore System:</strong> You set the amount per chore.</li>
-        <li><strong>Amount per Cycle System:</strong> The value gets determined by the amount of chores in a cycle and the weighting you assign to each chore (some could be more valuable than others).</li>
+        <li><strong>Amount per chore System:</strong> You set the amount per chore.</li>
+        <li><strong>Amount per cycle System:</strong> The value gets determined by the amount of chores in a cycle and the weighting you assign to each chore (some could be more valuable than others).</li>
       </ul>` },
     { id: 'bonuses', tab: 'bonuses', title: 'Bonuses',
       body: "This is where you can set your children's savings milestones. This would allow them to earn a one time bonus for each milestone they achieve.<br><br>An example would be: Save R1000 and earn a R100 bonus." },
@@ -3317,7 +3317,7 @@ function vSignupPage() {
                   <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg>
                   <div>
                     <div style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:800;color:var(--color-green-700)">Save with annual billing</div>
-                    <div style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:800;color:var(--color-green-600);margin-top:2px">${pr.sym}${pr.yearly}/year — two months free</div>
+                    <div style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:800;color:var(--color-green-600);margin-top:2px">${pr.sym}${pr.yearly}/year - two months free</div>
                     <div style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-muted);margin-top:2px">That's only ${pr.sym}${pr.yearlyMo}/month, billed once a year.</div>
                   </div>
                 </div>
@@ -3626,7 +3626,7 @@ function vRestartGate() {
           <div style="position:relative;z-index:1">
             <div style="display:flex;justify-content:center;margin-bottom:20px"><picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture></div>
             <h2 style="${font};font-size:var(--text-xl);font-weight:800;color:#14532d;margin-bottom:10px">Welcome back!</h2>
-            <p style="${font};font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:22px">Your subscription has ended. Restart it to pick up where you left off — your family’s chores and savings are still here.</p>
+            <p style="${font};font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:22px">Your subscription has ended. Restart it to pick up where you left off - your family’s chores and savings are still here.</p>
             ${body}
             <div>
               <button onclick="signOut()" style="${font};font-size:var(--text-sm);font-weight:600;color:var(--color-text-muted);background:none;border:none;cursor:pointer">Sign out</button>
@@ -3821,7 +3821,7 @@ async function submitSignUp({ name, email, pass, country, referralCode, billingC
         S.signupDraft = captureSignupDraft();
         S.authMode = 'signin';
         render();
-        toast('This email already has an account — please sign in.');
+        toast('This email already has an account - please sign in.');
         return;
     }
     const userId = data?.user?.id;
@@ -3995,7 +3995,7 @@ function vHome() {
             </button>`).join('')}
             <!-- Kid cards grid -->
             ${kids.length === 0
-              ? `<p style="text-align:center;color:var(--color-text-secondary);font-family:var(--font-family);font-size:var(--text-sm);padding:12px 0 20px">No kids yet — log in as parent to add them.</p>`
+              ? `<p style="text-align:center;color:var(--color-text-secondary);font-family:var(--font-family);font-size:var(--text-sm);padding:12px 0 20px">No kids yet - log in as parent to add them.</p>`
               : `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px;margin-bottom:28px">
                 ${kids.map((k, i) => {
                   const ac    = kidAccent(k);
@@ -4055,7 +4055,7 @@ function vOnboarding() {
         const currCode = getCurrencyCode();
         body = `
         <h2 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:6px">Welcome to Sprout</h2>
-        <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:20px">Let's get your family set up — it only takes a minute. First, what currency should we use?</p>
+        <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:20px">Let's get your family set up - it only takes a minute. First, what currency should we use?</p>
         <select onchange="saveCurrency(this.value)" class="mb-5">
           ${CURRENCIES.map(c => `<option value="${c.code}" ${c.code === currCode ? 'selected' : ''}>${c.name}</option>`).join('')}
         </select>
@@ -4071,12 +4071,12 @@ function vOnboarding() {
         <div style="display:flex;flex-direction:column;gap:10px" class="mb-4">
           <button onclick="chooseAllowanceMode('per_chore')" type="button"
             style="text-align:left;padding:14px 16px;border-radius:var(--radius-lg);border:2px solid ${mode==='per_chore'?'var(--color-green-600)':'var(--color-border)'};background:${mode==='per_chore'?'var(--color-green-100)':'white'};cursor:pointer">
-            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-sm)">Amount per Chore</p>
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-sm)">Amount per chore</p>
             <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:2px">Each chore has its own amount. A kid earns it the moment that chore is approved.</p>
           </button>
           <button onclick="chooseAllowanceMode('per_cycle')" type="button"
             style="text-align:left;padding:14px 16px;border-radius:var(--radius-lg);border:2px solid ${mode==='per_cycle'?'var(--color-green-600)':'var(--color-border)'};background:${mode==='per_cycle'?'var(--color-green-100)':'white'};cursor:pointer">
-            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-sm)">Amount per Cycle</p>
+            <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-sm)">Amount per cycle</p>
             <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:2px">Set a total amount for the week, fortnight, or month. A kid's share is worked out from the percentage of their chores they complete by the end of the cycle, nothing is added to their balance until then.</p>
           </button>
         </div>
@@ -4101,7 +4101,7 @@ function vOnboarding() {
           </div>`).join('');
         body = `
         <h2 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:6px">Add your first kid</h2>
-        <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:20px">You can add more any time from the Kids tab — let's start with one.</p>
+        <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:20px">You can add more any time from the Kids tab - let's start with one.</p>
         ${db.kids.length > 0 ? `<div class="flex flex-col gap-2 mb-4">${kidRows}</div>` : ''}
         <button onclick="openModal('add-kid')" class="btn-outline mb-3" style="width:100%">+ Add another kid</button>
         <div style="display:flex;gap:8px">
@@ -4168,7 +4168,7 @@ function vOnboarding() {
             { icon: 'scale',    title: 'Reconciliation', desc: 'Compare their app balance against their real bank or piggy bank balance.' },
         ];
         body = `
-        <h2 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:6px">One more thing — the Money tab</h2>
+        <h2 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:6px">One more thing - the Money tab</h2>
         <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:20px">Everything about cash moving in and out of your kids' balances lives under one place.</p>
         <div class="flex flex-col gap-2 mb-5">
           ${cards.map(c => `
@@ -4237,8 +4237,8 @@ function reconDiffHTML(db, kid, bankVal) {
     const bankBal = (bankVal !== undefined && bankVal !== '') ? parseFloat(bankVal) : null;
     const diff = (bankBal !== null && !isNaN(bankBal)) ? bankBal - expected : null;
     const diffColor = diff === null ? '#94a3b8' : diff === 0 ? '#16a34a' : diff > 0 ? '#f59e0b' : '#f43f5e';
-    const diffLabel = diff === null ? '—' : diff === 0 ? '✓ Balanced' : diff > 0 ? `+${R(diff)} more in bank` : `${R(Math.abs(diff))} likely spent`;
-    const diffSub = diff === null ? 'Enter bank balance' : diff === 0 ? 'Matches what\'s expected' : diff > 0 ? 'Unexplained extra — check for an unlogged distribution' : 'Missing vs. expected';
+    const diffLabel = diff === null ? '-' : diff === 0 ? '✓ Balanced' : diff > 0 ? `+${R(diff)} more in bank` : `${R(Math.abs(diff))} likely spent`;
+    const diffSub = diff === null ? 'Enter bank balance' : diff === 0 ? 'Matches what\'s expected' : diff > 0 ? 'Unexplained extra - check for an unlogged distribution' : 'Missing vs. expected';
     const spendBtn = (diff !== null && diff < 0)
         ? `<button onclick="recordReconSpend('${kid.id}')" class="chip-btn" style="margin-top:6px">Record as spent</button>`
         : '';
@@ -4364,7 +4364,7 @@ async function recordReconSpend(kidId) {
     const owed = owedSinceDistribution(db, k);
     const expected = appBal - owed;
     const diff = bankBal - expected;
-    if (diff >= 0) return toast('Nothing to record — bank balance already matches or exceeds expected.');
+    if (diff >= 0) return toast('Nothing to record - bank balance already matches or exceeds expected.');
 
     const amount = Math.abs(diff);
     const id = uid();
@@ -4527,7 +4527,7 @@ function paymentFailedBanner() {
     const date = ends.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' });
     return `
     <div style="max-width:900px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:20px">
-      <p style="font-family:var(--font-family);font-size:var(--text-sm);line-height:1.45;color:#7f1d1d;margin:0;flex:1;min-width:200px"><strong>Your last payment didn't go through.</strong> We'll try your card again over the next few days. Sprout keeps working until ${date}${activeIsOwner() ? ' — update your card to keep it that way.' : '. Ask the account owner to update the card.'}</p>
+      <p style="font-family:var(--font-family);font-size:var(--text-sm);line-height:1.45;color:#7f1d1d;margin:0;flex:1;min-width:200px"><strong>Your last payment didn't go through.</strong> We'll try your card again over the next few days. Sprout keeps working until ${date}${activeIsOwner() ? ' - update your card to keep it that way.' : '. Ask the account owner to update the card.'}</p>
       ${activeIsOwner() ? `<button onclick="openManageSubscription()" class="btn-primary manage-sub-btn" style="width:auto;padding:10px 18px;font-size:var(--text-sm)">Update my card</button>` : ''}
     </div>`;
 }
@@ -4871,7 +4871,7 @@ function pChores(db) {
             const who = choreAssignmentLabel(c, db.kids);
             const needsValue = !isCycleMode() && !c.oneOff && !c.value;
             const valueLine = c.oneOff || !isCycleMode()
-                ? `${who} · ${R(c.value)}${needsValue ? ` <span style="color:var(--color-coral-text);font-weight:700">— needs an amount</span>` : ''}`
+                ? `${who} · ${R(c.value)}${needsValue ? ` <span style="color:var(--color-coral-text);font-weight:700">- needs an amount</span>` : ''}`
                 : `${who} · ${choreWeight(c)}× weighting`;
             const open = c.oneOff ? null : choreOpenPause(c);
             const paused = !!open && open.from <= todayDate;
@@ -5136,12 +5136,12 @@ function pExpenditure(db) {
             const kid = db.kids.find(k => k.id === t.kidId);
             return `
             <div class="card flex items-center gap-3">
-              <div style="width:36px;height:36px;background:var(--color-coral-bg);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--color-coral-text)">${uiIcon('bag', 17)}</div>
+              <div style="width:36px;height:36px;background:#f1f5f9;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--color-text-secondary)">${uiIcon('bag', 17)}</div>
               <div class="flex-1">
                 <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary)">${esc(kid?.name) || '?'}</p>
                 <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">${esc(t.description) || 'Money spent'} · ${dateStr(t.createdAt)}${byParent(t.actioned_by)}</p>
               </div>
-              <p style="font-family:var(--font-family);font-weight:800;color:var(--color-coral)">${R(Math.abs(t.amount))}</p>
+              <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary)">−${R(Math.abs(t.amount))}</p>
               <button onclick="deleteExpense('${t.id}')" title="Delete" class="icon-btn danger">${uiIcon('trash', 15)}</button>
             </div>`;
         }).join('');
@@ -5222,7 +5222,7 @@ function pBonuses(db) {
     }).join('');
 
     return `
-    <div class="sp-page-head"><h1 class="sp-page-title">Bonuses</h1><button onclick="openModal('add-bonus')" class="btn-primary sp-head-btn">${uiIcon('plus', 16, 2.5)}Add milestone</button></div><p class="sp-page-intro">When a kid's balance reaches a threshold, they automatically receive the bonus — once per milestone.</p>
+    <div class="sp-page-head"><h1 class="sp-page-title">Bonuses</h1><button onclick="openModal('add-bonus')" class="btn-primary sp-head-btn">${uiIcon('plus', 16, 2.5)}Add milestone</button></div><p class="sp-page-intro">When a kid's balance reaches a threshold, they automatically receive the bonus - once per milestone.</p>
     ${milestones.length === 0
         ? `<div class="card text-center py-12" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:var(--text-sm)"><div style="display:flex;justify-content:center;margin-bottom:12px">${milestoneStarSVG(40)}</div>No milestones yet.<br>Add one to reward your kids for saving!</div>`
         : `<div class="sp-narrow-list flex flex-col gap-3 mb-6">${milestoneCards}</div>`}
@@ -5304,7 +5304,7 @@ function pRewards(db) {
     }).join('');
 
     return `
-    <div class="sp-page-head"><h1 class="sp-page-title">Rewards</h1><button onclick="openModal('add-reward')" class="btn-primary sp-head-btn">${uiIcon('plus', 16, 2.5)}Add reward</button></div><p class="sp-page-intro">Set a reward for a longer-term goal — an exam mark, a sports achievement, anything worth celebrating. Kids mark it done, you verify it before the reward pays out.</p>
+    <div class="sp-page-head"><h1 class="sp-page-title">Rewards</h1><button onclick="openModal('add-reward')" class="btn-primary sp-head-btn">${uiIcon('plus', 16, 2.5)}Add reward</button></div><p class="sp-page-intro">Set a reward for a longer-term goal - an exam mark, a sports achievement, anything worth celebrating. Kids mark it done, you verify it before the reward pays out.</p>
     ${rewards.length === 0
         ? `<div class="card text-center py-12" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:var(--text-sm)">🏆<br><br>No rewards yet.<br>Add one to celebrate a big goal!</div>`
         : `<div class="gap-3 mb-6" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));align-items:start">${rewardCards}</div>`}
@@ -5339,16 +5339,16 @@ ${faqVideoHTML('android')}` },
       a: `When a child marks a chore as done, it shows up under "Pending Chore Approvals" on your dashboard. Tap the checkmark to approve it or the cross to reject it - you can also use "Approve all" to clear every pending chore for one child at once.` },
     { q: "Does approving a chore send real money to my child?",
       a: `No. Sprout is a ledger, not a payment system - approving a chore adds to your child's balance inside the app only. When you're ready to hand over real money, use "Mark as paid" in Money Management to record that you've paid them and reset the amount owed.` },
-    { q: "What's the difference between Amount per Chore and Amount per Cycle, and can I switch between them?",
-      a: "With Amount per Chore, each chore has its own value and pays out the moment it's approved. With Amount per Cycle, you set one total amount for the week, fortnight or month, and each child's share is worked out from the percentage of chores they complete by the end of that cycle. You can switch between the two anytime in Settings." },
+    { q: "What's the difference between Amount per chore and Amount per cycle, and can I switch between them?",
+      a: "With Amount per chore, each chore has its own value and pays out the moment it's approved. With Amount per cycle, you set one total amount for the week, fortnight or month, and each child's share is worked out from the percentage of chores they complete by the end of that cycle. You can switch between the two anytime in Settings." },
     { q: "Can I add more than one child, and can each one have different chores and amounts?",
-      a: "Yes. Add as many children as you like from the Kids tab, each with their own PIN, avatar and colour. Chores can be assigned to one child, several, or all of them, and each child can have a different value per chore, or a different Amount per Cycle target." },
+      a: "Yes. Add as many children as you like from the Kids tab, each with their own PIN, avatar and colour. Chores can be assigned to one child, several, or all of them, and each child can have a different value per chore, or a different Amount per cycle target." },
     { q: "What happens if my child misses a chore?",
       a: `If a chore's due date passes without it being marked done, it's automatically logged as missed at the end of that day. For a repeating chore that can be done anytime, this happens at the end of its week, fortnight or month instead. Missed chores don't pay out, and they show up under "Missed Chores" on your dashboard so you can see the full history. If however you know they did the chore and forgot to mark it as done, you can still approve it in the "Missed Chores" section.` },
     { q: "What are Distributions and Expenditure in Money Management?",
       a: `Distributions show how much you still owe each child since you last paid them out - tap "Mark as paid" once you've handed over the cash or made a bank transfer, and the amount owed resets to zero. Expenditure is a separate record of money your kids have actually spent from their bank account or piggy bank, which you can capture manually to keep the app's balance matching reality - recorded expenses don't count against what you still owe.` },
     { q: "What are Quick Chores, and how are they different from regular chores?",
-      a: "Quick Chores are one-off tasks you can assign on the spot - say, helping wash the car - with their own reward and an expiry date you choose. If you're on the Amount per Cycle system, a Quick Chore's reward is added to your child's balance as soon as it's approved, unlike regular chores, which are only added to their balance at the end of the cycle." },
+      a: "Quick Chores are one-off tasks you can assign on the spot - say, helping wash the car - with their own reward and an expiry date you choose. If you're on the Amount per cycle system, a Quick Chore's reward is added to your child's balance as soon as it's approved, unlike regular chores, which are only added to their balance at the end of the cycle." },
     { q: "What are bonuses and milestones, and how do my kids earn them?",
       a: "You can set a savings milestone with its own bonus amount. As soon as a child's balance reaches that threshold, the bonus is added automatically - no approval needed. It's a way to reward long-term saving on top of regular chores." },
     { q: "What are Rewards, and how are they different from chore earnings and bonuses?",
@@ -5375,9 +5375,9 @@ Your child also sees a "Coming up" line under Today's chores showing set-day cho
 • If you reject an anytime chore: it goes back on your child's list so they can redo it before the period ends.
 • Paused chores: paused days never count as missed. If a chore is still paused when its set day or period ends, that time is simply skipped.
 • Taking turns: a paused period doesn't use up anyone's turn, so whoever was next is still next when the chore comes back. A missed turn still counts as that child's turn.` },
-    { q: "What does a chore's weighting (0.5x-2x) mean under Amount per Cycle?",
+    { q: "What does a chore's weighting (0.5x-2x) mean under Amount per cycle?",
       a: "Weighting decides how much a chore counts toward a child's overall progress for the cycle, not how much it's worth in money. A chore weighted 2x counts double toward their percentage complete; one weighted 0.5x counts half. It's useful for making bigger or smaller chores count accordingly without assigning them an amount directly." },
-    { q: "What happens if I switch from Amount per Cycle to Amount per Chore partway through a cycle?",
+    { q: "What happens if I switch from Amount per cycle to Amount per chore partway through a cycle?",
       a: "Switching mid-cycle closes it out early. You'll see exactly what each child has earned so far - worked out the same way as normal, just for a shorter period - before you confirm. That amount is added to their balance straight away, and every chore then needs its own value set before it pays out again." },
     { q: "What is Reconciliation, and when should I use it?",
       a: "Reconciliation lets you compare what the app says a child should have against what they actually have in real life, like their bank account or piggy bank. It's a quick way to check the two match up, especially after handing over cash or making a manual adjustment." },
@@ -5460,7 +5460,7 @@ function pSettings() {
         { stage: 4, name: 'Forest',     range: `${R(t.t4)} and above` },
     ];
     const sections = [
-        { id: 'allowance', title: 'Allowance system',         subtitle: isCycleMode() ? `Amount per Cycle — ${CYCLE_PERIOD_LABELS[getCyclePeriod()]}` : 'Amount per Chore' },
+        { id: 'allowance', title: 'Allowance system',         subtitle: isCycleMode() ? `Amount per cycle - ${CYCLE_PERIOD_LABELS[getCyclePeriod()]}` : 'Amount per chore' },
         { id: 'currency', title: 'Currency and display',     subtitle: 'Choose how values are displayed' },
         { id: 'tree',     title: 'Tree growth stages',       subtitle: 'Set the balance thresholds for each tree stage' },
         { id: 'pin',      title: 'Parents and PINs',         subtitle: coParent() ? `${esc(ownerProfile()?.name)} and ${esc(coParent().name)}` : (hasParentPin ? 'A PIN is set · add a co-parent' : 'No PIN set') },
@@ -5490,12 +5490,12 @@ function pSettings() {
             <div style="display:flex;flex-direction:column;gap:10px">
               <button onclick="chooseAllowanceMode('per_chore')" type="button"
                 style="text-align:left;padding:14px 16px;border-radius:var(--radius-lg);border:2px solid ${mode==='per_chore'?'var(--color-green-600)':'var(--color-border)'};background:${mode==='per_chore'?'var(--color-green-100)':'white'};cursor:pointer">
-                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-sm)">Amount per Chore</p>
+                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-sm)">Amount per chore</p>
                 <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:2px">Each chore has its own amount. A kid earns it the moment that chore is approved.</p>
               </button>
               <button onclick="chooseAllowanceMode('per_cycle')" type="button"
                 style="text-align:left;padding:14px 16px;border-radius:var(--radius-lg);border:2px solid ${mode==='per_cycle'?'var(--color-green-600)':'var(--color-border)'};background:${mode==='per_cycle'?'var(--color-green-100)':'white'};cursor:pointer">
-                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-sm)">Amount per Cycle</p>
+                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-sm)">Amount per cycle</p>
                 <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:2px">Set a total amount for the week, fortnight, or month. A kid's share is worked out from the percentage of their chores they complete by the end of the cycle, nothing is added to their balance until then.</p>
               </button>
             </div>
@@ -5503,7 +5503,7 @@ function pSettings() {
           ${mode === 'per_cycle' ? `
           <div class="card">
             <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-base);margin-bottom:4px">Cycle length</p>
-            <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:12px">Changing your cycle length won't affect the cycle that's already running — it'll only apply once the next one starts.</p>
+            <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:12px">Changing your cycle length won't affect the cycle that's already running - it'll only apply once the next one starts.</p>
             <select onchange="queueCyclePeriodChange(this.value)">
               ${Object.keys(CYCLE_PERIOD_LABELS).map(p => `<option value="${p}" ${p===period?'selected':''}>${CYCLE_PERIOD_LABELS[p]}</option>`).join('')}
             </select>
@@ -5595,7 +5595,7 @@ function pSettings() {
               ${backBtn}
               <div class="card">
                 <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-base);margin-bottom:4px">Parent PIN</p>
-                <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:16px">${hasParentPin ? 'A PIN is currently set to protect the parent dashboard.' : 'No PIN set — anyone can access the parent dashboard.'}</p>
+                <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:16px">${hasParentPin ? 'A PIN is currently set to protect the parent dashboard.' : 'No PIN set - anyone can access the parent dashboard.'}</p>
                 <button onclick="openModal('set-parent-pin')" class="btn-primary" style="width:auto;padding:10px 28px">${hasParentPin ? 'Change PIN' : 'Set PIN'}</button>
               </div>
             </div>`;
@@ -5615,7 +5615,7 @@ function pSettings() {
                 ${p.is_owner ? `<span style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;background:var(--color-green-100);color:var(--color-green-700);padding:2px 8px;border-radius:var(--radius-full)">ACCOUNT OWNER</span>` : ''}
                 ${isMe && co ? `<span style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;background:var(--color-background);color:var(--color-text-secondary);padding:2px 8px;border-radius:var(--radius-full)">YOU</span>` : ''}
               </div>
-              <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:10px">${p.has_pin ? faIcon('lock') + ' PIN set' : faIcon('triangle-exclamation') + ' No PIN — anyone can open the parent dashboard'}</p>
+              <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:10px">${p.has_pin ? faIcon('lock') + ' PIN set' : faIcon('triangle-exclamation') + ' No PIN - anyone can open the parent dashboard'}</p>
               <div style="display:flex;gap:8px;flex-wrap:wrap">${btns.join('')}</div>
             </div>`;
         };
@@ -5650,7 +5650,7 @@ function pSettings() {
                 <div style="flex:1;min-width:0">
                   <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
                     <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-sm)">${tier.name}</p>
-                    ${tier.stage === 4 ? `<span style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;background:var(--color-green-100);color:var(--color-green-700);padding:2px 8px;border-radius:var(--radius-full)">TOP TIER ${faIcon('trophy')}</span>` : ''}
+                    ${tier.stage === 4 ? `<span style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;background:var(--color-green-100);color:var(--color-green-700);padding:2px 8px;border-radius:var(--radius-full)">Top tier ${faIcon('trophy')}</span>` : ''}
                   </div>
                   <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">${TREE_STAGES[tier.stage].description}</p>
                   <p style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;color:var(--color-green-600);margin-top:3px">${tier.range}</p>
@@ -5949,7 +5949,7 @@ function vKid() {
                 </div>
               </div>
               <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:800;color:var(--color-text-primary)">${earningsFooter}</p>
-              ${cycleMode ? `<p style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:600;color:var(--color-text-secondary);line-height:1.3">Updates as chores are approved — added to balance when the cycle ends</p>` : ''}
+              ${cycleMode ? `<p style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:600;color:var(--color-text-secondary);line-height:1.3">Updates as chores are approved - added to balance when the cycle ends</p>` : ''}
             </div>`;
             const treeRing = nextThresh ? `
             <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;text-align:center">
@@ -5987,7 +5987,7 @@ function vKid() {
         })()}
         <p class="pr-section-label mb-3">
           Today's chores
-          <span style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:600;color:var(--color-text-secondary);letter-spacing:normal;text-transform:none;margin-left:6px">&mdash; ${new Date().toLocaleDateString('en-ZA',{weekday:'long', day:'numeric', month:'short'})}</span>
+          <span style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:600;color:var(--color-text-secondary);letter-spacing:normal;text-transform:none;margin-left:6px">- ${new Date().toLocaleDateString('en-ZA',{weekday:'long', day:'numeric', month:'short'})}</span>
         </p>
         ${ready.length === 0
             ? `<div class="card text-center py-2 mb-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:var(--text-sm);font-weight:700"><picture><source srcset="../images/sprout-celebrating_800_cropped.webp" type="image/webp"><img src="../images/sprout-celebrating_800_cropped.png" alt="" style="height:75px;width:auto;display:block;margin:0 auto"></picture>All done for today!</div>`
@@ -6165,14 +6165,14 @@ function renderModal() {
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">This cycle's amount (${CYCLE_PERIOD_LABELS[getCyclePeriod()]})</p>
         <div class="relative mb-2">
           <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:var(--text-base);line-height:1;pointer-events:none">${currSymbol()}</span>
-          <input id="k-cycle-amount" type="number" placeholder="Amount" value="${data.cycle_amount||''}" step="0.01" min="0" style="padding-left:38px !important">
+          <input id="k-cycle-amount" type="number" placeholder="0.00" value="${data.cycle_amount||''}" step="0.01" min="0" style="padding-left:38px !important">
         </div>
-        <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:16px">Changes here apply straight away — this cycle's amount is only worked out once the cycle ends.</p>
+        <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:16px">Changes here apply straight away - this cycle's amount is only worked out once the cycle ends.</p>
         ${getCyclePeriodPending() ? `
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Starting next cycle's amount (${CYCLE_PERIOD_LABELS[getCyclePeriodPending()]})</p>
         <div class="relative mb-4">
           <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:var(--text-base);line-height:1;pointer-events:none">${currSymbol()}</span>
-          <input id="k-cycle-amount-pending" type="number" placeholder="Amount" value="${data.cycle_amount_pending ?? data.cycle_amount ?? ''}" step="0.01" min="0" style="padding-left:38px !important">
+          <input id="k-cycle-amount-pending" type="number" placeholder="0.00" value="${data.cycle_amount_pending ?? data.cycle_amount ?? ''}" step="0.01" min="0" style="padding-left:38px !important">
         </div>` : ''}
         ` : ''}
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Theme colour</p>
@@ -6230,7 +6230,7 @@ function renderModal() {
           </label>
           <div style="flex:1;min-width:0">
             <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary)">${usingPhoto ? 'Using your photo' : 'Photograph the real thing'}</p>
-            <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:2px">${usingPhoto ? 'This replaces the illustration below.' : 'Tap to use your camera or photo library. Frame the subject in the middle — it gets cropped square.'}</p>
+            <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:2px">${usingPhoto ? 'This replaces the illustration below.' : 'Tap to use your camera or photo library. Frame the subject in the middle - it gets cropped square.'}</p>
             ${usingPhoto ? `<button onclick="clearChorePhoto()" type="button" style="margin-top:6px;padding:5px 11px;border-radius:var(--radius-sm);font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;border:1.5px solid var(--color-border);background:white;color:var(--color-coral-text);cursor:pointer">Remove photo</button>` : ''}
           </div>
         </div>`;
@@ -6257,7 +6257,7 @@ function renderModal() {
             ${w}×
           </button>`).join('')}
         </div>
-        <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:16px">This doesn't set an amount — it decides how much this chore counts toward the cycle's overall progress. 2× counts double, 0.5× counts half.</p>
+        <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:16px">This doesn't set an amount - it decides how much this chore counts toward the cycle's overall progress. 2× counts double, 0.5× counts half.</p>
         ` : `
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Amount</p>
         <div class="relative mb-3">
@@ -6321,7 +6321,7 @@ function renderModal() {
             </div>
             ${DAYS.map(d => {
               const sel = (S.selectedKidDays[k.id] || []).includes(d);
-              return `<button onclick="toggleKidDay('${k.id}','${d}')" type="button" title="${esc(k.name)} — ${d}" aria-pressed="${sel}"
+              return `<button onclick="toggleKidDay('${k.id}','${d}')" type="button" title="${esc(k.name)} - ${d}" aria-pressed="${sel}"
                 style="height:30px;padding:0;border-radius:var(--radius-sm);border:2px solid ${sel?'var(--color-green-600)':'var(--color-border)'};background:${sel?'var(--color-green-600)':'white'};color:white;cursor:pointer;display:flex;align-items:center;justify-content:center">
                 ${sel ? uiIcon('check', 13) : ''}
               </button>`;
@@ -6350,7 +6350,7 @@ function renderModal() {
         const total = rows.reduce((s, r) => s + r.amountPaid, 0);
         body = `
         <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:12px">Switch to amount per chore?</h3>
-        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">You're partway through a cycle that started ${dateStr(anchor)}. Switching now closes it early — each child gets their share for the days completed so far, worked out the usual way.</p>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">You're partway through a cycle that started ${dateStr(anchor)}. Switching now closes it early - each child gets their share for the days completed so far, worked out the usual way.</p>
         <div class="flex flex-col gap-2 mb-4">
           ${rows.length === 0 ? `<p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-muted)">No kids yet.</p>` : rows.map(r => `
           <div class="card flex items-center justify-between" style="padding:10px 14px">
@@ -6358,7 +6358,7 @@ function renderModal() {
             <p style="font-family:var(--font-family);font-weight:800;font-size:var(--text-sm)">${r.pct}% · ${R(r.amountPaid)}</p>
           </div>`).join('')}
         </div>
-        <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:16px">Total added to balances: <strong>${R(total)}</strong>. After switching, every chore needs its own amount before it pays out again — we'll flag the ones that still need one.</p>
+        <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:16px">Total added to balances: <strong>${R(total)}</strong>. After switching, every chore needs its own amount before it pays out again - we'll flag the ones that still need one.</p>
         <div class="sp-modal-actions">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
           <button onclick="confirmSwitchToPerChore()" class="btn-primary flex-1" style="padding:10px">Switch now</button>
@@ -6472,7 +6472,7 @@ function renderModal() {
         <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${coParent() && p ? `${esc(p.name)}'s PIN` : 'Parent PIN'}</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">${forOther
           ? `Set a temporary PIN for ${esc(p.name)}. They can change it from Settings once they're in.`
-          : hasPin ? faIcon('lock') + ' A PIN is currently set.' : faIcon('triangle-exclamation') + ' No PIN set — anyone can access the parent dashboard.'}</p>
+          : hasPin ? faIcon('lock') + ' A PIN is currently set.' : faIcon('triangle-exclamation') + ' No PIN set - anyone can access the parent dashboard.'}</p>
         <input id="pp-pin" placeholder="New 4-digit PIN" maxlength="4" inputmode="numeric" class="mb-4">
         <div class="sp-modal-actions">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
@@ -6527,11 +6527,13 @@ function renderModal() {
             − Deduct funds
           </button>
         </div>
+        <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Amount</p>
         <div class="relative mb-3">
           <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:var(--text-base);line-height:1;pointer-events:none">${currSymbol()}</span>
-          <input id="ma-amount" type="number" placeholder="Amount" value="${data.amount||''}" step="0.01" min="0" style="padding-left:38px !important">
+          <input id="ma-amount" type="number" placeholder="0.00" value="${data.amount||''}" step="0.01" min="0" style="padding-left:38px !important">
         </div>
-        <input id="ma-desc" placeholder="Reason (e.g. Birthday gift, Correction)" value="${esc(data.description)}" class="mb-4">
+        <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Reason</p>
+        <input id="ma-desc" placeholder="e.g. Birthday money from Ouma" value="${esc(data.description)}" class="mb-4">
         <div class="sp-modal-actions">
           <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
           <button onclick="saveManualAdjustment('${data.kidId}')" class="btn-primary flex-1" style="padding:10px">${isAdd ? 'Add to balance' : 'Deduct from balance'}</button>
@@ -6542,10 +6544,12 @@ function renderModal() {
         body = `
         <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">Quick chore</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">Assign a one-off task to a kid. Choose how many days it stays available before it expires.</p>
-        <input id="qt-name" placeholder="Task name (e.g. Help wash the car)" value="${esc(data.name)}" class="mb-3">
+        <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Chore name</p>
+        <input id="qt-name" placeholder="e.g. Help wash the car" value="${esc(data.name)}" class="mb-3">
+        <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Amount</p>
         <div class="relative mb-4">
           <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:var(--text-base);line-height:1;pointer-events:none">${currSymbol()}</span>
-          <input id="qt-val" type="number" placeholder="Reward" value="${data.value||''}" step="0.01" min="0" style="padding-left:38px !important">
+          <input id="qt-val" type="number" placeholder="0.00" value="${data.value||''}" step="0.01" min="0" style="padding-left:38px !important">
         </div>
         <div class="mb-4">
           <label style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px;display:block">Valid for how many days?</label>
@@ -6629,7 +6633,7 @@ function renderModal() {
         }).join('');
         body = `
         <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${isEdit ? 'Edit' : 'Add'} reward</h3>
-        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">For longer-term goals — an exam mark, a sports achievement, anything worth celebrating.</p>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">For longer-term goals - an exam mark, a sports achievement, anything worth celebrating.</p>
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Goal</p>
         <input id="rw-name" placeholder="e.g. 90% in Maths exam" value="${esc(data.name)}" class="mb-3">
         <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Description <span style="font-weight:400;color:var(--color-text-secondary)">(optional)</span></p>
@@ -7435,7 +7439,7 @@ async function confirmSwitchToPerChore() {
     const { data } = await sb.auth.updateUser({ data: { allowance_mode: 'per_chore', cycle_period_pending: null, cycle_anchor_date: null } });
     if (data?.user) currentUser = data.user;
     closeModal();
-    toast('Switched to amount per chore. Check your chores — each one needs its own amount before it pays out.');
+    toast('Switched to amount per chore. Check your chores - each one needs its own amount before it pays out.');
 }
 function saveCurrency(code) {
     track('currency_changed', { currency: code });
