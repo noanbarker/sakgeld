@@ -268,18 +268,81 @@
         touch-action:manipulation; user-select:none; -webkit-user-select:none;
       }
       .numpad-btn:active, .numpad-btn.pressed { background:#f1f5f9; transform:scale(0.9); box-shadow:none; }
-      .tab-active   { color:#fff; }
-      .tab-inactive { color:#6b7280; }
-      .sp-mob-tabbar { position:relative; }
-      .sp-mob-thumb {
-        position:absolute; top:4px; bottom:4px; left:0;
-        background:var(--color-green-600); border-radius:var(--radius-sm);
-        box-shadow:none; z-index:0;
+      /* ── Navigation (desktop sidebar, phone header + bottom bar) ── */
+      .sp-logo-crop { /* the logo PNG has wide transparent margins; show just the mark */
+        height:calc(var(--logo-h) * 2.24); width:auto; display:block;
+        margin:calc(var(--logo-h) * -0.49) 0 calc(var(--logo-h) * -0.75) calc(var(--logo-h) * -0.18);
       }
-      .sp-mob-divider {
-        position:absolute; top:9px; bottom:9px; width:1px;
-        background:var(--color-border); transition:opacity 0.2s ease; z-index:0;
+      .sp-sidebar {
+        width:232px; min-height:100vh; flex-direction:column; flex-shrink:0;
+        position:sticky; top:0; height:100vh;
+        background:var(--color-surface); border-right:1px solid var(--color-border);
       }
+      .sp-quiet-link {
+        display:flex; align-items:center; gap:8px; width:100%; padding:8px 10px;
+        background:none; border:none; border-radius:var(--radius-sm); cursor:pointer;
+        font-family:var(--font-family); font-size:var(--text-sm); font-weight:600;
+        color:var(--color-text-secondary); text-align:left;
+      }
+      .sp-quiet-link:hover, .sp-quiet-link.active { background:var(--color-green-50); color:var(--color-green-800); }
+      .sp-mob-header {
+        position:sticky; top:0; z-index:20;
+        display:flex; align-items:center; justify-content:space-between;
+        padding:12px 12px 10px 16px;
+        background:var(--color-surface); border-bottom:1px solid var(--color-border);
+      }
+      .sp-bottom-nav {
+        position:fixed; left:0; right:0; bottom:0; z-index:30; display:flex;
+        padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+        background:var(--color-surface); border-top:1px solid var(--color-border);
+      }
+      .sp-bnav-track { position:absolute; top:6px; bottom:calc(6px + env(safe-area-inset-bottom)); left:4px; right:4px; pointer-events:none; }
+      .sp-bnav-pill {
+        position:absolute; top:0; bottom:0; left:0; width:20%;
+        border-radius:var(--radius-lg); background:var(--color-green-100);
+        transform:translateX(calc(var(--slot) * 100%));
+        transition:transform 420ms cubic-bezier(0.32, 0.72, 0, 1); /* iOS-style ease-out */
+      }
+      .sp-bnav-item {
+        position:relative; z-index:1; -webkit-tap-highlight-color:transparent;
+        flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:2px 0;
+        background:none; border:none; cursor:pointer;
+        font-family:var(--font-family); font-size:var(--text-xs); font-weight:700; color:var(--color-text-secondary);
+      }
+      .sp-bnav-icon {
+        position:relative; display:flex; align-items:center; justify-content:center;
+        width:56px; height:30px;
+        transition:transform 140ms ease;
+      }
+      .sp-bnav-item:active .sp-bnav-icon { transform:scale(0.86); }
+      .sp-bnav-item.pop .sp-bnav-icon { animation:bnavPop 420ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+      @keyframes bnavPop { 0% { transform:scale(0.86); } 55% { transform:scale(1.14); } 100% { transform:scale(1); } }
+      .sp-bnav-icon svg { width:22px; height:22px; }
+      .sp-bnav-icon .badge { position:absolute; top:-3px; right:6px; }
+      .sp-bnav-item.active { color:var(--color-green-800); }
+      @media (min-width: 768px) { .sp-mob-header, .sp-bottom-nav { display:none !important; } }
+      @media (max-width: 767px) {
+        .sp-tab-content { padding-bottom:calc(92px + env(safe-area-inset-bottom)) !important; }
+        .sp-tab-content.sp-has-nudge { padding-bottom:calc(156px + env(safe-area-inset-bottom)) !important; }
+        .sp-tutorial-nudge { bottom:calc(76px + env(safe-area-inset-bottom)); }
+        body:has(.sp-bottom-nav) .sp-toast { bottom:calc(88px + env(safe-area-inset-bottom)) !important; }
+      }
+      /* Grouped list: one card, rows divided by hairlines (More, Settings, Money) */
+      .sp-list { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); overflow:hidden; }
+      .sp-list-row {
+        display:flex; align-items:center; gap:14px; width:100%; padding:14px 16px;
+        background:none; border:none; border-top:1px solid var(--color-border);
+        text-align:left; cursor:pointer; font-family:var(--font-family);
+      }
+      .sp-list-row:first-child { border-top:none; }
+      .sp-list-row:hover { background:var(--color-green-50); }
+      .sp-list-icon {
+        width:40px; height:40px; flex-shrink:0; border-radius:var(--radius-sm);
+        display:flex; align-items:center; justify-content:center;
+        background:var(--color-green-50); color:var(--color-green-700);
+      }
+      .sp-list-title { display:block; font-size:var(--text-base); font-weight:700; color:var(--color-text-primary); }
+      .sp-list-sub   { display:block; font-size:var(--text-sm); color:var(--color-text-secondary); margin-top:1px; }
       .card {
         background:var(--color-surface); border-radius:var(--radius-md);
         border:1px solid var(--color-border);
@@ -290,10 +353,19 @@
         border-radius:var(--radius-sm);font-size:var(--text-sm);font-weight:700;font-family:var(--font-family);
         transition:background 0.15s;text-align:left;
       }
-      .sidebar-item                   { color:#475569; border:1px solid transparent; }
-      .sidebar-item:not(.active):hover{ background:rgba(22,163,74,0.08);color:#14532d; }
-      .sp-sidebar-icon { display:inline-flex; transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1); }
-      .sidebar-item.active .sp-sidebar-icon { transform: scale(1.18); }
+      /* Fixed 42px rows + 2px gap, so the highlight can slide by slot (44px each). */
+      .sidebar-item { position:relative; z-index:1; height:42px; color:var(--color-text-secondary); border:none; background:none; cursor:pointer; margin-bottom:2px; }
+      .sidebar-item:not(.active):hover { background:var(--color-green-50); color:var(--color-green-800); }
+      .sidebar-item.active { color:var(--color-green-800); }
+      .sp-side-pill {
+        position:absolute; left:0; right:0; top:0; height:42px;
+        border-radius:var(--radius-sm); background:var(--color-green-100);
+        transform:translateY(calc(var(--slot) * 44px));
+        transition:transform 420ms cubic-bezier(0.32, 0.72, 0, 1);
+      }
+      .sp-sidebar-icon { display:inline-flex; transition:transform 140ms ease; }
+      .sidebar-item:active .sp-sidebar-icon { transform:scale(0.86); }
+      .sidebar-item.pop .sp-sidebar-icon { animation:bnavPop 420ms cubic-bezier(0.34, 1.56, 0.64, 1); }
       input, select {
         outline:none; border:1.5px solid var(--color-border);
         border-radius:var(--radius-md); padding:10px 14px !important;
@@ -418,13 +490,6 @@
         /* Parent dashboard content area */
         .sp-tab-content { padding: 14px 16px !important; }
 
-        /* Mobile tab bar — show icon only, hide text label */
-        .sp-mob-tab { display:flex; flex-direction:column; align-items:center; gap:2px; padding:7px 2px !important; }
-        .sp-mob-tab-svg { display:flex; transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1); }
-        .sp-mob-tab-svg svg { width:22px; height:22px; stroke-width:3.3; }
-        .sp-mob-tab-label { font-size:var(--text-xs) !important; letter-spacing:0 !important; }
-        .tab-active .sp-mob-tab-svg { transform: scale(1.18); }
-
         /* Kid view: tighten header padding */
         .sp-kid-header { padding: 20px 16px 18px !important; }
 
@@ -471,7 +536,7 @@
       }
       @media (prefers-reduced-motion: reduce) {
         .sp-tab-anim-fwd, .sp-tab-anim-back, .sp-tab-exit-fwd, .sp-tab-exit-back { animation: none !important; }
-        .sp-mob-tab-svg, .sp-sidebar-icon, .sp-mob-thumb, .sp-mob-divider { transition: none !important; }
+        .sp-bnav-icon, .sp-bnav-pill, .sp-side-pill, .sp-sidebar-icon { transition: none !important; animation: none !important; }
         .sp-cel-overlay, .sp-cel-card, .sp-cel-art { animation: none !important; }
         .sp-cel-rays, .sp-cel-ring { display: none !important; }
       }
@@ -1542,6 +1607,8 @@ const UI_ICON_PATHS = {
   help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 4"/><path d="M12 17h.01"/>',
   bag: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
   camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+  menu: '<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>',
+  chevron: '<path d="M9 6l6 6-6 6"/>',
   pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
   play: '<path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/>',
 };
@@ -1968,8 +2035,19 @@ function avatarIMG(num, size) {
         `style="${box};object-fit:cover;border-radius:50%;display:block"></picture>`;
 }
 function go(view, params = {}) { Object.assign(S, params); S.view = view; render(); }
-const PARENT_TAB_ORDER = ['overview', 'money', 'chores', 'kids', 'bonuses', 'rewards', 'settings'];
+// Phone bottom bar order, then the sections that live under More.
+const PARENT_TAB_ORDER = ['overview', 'chores', 'kids', 'money', 'more', 'bonuses', 'rewards', 'settings', 'faq'];
+const MORE_TABS = ['more', 'bonuses', 'rewards', 'settings', 'faq'];
+// Bottom bar slot for a tab: the four main tabs, everything else sits under More.
+function bottomNavIndex(tab) {
+    const i = ['overview', 'chores', 'kids', 'money'].indexOf(tab);
+    return i >= 0 ? i : 4;
+}
+// Desktop sidebar slot for a tab (-1: not in the list, e.g. Help & FAQ).
+const SIDEBAR_ORDER = ['overview', 'chores', 'kids', 'money', 'bonuses', 'rewards', 'settings'];
 function setTab(t) {
+    const oldSlot = bottomNavIndex(S.tab);
+    const oldSideSlot = SIDEBAR_ORDER.indexOf(S.tab);
     const oldIdx = PARENT_TAB_ORDER.indexOf(S.tab);
     const newIdx = PARENT_TAB_ORDER.indexOf(t);
     const dir = newIdx === oldIdx ? null : (newIdx > oldIdx ? 'fwd' : 'back');
@@ -1994,23 +2072,29 @@ function setTab(t) {
     S.tabAnim = dir;
     S.tab = t; S.settingsSection = null; S.moneySection = null; render();
 
-    // Mobile tab bar's sliding pill: since render() rebuilds the whole bar from
-    // scratch, the thumb is a brand-new element each time and a plain CSS
-    // transition never plays. Snap it back to the old spot with transitions
-    // off, force a reflow, then transition to the real target so it visibly
-    // slides across every tab in between (further apart = slower).
-    if (dir) {
-        const mobileBar = document.querySelector('.sp-mob-tabbar');
-        const thumb = document.querySelector('.sp-mob-thumb');
-        if (mobileBar && thumb) {
-            const tabWidth = mobileBar.getBoundingClientRect().width / PARENT_TAB_ORDER.length;
-            const duration = Math.min(900, 220 + Math.abs(newIdx - oldIdx) * 70);
-            thumb.style.transition = 'none';
-            thumb.style.transform = `translateX(${oldIdx * tabWidth}px)`;
-            thumb.getBoundingClientRect();
-            thumb.style.transition = `transform ${duration}ms cubic-bezier(0.65,0,0.35,1)`;
-            thumb.style.transform = `translateX(${newIdx * tabWidth}px)`;
-        }
+    // render() rebuilds the bar, so the pill is a new element already sitting
+    // on the new tab and a CSS transition would never play. Put it back on the
+    // old tab with transitions off, force a reflow, then let it glide across.
+    // The desktop sidebar's highlight does the same, sliding up or down the list.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const slide = (el, from, to) => {
+        el.style.transition = 'none';
+        el.style.setProperty('--slot', from);
+        el.getBoundingClientRect();
+        el.style.transition = '';
+        el.style.setProperty('--slot', to);
+    };
+    const pill = document.querySelector('.sp-bnav-pill');
+    const newSlot = bottomNavIndex(t);
+    if (pill && oldSlot !== newSlot) {
+        slide(pill, oldSlot, newSlot);
+        document.querySelector('.sp-bnav-item.active')?.classList.add('pop');
+    }
+    const sidePill = document.querySelector('.sp-side-pill');
+    const newSideSlot = SIDEBAR_ORDER.indexOf(t);
+    if (sidePill && oldSideSlot >= 0 && newSideSlot >= 0 && oldSideSlot !== newSideSlot) {
+        slide(sidePill, oldSideSlot, newSideSlot);
+        document.querySelector('.sidebar-item.active')?.classList.add('pop');
     }
 }
 
@@ -2110,7 +2194,7 @@ function positionTourSpotlight() {
     let rect = target && target.getBoundingClientRect();
     let onMobile = false;
     if (!rect || (rect.width === 0 && rect.height === 0)) {
-        target = document.getElementById('mnav-' + step.tab);
+        target = document.getElementById('mnav-' + step.tab) || document.getElementById('mnav-more');
         rect = target && target.getBoundingClientRect();
         onMobile = true;
     }
@@ -2122,18 +2206,18 @@ function positionTourSpotlight() {
     spotlight.style.width = (rect.width + pad * 2) + 'px';
     spotlight.style.height = (rect.height + pad * 2) + 'px';
 
-    // On mobile the nav bar sits fixed at the top of the screen, so a vertically
+    // On mobile the nav bar sits fixed at the bottom of the screen, so a vertically
     // centered popup can grow tall enough to cover the very icon it's pointing at.
-    // Anchor it just below the nav bar instead, and let it scroll internally.
+    // Anchor it just below the header instead, stop it above the bar, and let it
+    // scroll internally.
     const popup = document.getElementById('tourPopup');
     if (popup) {
         if (onMobile) {
-            const bar = document.querySelector('.sp-mob-tabbar');
-            const barBottom = bar ? bar.getBoundingClientRect().bottom : 0;
-            const top = barBottom + 12;
+            const header = document.querySelector('.sp-mob-header');
+            const top = (header ? header.getBoundingClientRect().bottom : 0) + 12;
             popup.style.top = top + 'px';
             popup.style.transform = 'translateX(-50%)';
-            popup.style.maxHeight = `calc(100vh - ${top + 24}px)`;
+            popup.style.maxHeight = `${rect.top - pad - 12 - top}px`;
         } else {
             resetTourPopupPosition();
         }
@@ -4277,68 +4361,60 @@ function vParent() {
     const pendingRewards = (db.rewardCompletions || []).filter(c => !c.approved && !c.rejected).length;
     const navItems = [
         { id: 'overview', label: 'Overview', badge: pending, svg: uiIcon('grid', 18) },
-        { id: 'money', label: 'Money', svg: uiIcon('banknote', 18) },
         { id: 'chores',   label: 'Chores',   svg: uiIcon('list', 18) },
         { id: 'kids',     label: 'Kids',     svg: uiIcon('users', 18) },
+        { id: 'money',    label: 'Money',    svg: uiIcon('banknote', 18) },
         { id: 'bonuses',  label: 'Bonuses',  svg: uiIcon('star', 18) },
         { id: 'rewards',  label: 'Rewards',  badge: pendingRewards, svg: uiIcon('trophy', 18) },
         { id: 'settings', label: 'Settings', svg: uiIcon('gear', 18) },
     ];
     const sidebar = `
-    <aside style="width:220px;min-height:100vh;background:#f6faf7;flex-direction:column;flex-shrink:0;border-right:1px solid var(--color-border)" class="hidden md:flex">
-      <div style="padding:28px 20px 16px;display:flex;flex-direction:column;align-items:flex-start;gap:2px">
-        <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture>
-        <p style="color:var(--color-green);font-size:var(--text-lg);font-weight:700;font-family:var(--font-family);margin-left:9px">Parent Dashboard</p>
+    <aside class="hidden md:flex sp-sidebar">
+      <div style="padding:24px 20px 16px">
+        <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" class="sp-logo-crop" style="--logo-h:40px"></picture>
       </div>
-      <div style="padding:16px 20px;border-top:1px solid #16a34a;border-bottom:1px solid #16a34a">
-        <button onclick="go('home')" style="color:var(--color-text-secondary);font-size:var(--text-sm);font-weight:700;font-family:var(--font-family);display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer"><span style="font-size:var(--text-base);line-height:1">←</span> Family Portal</button>
+      <div style="padding:0 12px 12px;border-bottom:1px solid var(--color-border)">
+        <button onclick="go('home')" class="sp-quiet-link">${uiIcon('users', 16)} Family Portal</button>
       </div>
-      <nav style="padding:12px">
-        ${navItems.map(t => {
-          const isActive = S.tab === t.id;
-          const activeStyle = isActive ? 'background:rgba(22,163,74,.12);color:#14532d;' : '';
-          return `
-          <button id="nav-${t.id}" onclick="setTab('${t.id}')" class="sidebar-item ${isActive ? 'active' : ''}" style="margin-bottom:4px;${activeStyle}">
+      <nav style="padding:12px;flex:1">
+       <div style="position:relative">
+        <div class="sp-side-pill" style="--slot:${Math.max(0, SIDEBAR_ORDER.indexOf(S.tab))};${SIDEBAR_ORDER.includes(S.tab) ? '' : 'opacity:0'}"></div>
+        ${navItems.map(t => `
+          <button id="nav-${t.id}" onclick="setTab('${t.id}')" class="sidebar-item ${S.tab === t.id ? 'active' : ''}">
             <span class="sp-sidebar-icon">${t.svg}</span>
             <span style="flex:1">${t.label}</span>
             ${t.badge ? `<span class="badge">${t.badge}</span>` : ''}
-          </button>`;
-        }).join('')}
-        <div style="padding:12px 4px 0;margin-top:8px;border-top:1px solid #16a34a">
-          ${activeIsOwner() ? `<button class="manage-sub-btn" onclick="openManageSubscription()" style="color:var(--color-text-secondary);font-size:var(--text-sm);font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('card', 16)} Manage Subscription</button>` : ''}
-          <button id="nav-faq" onclick="setTab('faq')" style="color:${S.tab === 'faq' ? 'var(--color-green-700)' : 'var(--color-text-secondary)'};font-size:var(--text-sm);font-weight:${S.tab === 'faq' ? '800' : '400'};font-family:var(--font-family);display:flex;align-items:center;gap:6px;margin-bottom:6px;background:none;border:none;cursor:pointer">${uiIcon('help', 16)} FAQ</button>
-          <button onclick="signOut()" style="color:var(--color-text-secondary);font-size:var(--text-sm);font-family:var(--font-family);display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer">${uiIcon('logout', 16)} Sign out</button>
-        </div>
+          </button>`).join('')}
+       </div>
       </nav>
+      <div style="padding:12px;border-top:1px solid var(--color-border)">
+        ${activeIsOwner() ? `<button class="manage-sub-btn sp-quiet-link" onclick="openManageSubscription()">${uiIcon('card', 16)} Manage subscription</button>` : ''}
+        <button id="nav-faq" onclick="setTab('faq')" class="sp-quiet-link ${S.tab === 'faq' ? 'active' : ''}">${uiIcon('help', 16)} Help & FAQ</button>
+        <button onclick="signOut()" class="sp-quiet-link">${uiIcon('logout', 16)} Sign out</button>
+      </div>
     </aside>`;
 
+    // Phones: slim header on top, the four busiest sections plus More in a
+    // bottom bar where thumbs reach. Everything else lives under More.
+    const mobileItems = [
+        ...navItems.filter(t => ['overview', 'chores', 'kids', 'money'].includes(t.id)),
+        { id: 'more', label: 'More', badge: pendingRewards, svg: uiIcon('menu', 18) },
+    ];
+    const mobileActive = MORE_TABS.includes(S.tab) ? 'more' : S.tab;
     const mobileHeader = `
-    <div class="md:hidden" style="position:sticky;top:0;z-index:20">
-    <div class="pl-2 pr-5 pt-0 pb-0 flex justify-between items-center" style="background:var(--color-surface);border-bottom:1px solid var(--color-green-border)">
-      <div style="display:flex;align-items:flex-start;gap:10px;height:88px;overflow:hidden">
-        <picture class="sp-mobile-logo"><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block;flex-shrink:0"></picture>
-      </div>
-      <div class="flex items-center gap-4">
-        <button onclick="go('home')" style="color:#15803d;font-size:var(--text-lg);background:none;border:none;cursor:pointer;font-family:var(--font-family);display:flex;align-items:center;gap:6px">← ${uiIcon('home', 24)}</button>
-      </div>
-    </div>
-    <div class="sp-mob-tabbar border-b flex" style="background:#dcfce7;border-color:var(--color-green-border)">
-      <div class="sp-mob-thumb" style="width:calc(100% / ${navItems.length});transform:translateX(${PARENT_TAB_ORDER.indexOf(S.tab) * 100}%)"></div>
-      ${navItems.slice(0, -1).map((_, i) => {
-          const activeIdx = PARENT_TAB_ORDER.indexOf(S.tab);
-          const hidden = i === activeIdx - 1 || i === activeIdx;
-          return `<div class="sp-mob-divider" style="left:calc(${i + 1} * (100% / ${navItems.length}));opacity:${hidden ? 0 : 1}"></div>`;
-      }).join('')}
-      ${navItems.map(t => `
-        <button id="mnav-${t.id}" onclick="setTab('${t.id}')"
-          class="sp-mob-tab flex-1 py-3 relative ${S.tab === t.id ? 'tab-active' : 'tab-inactive'}"
-          style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;letter-spacing:0.04em">
-          <span class="sp-mob-tab-svg">${t.svg}</span>
-          <span class="sp-mob-tab-label">${t.label}</span>
-          ${t.badge ? `<span class="badge absolute top-1.5 right-1">${t.badge}</span>` : ''}
-        </button>`).join('')}
-    </div>
+    <div class="md:hidden sp-mob-header">
+      <picture class="sp-mobile-logo"><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" class="sp-logo-crop" style="--logo-h:34px"></picture>
+      <button onclick="go('home')" class="sp-quiet-link" style="width:auto;margin:0">${uiIcon('users', 16)} Family Portal</button>
     </div>`;
+    const bottomNav = `
+    <nav class="md:hidden sp-bottom-nav">
+      <div class="sp-bnav-track"><div class="sp-bnav-pill" style="--slot:${bottomNavIndex(S.tab)}"></div></div>
+      ${mobileItems.map(t => `
+        <button id="mnav-${t.id}" onclick="setTab('${t.id}')" class="sp-bnav-item ${mobileActive === t.id ? 'active' : ''}">
+          <span class="sp-bnav-icon">${t.svg}${t.badge ? `<span class="badge">${t.badge}</span>` : ''}</span>
+          <span>${t.label}</span>
+        </button>`).join('')}
+    </nav>`;
 
     return `
     <div style="display:flex;min-height:100vh">
@@ -4355,10 +4431,12 @@ function vParent() {
             S.tab === 'bonuses'   ? pBonuses(db) :
             S.tab === 'rewards'   ? pRewards(db) :
             S.tab === 'faq'       ? pFAQ() :
+            S.tab === 'more'      ? pMore(db) :
                                     pSettings()}
         </div>
       </div>
     </div>
+    ${bottomNav}
     ${S.tourStep >= 0 ? renderTour() : ''}`;
 }
 
@@ -5260,6 +5338,36 @@ function pFAQ() {
       </div>
     </div>`;
 }
+function pMore(db) {
+    const pendingRewards = (db.rewardCompletions || []).filter(c => !c.approved && !c.rejected).length;
+    const rows = [
+        { tab: 'bonuses',  icon: 'star',   title: 'Bonuses',    sub: 'Savings milestones that pay a one-time bonus' },
+        { tab: 'rewards',  icon: 'trophy', title: 'Rewards',    sub: 'Bigger goals you approve', badge: pendingRewards },
+        { tab: 'settings', icon: 'gear',   title: 'Settings',   sub: 'Allowance, currency, PINs, notifications' },
+        { tab: 'faq',      icon: 'help',   title: 'Help & FAQ', sub: 'Answers to common questions' },
+    ];
+    const row = (onclick, icon, title, sub, badge, cls = '') => `
+      <button onclick="${onclick}" class="sp-list-row ${cls}">
+        <span class="sp-list-icon">${uiIcon(icon, 20)}</span>
+        <span style="flex:1;min-width:0">
+          <span class="sp-list-title">${title}</span>
+          <span class="sp-list-sub">${sub}</span>
+        </span>
+        ${badge ? `<span class="badge">${badge}</span>` : ''}
+        <span style="color:var(--color-text-muted);display:flex">${uiIcon('chevron', 18)}</span>
+      </button>`;
+    return `
+    <div style="max-width:600px">
+      <p class="pr-section-label mb-5">More</p>
+      <div class="sp-list">
+        ${rows.map(r => row(`setTab('${r.tab}')`, r.icon, r.title, r.sub, r.badge)).join('')}
+      </div>
+      <div class="sp-list" style="margin-top:16px">
+        ${activeIsOwner() ? row('openManageSubscription()', 'card', 'Manage subscription', 'Payment method, billing history, or cancel', 0, 'manage-sub-btn') : ''}
+        ${row('signOut()', 'logout', 'Sign out', 'You will need your password to get back in', 0)}
+      </div>
+    </div>`;
+}
 function pSettings() {
     const currCode = getCurrencyCode();
     const t = loadTreeThresholds();
@@ -5291,23 +5399,6 @@ function pSettings() {
             </div>
             ${chevron}
           </button>`).join('')}
-          <div class="md:hidden">
-            ${activeIsOwner() ? `
-            <button onclick="openManageSubscription()" class="manage-sub-btn card mb-3" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;cursor:pointer">
-              <span>
-                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-base);margin-bottom:2px">Manage Subscription</p>
-                <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary)">Update payment method, billing history, or cancel</p>
-              </span>
-            </button>
-            ` : ''}
-            <button onclick="setTab('faq')" class="card mb-3" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;cursor:pointer">
-              <span>
-                <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-base);margin-bottom:2px">FAQ</p>
-                <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary)">Answers to common questions</p>
-              </span>
-            </button>
-            <button onclick="signOut()" style="display:flex;width:100%;justify-content:center;align-items:center;gap:6px;color:#94a3b8;font-size:var(--text-sm);font-weight:600;font-family:var(--font-family);background:none;border:none;cursor:pointer;padding:14px 0">${uiIcon('logout', 16)} Sign out</button>
-          </div>
         </div>`;
     }
 
@@ -7384,7 +7475,7 @@ function render() {
     trackScreen();
     document.title = currentUser ? 'Sprout' : 'Sign In or Start Your Free Trial | Sprout';
     const toastHtml = S.toast
-        ? `<div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:6px;background:#1e293b;color:white;font-family:var(--font-family);font-size:var(--text-sm);font-weight:600;padding:10px 20px;border-radius:var(--radius-full);box-shadow:var(--shadow-overlay);z-index:99;max-width:320px;text-align:center">${S.toastIcon || ''}${esc(S.toast)}</div>`
+        ? `<div class="sp-toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:6px;background:#1e293b;color:white;font-family:var(--font-family);font-size:var(--text-sm);font-weight:600;padding:10px 20px;border-radius:var(--radius-full);box-shadow:var(--shadow-overlay);z-index:99;max-width:320px;text-align:center">${S.toastIcon || ''}${esc(S.toast)}</div>`
         : '';
     if (S.authMode === 'reset') {
         document.getElementById('app').innerHTML = vResetPassword() + toastHtml;
