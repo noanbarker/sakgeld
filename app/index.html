@@ -329,9 +329,6 @@
       .sp-bnav-item.active { color:var(--color-green-800); }
       @media (min-width: 768px) { .sp-mob-header, .sp-bottom-nav { display:none !important; } }
       @media (max-width: 767px) {
-        .sp-tab-content { padding-bottom:calc(92px + env(safe-area-inset-bottom)) !important; }
-        .sp-tab-content.sp-has-nudge { padding-bottom:calc(156px + env(safe-area-inset-bottom)) !important; }
-        .sp-tutorial-nudge { bottom:calc(76px + env(safe-area-inset-bottom)); }
         body:has(.sp-bottom-nav) .sp-toast { bottom:calc(88px + env(safe-area-inset-bottom)) !important; }
       }
       /* Grouped list: one card, rows divided by hairlines (More, Settings, Money) */
@@ -638,7 +635,13 @@
       }
       /* Let the tab content scroll clear of the pill so nothing sits under it. */
       .sp-tab-content.sp-has-nudge { padding-bottom:104px !important; }
-      @media (max-width:640px) { .sp-tab-content.sp-has-nudge { padding-bottom:88px !important; } }
+      @media (max-width:767px) {
+        /* Phones: leave room under the last item for the bottom bar (and the
+           tour pill when it shows), and sit the pill just above the bar. */
+        .sp-tab-content { padding-bottom:calc(96px + env(safe-area-inset-bottom)) !important; }
+        .sp-tutorial-nudge { bottom:calc(80px + env(safe-area-inset-bottom)); }
+        .sp-tab-content.sp-has-nudge { padding-bottom:calc(164px + env(safe-area-inset-bottom)) !important; }
+      }
       /* Cards in these lists stay stacked one per line, but only take half the
          width on desktop - stretched across the full dashboard they read as
          banners. Narrower than this and half a row is not enough for the text,
@@ -2121,7 +2124,14 @@ function bottomNavIndex(tab) {
 }
 // Desktop sidebar slot for a tab (-1: not in the list, e.g. Help & FAQ).
 const SIDEBAR_ORDER = ['overview', 'chores', 'kids', 'money', 'bonuses', 'rewards', 'settings'];
+function scrollPageToTop(smooth) {
+    const behavior = smooth && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto';
+    window.scrollTo({ top: 0, behavior });
+    document.querySelector('.sp-tab-content')?.scrollTo({ top: 0, behavior });
+}
 function setTab(t) {
+    // Tapping the tab you're already on scrolls back to its top, like iPhone apps.
+    if (t === S.tab && !S.settingsSection && !S.moneySection && !S.openMenu) return scrollPageToTop(true);
     const oldSlot = bottomNavIndex(S.tab);
     const oldSideSlot = SIDEBAR_ORDER.indexOf(S.tab);
     const oldIdx = PARENT_TAB_ORDER.indexOf(S.tab);
@@ -2147,6 +2157,7 @@ function setTab(t) {
     }
     S.tabAnim = dir;
     S.tab = t; S.settingsSection = null; S.moneySection = null; S.openMenu = null; render();
+    scrollPageToTop(false); // a new tab always opens at its top
 
     // render() rebuilds the bar, so the pill is a new element already sitting
     // on the new tab and a CSS transition would never play. Put it back on the
@@ -4969,7 +4980,7 @@ function owedSinceDistribution(db, kid) {
         .reduce((s, t) => s + (t.amount || 0), 0);
 }
 
-function openMoneySection(id) { S.moneySection = id; render(); }
+function openMoneySection(id) { S.moneySection = id; render(); scrollPageToTop(false); }
 
 // One "⋯" button per item (chore, kid, bonus, reward) instead of a row of
 // icons. Tapping anywhere else closes it.
@@ -5684,7 +5695,7 @@ function pSettings() {
     })();
     return wide ? splitView(list, detail) : detail;
 }
-function openSettingsSection(id) { S.settingsSection = id; render(); }
+function openSettingsSection(id) { S.settingsSection = id; render(); scrollPageToTop(false); }
 
 function vKidPin() {
     const db = DB.load();
