@@ -193,14 +193,6 @@
         content:''; display:block; position:sticky; top:0; height:4px; margin-bottom:-4px;
         background:var(--gradient-stripe); z-index:200; pointer-events:none;
       }
-      /* Screens without their own sticky header (Family Portal, sign-in, PIN
-         pads, onboarding): a thin solid band under the stripe, in the page
-         colour. A 4px stripe alone is too thin for a home-screen iPhone to
-         treat as the app's top bar, so iOS faded it with its frosted top edge. */
-      body.sp-no-header::before {
-        height:28px; margin-bottom:-28px;
-        background:var(--gradient-stripe) top / 100% 4px no-repeat, var(--color-background);
-      }
 
       /* ── Component classes ────────────────────────────────────── */
       .pr-card {
@@ -310,6 +302,13 @@
       }
       .sp-quiet-link.active { background:var(--color-green-50); color:var(--color-green-800); }
       @media (hover: hover) and (pointer: fine) { .sp-quiet-link:hover { background:var(--color-green-50); color:var(--color-green-800); } }
+      .sp-topbar { display:none; }
+      body.sp-no-header .sp-topbar {
+        display:flex; align-items:center; position:sticky; top:0; z-index:20;
+        padding:12px 16px 10px; background:var(--color-surface); border-bottom:1px solid var(--color-border);
+      }
+      /* Full-height centred screens leave room for the top bar instead of scrolling */
+      body.sp-no-header #app .min-h-screen { min-height:calc(100dvh - 61px); }
       .sp-mob-header {
         position:sticky; top:0; z-index:20;
         display:flex; align-items:center; justify-content:space-between;
@@ -677,6 +676,10 @@
     </style>
 </head>
 <body class="min-h-screen">
+<!-- Top bar for screens without their own header (Family Portal, sign-in, PIN
+     pads, set-up). Same look as the dashboard's phone header; a home-screen
+     iPhone only leaves the brand stripe bright when a real top bar is present. -->
+<div class="sp-topbar"><picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" class="sp-logo-crop" style="--logo-h:34px"></picture></div>
 <div id="app" class="min-h-screen"></div>
 
 <script>
@@ -3259,9 +3262,6 @@ function vLogin() {
         <a href="../index.html" style="display:inline-flex;align-items:center;gap:6px;font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:#15803d;text-decoration:none;margin-bottom:16px">&larr; Back to website</a>
         <div class="pr-card" style="padding:52px 40px 44px">
           <div style="position:relative;z-index:1">
-            <div style="display:flex;justify-content:center;margin-bottom:28px">
-              <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:130px;width:auto;display:block;transform:translateX(-10.75%)"></picture>
-            </div>
             ${isForgot ? `
             <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:18px;text-align:center">Enter your email and we'll send you a link to reset your password.</p>
             <input type="email" id="l-email" placeholder="Email address" value="${esc(draft.email)}" class="mb-3"
@@ -3328,9 +3328,6 @@ function vSignupPage() {
         <a href="../index.html" style="display:inline-flex;align-items:center;gap:6px;font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:#15803d;text-decoration:none;margin-bottom:16px">&larr; Back to website</a>
         <div class="pr-card">
           <div style="position:relative;z-index:1;padding:clamp(24px,4vw,40px)">
-            <div style="display:flex;justify-content:center;margin-bottom:28px">
-              <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:130px;width:auto;display:block;transform:translateX(-10.75%)"></picture>
-            </div>
 
             <div class="su-grid">
               <div>
@@ -3496,9 +3493,6 @@ function vResetPassword() {
       <div style="width:100%;max-width:440px">
         <div class="pr-card" style="padding:52px 40px 44px">
           <div style="position:relative;z-index:1">
-            <div style="display:flex;justify-content:center;margin-bottom:28px">
-              <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture>
-            </div>
             <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:18px;text-align:center">Choose a new password for your account.</p>
             ${pwField('rp-pass', 'New password', '', 'mb-3', 'doResetPassword()')}
             <p id="rp-err" style="color:#f43f5e;font-size:var(--text-sm);margin:4px 0 12px;min-height:20px"></p>
@@ -3529,9 +3523,6 @@ function vResetParentPin() {
       <div style="width:100%;max-width:440px">
         <div class="pr-card" style="padding:52px 40px 44px">
           <div style="position:relative;z-index:1">
-            <div style="display:flex;justify-content:center;margin-bottom:28px">
-              <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture>
-            </div>
             <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:18px;text-align:center">Choose a new 4-digit parent PIN.</p>
             ${resetPinChoices.length > 1 ? `
             <select id="rpp-parent" class="mb-3">
@@ -3606,7 +3597,6 @@ function vSubscriptionGate() {
       <div style="width:100%;max-width:440px">
         <div class="pr-card" style="padding:52px 40px 44px;text-align:center">
           <div style="position:relative;z-index:1">
-            <div style="display:flex;justify-content:center;margin-bottom:20px"><picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture></div>
             <h2 style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:#14532d;margin-bottom:10px">${needsAttention ? 'Your subscription needs attention' : "You're almost there!"}</h2>
             <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:28px">${needsAttention
                 ? 'There’s an issue with your payment method or subscription. Please update your details to keep using Sprout.'
@@ -3661,7 +3651,6 @@ function vRestartGate() {
       <div style="width:100%;max-width:440px">
         <div class="pr-card" style="padding:52px 40px 44px;text-align:center">
           <div style="position:relative;z-index:1">
-            <div style="display:flex;justify-content:center;margin-bottom:20px"><picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:100px;width:auto;display:block"></picture></div>
             <h2 style="${font};font-size:var(--text-xl);font-weight:800;color:#14532d;margin-bottom:10px">Welcome back!</h2>
             <p style="${font};font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:22px">Your subscription has ended. Restart it to pick up where you left off - your family’s chores and savings are still here.</p>
             ${body}
@@ -3969,7 +3958,6 @@ function vCardCheck() {
       <div style="width:100%;max-width:440px">
         <div class="pr-card" style="padding:44px 32px 36px;text-align:center">
           <div style="position:relative;z-index:1">
-            <div style="display:flex;justify-content:center;margin-bottom:16px"><picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:84px;width:auto;display:block"></picture></div>
             <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:800;color:var(--color-green-600);margin:0 0 6px">${isOffer ? `Your ${c.trialDays}-day free trial` : 'Account created · Step 2 of 2'}</p>
             <h2 style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:#14532d;margin:0 0 8px">${isOffer ? `${c.trialDays} days of Sprout, on us` : 'One last step: a quick card check'}</h2>
             <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);margin:0 0 22px">${isOffer ? "Your account is already set up. Pick a plan, do a quick card check and you're in." : "Here's exactly what happens next, so nothing on the payment page surprises you."}</p>
@@ -4016,9 +4004,6 @@ function vHome() {
         <div class="pr-card" style="padding:52px 40px 44px">
           <div style="position:relative;z-index:1">
             <!-- Logo block -->
-            <div style="display:flex;justify-content:center;margin-bottom:20px">
-              <picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" style="height:130px;width:auto;display:block;transform:translateX(-10.75%)"></picture>
-            </div>
             <!-- Family Portal label -->
             <p style="margin:0 auto;text-align:center;font-family:var(--font-family);font-weight:800;color:var(--color-green);font-size:var(--text-2xl);white-space:nowrap">Family Portal</p>
             <p style="margin:6px auto 20px;text-align:center;font-family:var(--font-family);font-weight:600;color:var(--color-text-secondary);font-size:var(--text-base)">Who's using Sprout?</p>
@@ -5725,8 +5710,8 @@ function vKidPin() {
         : `<button class="numpad-btn" onclick="pinPress('${k}')" onpointerdown="this.classList.add('pressed')" onpointerup="this.classList.remove('pressed')" onpointerleave="this.classList.remove('pressed')" onpointercancel="this.classList.remove('pressed')">${k}</button>`
     ).join('');
     return `
-    <div class="min-h-screen flex flex-col items-center justify-center p-6" style="background:var(--color-background)">
-      <button onclick="go('home')" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:var(--text-sm);background:none;border:none;cursor:pointer;margin-bottom:40px;position:absolute;top:24px;left:24px">← Back</button>
+    <div class="min-h-screen flex flex-col items-center justify-center p-6" style="background:var(--color-background);position:relative">
+      <div style="position:absolute;top:16px;left:24px">${backLink('Family Portal', "go('home')")}</div>
       <div class="flex flex-col items-center">
         <div style="width:120px;height:120px;background:var(--color-surface);border:3px solid ${ac.header};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:60px;margin-bottom:12px">${kidIcon(kid)}</div>
         <h2 style="font-family:var(--font-family);font-size:var(--text-2xl);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${esc(kid?.name) || ''}</h2>
@@ -5799,8 +5784,8 @@ function vParentPin() {
         : `<button class="numpad-btn" onclick="parentPinPress('${k}')" onpointerdown="this.classList.add('pressed')" onpointerup="this.classList.remove('pressed')" onpointerleave="this.classList.remove('pressed')" onpointercancel="this.classList.remove('pressed')">${k}</button>`
     ).join('');
     return `
-    <div class="min-h-screen flex flex-col items-center justify-center p-6" style="background:var(--color-background)">
-      <button onclick="go('home')" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:var(--text-sm);background:none;border:none;cursor:pointer;margin-bottom:40px;position:absolute;top:24px;left:24px">← Back</button>
+    <div class="min-h-screen flex flex-col items-center justify-center p-6" style="background:var(--color-background);position:relative">
+      <div style="position:absolute;top:16px;left:24px">${backLink('Family Portal', "go('home')")}</div>
       <div class="flex flex-col items-center">
         <div style="width:80px;height:80px;background:var(--color-green-100);border:2px solid var(--color-green-border);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--color-green-700);margin-bottom:12px">${uiIcon('user', 36, 2)}</div>
         <h2 style="font-family:var(--font-family);font-size:var(--text-2xl);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${coParent() && pinParent ? esc(pinParent.name) : 'Parent'}</h2>
