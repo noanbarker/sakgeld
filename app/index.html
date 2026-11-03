@@ -5635,7 +5635,7 @@ function pGoals(db) {
     const grid = cards => `<div class="gap-3 mb-6" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));align-items:start">${cards}</div>`;
     return `
     <div class="sp-page-head"><h1 class="sp-page-title">Goals</h1><button onclick="openModal('add-goal')" class="btn-primary sp-head-btn">${uiIcon('plus', 16, 2.5)}Add goal</button></div>
-    <p class="sp-page-intro">Something a kid is saving up for. A set share of everything they earn goes into it automatically. Goal money is kept apart from their savings - it doesn't grow their tree or count toward bonuses - and you hold it until you buy the item.</p>
+    <p class="sp-page-intro">Something a kid is saving up for. A set share of everything they earn goes into it automatically. Goal money is kept apart from their savings - it doesn't grow their tree or count toward bonuses - and you hold it until you buy it for them.</p>
     ${ready.length ? `<p class="pr-section-label mb-3">Ready to buy</p>${grid(readyCards)}` : ''}
     ${active.length
         ? `${ready.length ? '<p class="pr-section-label mb-3">Saving up</p>' : ''}${grid(activeCards)}`
