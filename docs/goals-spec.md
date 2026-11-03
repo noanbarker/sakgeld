@@ -49,3 +49,4 @@ When a kid logs in and a parent has approved anything since their last visit, sh
 - Money into a goal = a negative `goal` transaction on the balance + a `goal_entries` row on the pot. Out (withdraw / cancel) = a positive `goal_return` transaction. Match money only touches the pot. This keeps "amount owed" and Reconciliation right without changing them.
 - Push kind `goal` added to `api/push-send.js`.
 - Vercel preview builds of this branch use the **live** database. Test on a test family account, not a real one: approving a chore in the preview moves money into a pot that the live app doesn't know about yet.
+- "New feature" pop-up for existing families: `WHATS_NEW` in app/index.html now announces Goals (replaces the chore-pause one). **Before merging to main, set `launchedAt` to the go-live moment** so only families who signed up before then see it.
