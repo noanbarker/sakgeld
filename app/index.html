@@ -624,6 +624,16 @@
       .modal-sheet { scrollbar-width: none; -ms-overflow-style: none; }
       .modal-sheet::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
+      /* ── Phones in landscape: the app is portrait-only. iOS won't let a website lock
+         rotation, so cover the screen and ask for the phone to be turned upright. ── */
+      .sp-rotate { display: none; }
+      @media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+        .sp-rotate { display: flex; position: fixed; inset: 0; z-index: 10000; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; background: var(--color-background); color: var(--color-text-primary); text-align: center; }
+        .sp-rotate p { margin: 0; font-size: var(--text-base); font-weight: 700; }
+        .sp-rotate svg { color: var(--color-green-600); transform: rotate(-90deg); }
+        body:has(.sp-rotate) { overflow: hidden; }
+      }
+
       /* ── Parent dashboard: animated tab transitions (mobile only) ── */
       @media (max-width: 767px) {
         .sp-tab-anim-fwd  { animation: spTabSlideRight 0.42s cubic-bezier(0.16,1,0.3,1); }
@@ -681,6 +691,7 @@
      iPhone only leaves the brand stripe bright when a real top bar is present. -->
 <div class="sp-topbar"><picture><source srcset="../images/Sprout_Logo_400.webp" type="image/webp"><img src="../images/Sprout_Logo_400.png" alt="Sprout" class="sp-logo-crop" style="--logo-h:34px"></picture></div>
 <div id="app" class="min-h-screen"></div>
+<div class="sp-rotate" aria-hidden="true"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2.5"/><line x1="11" y1="18" x2="13" y2="18"/></svg><p>Please turn your phone upright</p></div>
 
 <script>
 // ─── SUPABASE ────────────────────────────────────────────────────

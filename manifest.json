@@ -4,6 +4,7 @@
   "description": "A parent-controlled chore, allowance and savings tracker for the whole family.",
   "start_url": "/app/index.html?mode=signin",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#16a34a",
   "icons": [
