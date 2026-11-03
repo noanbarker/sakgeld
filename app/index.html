@@ -7366,8 +7366,7 @@ async function saveChore(id) {
 // account (not the device), so co-parents sharing a login see it once between
 // them. Families who signed up after the launch never get it — for them the
 // feature isn't new. Swap the id and date for the next announcement.
-// launchedAt: set to the go-live moment when the goals branch merges.
-const WHATS_NEW = { id: 'goals', launchedAt: '2026-11-03T12:00:00+02:00' };
+const WHATS_NEW = { id: 'goals', launchedAt: '2026-11-03T17:20:00+02:00' };
 function whatsNewDue() {
     const m = currentUser?.user_metadata || {};
     if (S.whatsNewDismissed || m.whats_new_seen === WHATS_NEW.id) return false;
