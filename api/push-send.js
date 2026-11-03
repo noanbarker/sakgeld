@@ -205,14 +205,17 @@ module.exports = async (req, res) => {
 
   const who = String(kidName || 'Someone').slice(0, 40);
   const what = String(itemName || '').slice(0, 60);
-  const title = kind === 'reward'
+  const isGoal = kind === 'goal';
+  const title = isGoal
+    ? `${who} reached a goal!`
+    : kind === 'reward'
     ? `${who} claimed a reward`
     : `${who} marked a chore done`;
   const waiting = total > 0 ? ` · ${pluralise(total, 'item')} waiting for your approval` : '';
-  const body = `${what}${waiting}`;
+  const body = isGoal ? `${what} is fully saved - time to buy it.` : `${what}${waiting}`;
 
   setVapid();
-  const payload = JSON.stringify({ title, body, count: total, url: APP_URL, tag: 'sprout-approvals' });
+  const payload = JSON.stringify({ title, body, count: total, url: APP_URL, tag: isGoal ? 'sprout-goal' : 'sprout-approvals' });
   const { sent, dead } = await pushToAll(subs, payload);
 
   if (dead.length) {
@@ -223,7 +226,7 @@ module.exports = async (req, res) => {
   sendPostHogEvent({
     distinctId: userId,
     event: 'push_notification_sent',
-    properties: { kind: kind === 'reward' ? 'reward' : 'chore', devices: sent, pending_total: total, dead_subscriptions: dead.length },
+    properties: { kind: isGoal ? 'goal' : kind === 'reward' ? 'reward' : 'chore', devices: sent, pending_total: total, dead_subscriptions: dead.length },
   }).catch(() => {});
 
   res.status(200).json({ sent, removed: dead.length });

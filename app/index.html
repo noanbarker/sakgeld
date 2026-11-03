@@ -396,6 +396,7 @@
       .sp-recon-input span { font-family:var(--font-family); font-size:var(--text-sm); color:var(--color-text-secondary); }
       .sp-recon-input input { border:none !important; padding:8px 0 !important; font-weight:700; background:transparent; }
       .sp-tag-grey  { background:#f1f5f9; color:var(--color-text-secondary); }
+      .sp-tag-green { background:var(--color-green-100); color:var(--color-green-700); }
       /* Kid screen: same rules, bigger and friendlier */
       .sp-kid-exit { display:inline-flex; align-items:center; gap:6px; flex-shrink:0; padding:8px 14px; border:none; border-radius:var(--radius-full); background:rgba(255,255,255,.2); color:#fff; cursor:pointer; font-family:var(--font-family); font-size:var(--text-sm); font-weight:700; }
       @media (hover: hover) and (pointer: fine) { .sp-kid-exit:hover { background:rgba(255,255,255,.3); } }
@@ -710,7 +711,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
 
 let currentUser = null;
-let cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [] };
+let cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [], goals: [], goalEntries: [] };
 const DB = { load: () => cache };
 
 // Reads the utm_source/medium/campaign/content/term captured by
@@ -1439,7 +1440,7 @@ async function selectAllForUser(table, uid) {
 }
 async function loadCache() {
     const uid = currentUser.id;
-    const [kRes, cRes, compRes, txRes, bmRes, rwRes, rcRes, distRes, chRes, pinRes, profilesOk] = await Promise.all([
+    const [kRes, cRes, compRes, txRes, bmRes, rwRes, rcRes, distRes, chRes, pinRes, profilesOk, goalRes, geRes] = await Promise.all([
         sb.from('kids').select('id,user_id,name,emoji,balance,created_at,color_key,date_of_birth,last_distribution_at,cycle_amount,cycle_amount_pending').eq('user_id', uid),
         sb.from('chores').select('*').eq('user_id', uid),
         selectAllForUser('completions', uid),
@@ -1451,18 +1452,22 @@ async function loadCache() {
         selectAllForUser('cycle_history', uid),
         sb.rpc('has_parent_pin'),
         loadParentProfiles(),
+        sb.from('goals').select('*').eq('user_id', uid),
+        selectAllForUser('goal_entries', uid),
     ]);
     hasParentPin = profilesOk ? !!ownerProfile()?.has_pin : !!pinRes.data;
     cache = {
         kids: kRes.data || [],
         chores: (cRes.data || []).map(c => ({ ...c, assignedTo: c.assigned_to, oneOff: c.one_off || false, expiresOn: c.expires_on || null })),
         completions: (compRes.data || []).map(c => ({ ...c, choreId: c.chore_id, kidId: c.kid_id, completedAt: c.completed_at, dueDate: c.due_date || null, missed: c.missed || false })),
-        transactions: (txRes.data || []).map(t => ({ ...t, kidId: t.kid_id, createdAt: t.created_at, choreDate: t.chore_date || null })),
+        transactions: (txRes.data || []).map(t => ({ ...t, kidId: t.kid_id, createdAt: t.created_at, choreDate: t.chore_date || null, goalId: t.goal_id || null })),
         bonusMilestones: (bmRes.data || []).map(m => ({ ...m, assignedTo: m.assigned_to, bonusAmount: m.bonus_amount, claimedBy: m.claimed_by || [] })),
         rewards: (rwRes.data || []).map(r => ({ ...r, assignedTo: r.assigned_to })),
         rewardCompletions: (rcRes.data || []).map(c => ({ ...c, rewardId: c.reward_id, kidId: c.kid_id, claimedAt: c.claimed_at, approvedAt: c.approved_at })),
         distributions: (distRes.data || []).map(d => ({ ...d, kidId: d.kid_id, createdAt: d.created_at })),
         cycleHistory: (chRes.data || []).map(h => ({ ...h, kidId: h.kid_id, periodType: h.period_type, startDate: h.start_date, endDate: h.end_date, weightCompleted: h.weight_completed, weightAssigned: h.weight_assigned, amountCeiling: h.amount_ceiling, amountPaid: h.amount_paid, createdAt: h.created_at })),
+        goals: (goalRes.data || []).map(mapGoalRow),
+        goalEntries: (geRes.data || []).map(e => ({ ...e, goalId: e.goal_id, kidId: e.kid_id, amount: +e.amount || 0, createdAt: e.created_at })),
     };
     await signChoreImages();
     // Family size on the person, so retention can be cut by "1 kid vs 3 kids" or
@@ -1542,7 +1547,7 @@ async function initApp() {
                 maybeResumeAfterUpdate();
             }
         }
-        else { parentProfiles = []; S.activeParentId = null; S.pinParentId = null; cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [] }; S.view = 'home'; }
+        else { parentProfiles = []; S.activeParentId = null; S.pinParentId = null; cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [], goals: [], goalEntries: [] }; S.view = 'home'; }
         render();
     });
     const { data: { session } } = await sb.auth.getSession();
@@ -1566,6 +1571,7 @@ async function signOut() { track('signed_out'); await sb.auth.signOut(); }
 function toggleHistory() { S.historyOpen = !S.historyOpen; render(); }
 function toggleBonusHistory()  { S.bonusHistoryOpen  = !S.bonusHistoryOpen;  render(); }
 function toggleRewardHistory() { S.rewardHistoryOpen = !S.rewardHistoryOpen; render(); }
+function toggleGoalHistory()   { S.goalHistoryOpen   = !S.goalHistoryOpen;   render(); }
 
 // Kid view: section heading with an optional "Show history (n)" toggle beside it.
 // Earned bonuses/rewards live behind the toggle so the list up top is only what's still to earn.
@@ -1727,6 +1733,7 @@ const UI_ICON_PATHS = {
   camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
   menu: '<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>',
   chevron: '<path d="M9 6l6 6-6 6"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
   back: '<path d="M15 18l-6-6 6-6"/>',
   pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
   play: '<path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/>',
@@ -1754,7 +1761,7 @@ const CHORE_PHOTO_TTL     = 604800; // signed URLs last a week; re-signed on eve
 const choreImgURL = {};
 
 async function signChoreImages() {
-    const paths = [...new Set((cache.chores || []).map(c => c.image_path).filter(Boolean))];
+    const paths = [...new Set([...(cache.chores || []), ...(cache.goals || [])].map(c => c.image_path).filter(Boolean))];
     if (!paths.length) return;
     const { data, error } = await sb.storage.from(CHORE_PHOTO_BUCKET).createSignedUrls(paths, CHORE_PHOTO_TTL);
     if (error) return;
@@ -1915,7 +1922,10 @@ function loadSeenMilestones(kidId) {
         const raw = localStorage.getItem(celSeenKey(kidId));
         if (!raw) return null;
         const v = JSON.parse(raw);
-        return { stage: Number(v.stage) || 0, bonuses: Array.isArray(v.bonuses) ? v.bonuses : [] };
+        // goals/at/approved arrived with Goals; a record from before then has
+        // none, which reads as "nothing new" rather than replaying the past.
+        return { stage: Number(v.stage) || 0, bonuses: Array.isArray(v.bonuses) ? v.bonuses : [],
+                 goals: Array.isArray(v.goals) ? v.goals : null, at: v.at || null, approved: Array.isArray(v.approved) ? v.approved : null };
     } catch { return null; }
 }
 function saveSeenMilestones(kidId, seen) {
@@ -1926,7 +1936,10 @@ function currentMilestoneState(kid) {
         stage: getTreeStage(kid.balance || 0),
         bonuses: (cache.bonusMilestones || [])
             .filter(m => (m.claimedBy || []).some(c => c.kidId === kid.id))
-            .map(m => m.id)
+            .map(m => m.id),
+        goals: (cache.goals || []).filter(g => g.kidId === kid.id && g.achievedAt).map(g => g.id),
+        at: new Date().toISOString(),
+        approved: recentApprovedIds(kid.id),
     };
 }
 function pendingCelebrations(kid) {
@@ -1934,6 +1947,14 @@ function pendingCelebrations(kid) {
     const seen = loadSeenMilestones(kid.id);
     if (!seen) { saveSeenMilestones(kid.id, now); return []; }
     const items = [];
+    // What came in since last time goes first: it's the cause of everything after.
+    const earned = earnedSince(kid, seen);
+    if (earned) items.push({ type: 'earned', earned });
+    if (seen.goals) {
+        (cache.goals || [])
+            .filter(g => now.goals.includes(g.id) && !seen.goals.includes(g.id) && g.status !== 'cancelled')
+            .forEach(g => items.push({ type: 'goal', goal: g }));
+    }
     // Bonuses come first: the bonus is what pushed the balance over the line
     // that grew the tree, so it reads as cause then effect.
     (cache.bonusMilestones || [])
@@ -1997,8 +2018,42 @@ function renderCelebration() {
     const item   = c.items[c.index];
     const isLast = c.index >= c.items.length - 1;
 
-    let kicker, headline, chip, art;
-    if (item.type === 'tree') {
+    let kicker, headline, chip, art, sub;
+    if (item.type === 'earned') {
+        const e = item.earned;
+        kicker   = 'Since you were last here';
+        headline = e.total > 0 ? `You earned ${R(e.total)}!` : `${e.rows.length} chore${e.rows.length > 1 ? 's' : ''} approved!`;
+        const shown = e.rows.slice(0, 5);
+        const more  = e.rows.length - shown.length;
+        const line = (icon, label, amount, strong) => `
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 0">
+            <span style="width:24px;height:24px;border-radius:50%;background:var(--color-green-50);color:var(--color-green-700);display:flex;align-items:center;justify-content:center;flex-shrink:0">${icon}</span>
+            <span style="flex:1;min-width:0;font-family:var(--font-family);font-size:var(--text-sm);font-weight:${strong ? 800 : 600};color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</span>
+            <span style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:800;color:var(--color-green-700);flex-shrink:0">${amount}</span>
+          </div>`;
+        const list = shown.map(r => line(uiIcon(r.icon, 13, 2.5), esc(r.name), r.amount != null ? `+${R(r.amount)}` : '<span style="font-weight:600;color:var(--color-text-secondary)">Approved</span>')).join('')
+            + (more > 0 ? `<p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);padding:2px 0 0 32px">and ${more} more</p>` : '');
+        const split = e.total > 0 && e.goals.length ? `
+          <div style="border-top:1px solid var(--color-border);margin-top:8px;padding-top:6px">
+            ${line(uiIcon('coin', 13, 2.5), 'To your savings', R(e.toSavings), true)}
+            ${e.goals.map(b => line(uiIcon('target', 13, 2.5), `To ${esc(b.goal.name)}`, R(b.kid), true)
+                + (b.match > 0 ? `<p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);padding:0 0 4px 32px">plus ${R(b.match)} from your parents</p>` : '')).join('')}
+          </div>` : '';
+        chip = `<div style="text-align:left;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:8px 12px;margin-bottom:14px;max-height:280px;overflow:auto">${list}${split}</div>`;
+        art = `<div class="sp-cel-ring"></div><div class="sp-cel-art"><picture><source srcset="../images/sprout-celebrating_800_cropped.webp" type="image/webp"><img src="../images/sprout-celebrating_800_cropped.png" alt="" style="height:96px;width:auto;display:block"></picture></div>`;
+        sub = '';
+    } else if (item.type === 'goal') {
+        const g = item.goal;
+        kicker   = 'Goal reached';
+        headline = esc(g.name);
+        chip = `
+          <div style="display:inline-flex;align-items:center;gap:6px;background:var(--color-green-50);border:1px solid var(--color-green-border);border-radius:var(--radius-full);padding:7px 16px;margin-bottom:12px">
+            <span style="color:var(--color-green-700);display:flex">${uiIcon('target', 16, 2.5)}</span>
+            <span style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:800;color:var(--color-green-700)">${R(g.target)} saved</span>
+          </div>`;
+        art = `<div class="sp-cel-ring"></div><div class="sp-cel-art">${goalPhoto(g, 112)}</div>`;
+        sub = `You did it, ${esc(kid.name)}! You saved up the whole amount. Your parents will help you get it.`;
+    } else if (item.type === 'tree') {
         const from = TREE_STAGES[item.from], to = TREE_STAGES[item.to];
         kicker   = 'New tree stage';
         headline = `Hello, ${to.label}!`;
@@ -2021,7 +2076,7 @@ function renderCelebration() {
         art = `<div class="sp-cel-ring"></div><div class="sp-cel-art"><picture><source srcset="../images/sprout-celebrating_800_cropped.webp" type="image/webp"><img src="../images/sprout-celebrating_800_cropped.png" alt="" style="height:132px;width:auto;display:block"></picture></div>`;
     }
 
-    const sub = item.type !== 'tree'
+    if (sub === undefined) sub = item.type !== 'tree'
         ? `You hit ${R(item.milestone.threshold)} in savings, ${esc(kid.name)}. Your bonus is already in your balance.`
         : item.to >= TREE_STAGES.length - 1
             ? `Nice saving, ${esc(kid.name)} - you've grown a whole forest. That's the very top!`
@@ -2039,11 +2094,166 @@ function renderCelebration() {
         <p style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:800;color:var(--color-green-700);margin-bottom:6px">${kicker}</p>
         <h2 style="font-family:var(--font-family);font-size:var(--text-xl);font-weight:800;color:var(--color-text-primary);margin-bottom:10px">${headline}</h2>
         ${chip}
-        <p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);line-height:1.5;margin-bottom:18px">${sub}</p>
+        ${sub ? `<p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);line-height:1.5;margin-bottom:18px">${sub}</p>` : ''}
         ${dots}
         <button onclick="nextCelebration()" class="btn-primary">${isLast ? "Awesome!" : 'Next'}</button>
       </div>
     </div>`;
+}
+
+// ─── GOALS ───────────────────────────────────────────────────────
+// A goal is a pot a kid fills with a set share of everything they earn
+// (chores, cycle payouts, rewards, bonuses). The pot lives outside
+// kids.balance: it's money already promised to something, so it never grows
+// the tree or unlocks a milestone, and the parent holds it until the goal is
+// bought. Moving money in is a negative 'goal' transaction on the balance side
+// plus a goal_entries row on the pot side; cancelling reverses that.
+function mapGoalRow(g) {
+    return { ...g, kidId: g.kid_id, target: +g.target || 0, percent: +g.percent || 0, matchPercent: +g.match_percent || 0,
+             saved: +g.saved || 0, createdAt: g.created_at, achievedAt: g.achieved_at || null, boughtAt: g.bought_at || null, cancelledAt: g.cancelled_at || null };
+}
+function isPoints() { return getCurrencyCode() === 'pts'; }
+// Floor, never round: a kid's share can't add up to more than they earned.
+function moneyFloor(n) { return isPoints() ? Math.floor(n + 1e-9) : Math.floor(n * 100 + 1e-6) / 100; }
+function moneyRound(n) { return isPoints() ? Math.round(n) : Math.round(n * 100) / 100; }
+function activeGoals(kidId) {
+    return (cache.goals || []).filter(g => g.kidId === kidId && g.status === 'active')
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+}
+function goalRemaining(g) { return Math.max(0, moneyRound(g.target - g.saved)); }
+function goalPct(g) { return g.target > 0 ? Math.min(100, Math.floor(g.saved / g.target * 100)) : 0; }
+// One number for the kid's header: everything saved across their active goals
+// against everything those goals need.
+function goalsCombinedPct(kidId) {
+    const gs = activeGoals(kidId);
+    const target = gs.reduce((s, g) => s + g.target, 0);
+    return target > 0 ? Math.min(100, Math.floor(gs.reduce((s, g) => s + g.saved, 0) / target * 100)) : 0;
+}
+// Share of each earning already promised to other active goals.
+function goalPercentUsed(kidId, exceptId) {
+    return activeGoals(kidId).filter(g => g.id !== exceptId).reduce((s, g) => s + g.percent, 0);
+}
+function goalPhoto(g, size = 64) {
+    const r = Math.round(size * 0.18);
+    if (g && g.image_path && choreImgURL[g.image_path]) {
+        return `<img src="${choreImgURL[g.image_path]}" alt="${esc(g.name)}" style="width:${size}px;height:${size}px;object-fit:cover;border-radius:${r}px;display:block;flex-shrink:0">`;
+    }
+    return `<div style="width:${size}px;height:${size}px;border-radius:${r}px;background:var(--color-green-50);color:var(--color-green-600);display:flex;align-items:center;justify-content:center;flex-shrink:0">${uiIcon('target', Math.round(size * 0.5), 2)}</div>`;
+}
+function goalMatchText(g) {
+    if (!g.matchPercent) return '';
+    return isPoints()
+        ? `Parents add ${g.matchPercent}% on top`
+        : `Parents add ${R(g.matchPercent / 100)} for every ${R(1)}`;
+}
+function goalCacheTx(row) {
+    cache.transactions.push({ actioned_by: row.actioned_by || null, id: row.id, kidId: row.kid_id, amount: row.amount, type: row.type,
+        description: row.description, createdAt: row.created_at, choreDate: row.chore_date || null, goalId: row.goal_id || null });
+}
+function goalCacheEntry(row) {
+    cache.goalEntries.push({ ...row, goalId: row.goal_id, kidId: row.kid_id, createdAt: row.created_at });
+}
+async function saveGoalProgress(g) {
+    await sb.from('goals').update({ saved: g.saved, status: g.status, achieved_at: g.achievedAt }).eq('id', g.id).eq('user_id', currentUser.id);
+}
+// Called after any money goes into a pot. Reaching the target closes the goal
+// to new money straight away, so its share flows back to the balance from the
+// next earning on, and tells the parent it's time to buy the thing.
+function goalReachedCheck(g, kid) {
+    if (g.status !== 'active' || g.saved < g.target) return false;
+    g.status = 'achieved';
+    g.achievedAt = new Date().toISOString();
+    notifyParentPush('goal', kid.id, g.name);
+    track('goal_achieved', { target: g.target, has_match: g.matchPercent > 0 });
+    return true;
+}
+
+// Splits a fresh earning between the balance and the kid's active goals. The
+// caller has already credited the full amount; this takes the goals' shares
+// back out. Returns how much left the balance.
+async function allocateToGoals(kid, amount, choreDate = null) {
+    const goals = activeGoals(kid.id).filter(g => g.percent > 0);
+    if (!goals.length || !(amount > 0)) return 0;
+    const now = new Date().toISOString();
+    const txRows = [], entryRows = [], touched = [], reached = [];
+    let taken = 0;
+    for (const g of goals) {
+        const left = goalRemaining(g);
+        if (left <= 0) continue;
+        const rate = g.matchPercent / 100;
+        let share = moneyFloor(amount * g.percent / 100);
+        let match = moneyFloor(share * rate);
+        // The last top-up fills the pot exactly instead of running past it.
+        if (share + match >= left) { share = moneyFloor(left / (1 + rate)); match = moneyRound(left - share); }
+        if (share <= 0 && match <= 0) continue;
+        taken = moneyRound(taken + share);
+        g.saved = moneyRound(g.saved + share + match);
+        touched.push(g);
+        let txId = null;
+        if (share > 0) {
+            txId = uid();
+            txRows.push({ id: txId, user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kid.id, amount: -share, type: 'goal', description: `Saved for ${g.name}`, created_at: now, chore_date: choreDate, goal_id: g.id });
+            entryRows.push({ id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), goal_id: g.id, kid_id: kid.id, amount: share, kind: 'auto', description: 'Share of earnings', transaction_id: txId, created_at: now });
+        }
+        if (match > 0) entryRows.push({ id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), goal_id: g.id, kid_id: kid.id, amount: match, kind: 'match', description: 'Parent match', transaction_id: txId, created_at: now });
+        if (goalReachedCheck(g, kid)) reached.push(g);
+    }
+    if (!touched.length) return 0;
+    if (taken > 0) {
+        kid.balance = moneyRound((kid.balance || 0) - taken);
+        await sb.from('kids').update({ balance: kid.balance }).eq('id', kid.id).eq('user_id', currentUser.id);
+        await sb.from('transactions').insert(txRows);
+        txRows.forEach(goalCacheTx);
+    }
+    await sb.from('goal_entries').insert(entryRows);
+    entryRows.forEach(goalCacheEntry);
+    for (const g of touched) await saveGoalProgress(g);
+    if (reached.length) toast(`${kid.name} reached ${reached.length > 1 ? reached.length + ' goals' : 'a goal'}: ${reached.map(g => g.name).join(', ')}!`, 'success');
+    return taken;
+}
+
+// ─── "SINCE YOU WERE LAST HERE" ──────────────────────────────────
+// Kids mark chores done and a parent approves them later, so the kid never
+// sees the money arrive. The next time they open their screen they get a
+// summary of what was approved and where the money went.
+const EARNING_TYPES = ['chore', 'reward', 'bonus', 'cycle_allowance'];
+const APPROVAL_LOOKBACK_MS = 45 * 86400000;
+function recentApprovedIds(kidId) {
+    const cutoff = Date.now() - APPROVAL_LOOKBACK_MS;
+    return cache.completions.filter(c => c.kidId === kidId && c.approved && !c.rejected && new Date(c.completedAt).getTime() > cutoff).map(c => c.id);
+}
+function earnedSince(kid, seen) {
+    if (!seen.at) return null;
+    const since = new Date(seen.at);
+    const after = x => new Date(x.createdAt) > since;
+    const typeIcon = { chore: 'check', reward: 'trophy', bonus: 'star', cycle_allowance: 'coin' };
+    const rows = cache.transactions
+        .filter(t => t.kidId === kid.id && EARNING_TYPES.includes(t.type) && t.amount > 0 && after(t))
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+        .map(t => ({ icon: typeIcon[t.type], name: t.description, amount: t.amount }));
+    // Per-cycle chores pay nothing until the cycle ends, but the kid still
+    // wants to know a parent ticked them off.
+    if (isCycleMode() && seen.approved) {
+        const seenIds = new Set(seen.approved);
+        const cutoff = Date.now() - APPROVAL_LOOKBACK_MS;
+        cache.completions
+            .filter(c => c.kidId === kid.id && c.approved && !c.rejected && !seenIds.has(c.id) && new Date(c.completedAt).getTime() > cutoff)
+            .forEach(c => {
+                const chore = cache.chores.find(x => x.id === c.choreId);
+                if (!chore || chore.oneOff) return; // quick chores pay out, so they're already a money row
+                rows.push({ icon: 'check', name: chore.name, amount: null });
+            });
+    }
+    if (!rows.length) return null;
+    const total = moneyRound(rows.reduce((s, r) => s + (r.amount || 0), 0));
+    const byGoal = {};
+    (cache.goalEntries || []).filter(e => e.kidId === kid.id && (e.kind === 'auto' || e.kind === 'match') && after(e)).forEach(e => {
+        const b = byGoal[e.goalId] || (byGoal[e.goalId] = { goal: cache.goals.find(g => g.id === e.goalId), kid: 0, match: 0 });
+        if (e.kind === 'auto') b.kid += e.amount; else b.match += e.amount;
+    });
+    const goals = Object.values(byGoal).filter(b => b.goal);
+    const toGoals = goals.reduce((s, b) => s + b.kid, 0);
+    return { rows, total, toSavings: moneyRound(Math.max(0, total - toGoals)), goals };
 }
 
 
@@ -2155,15 +2365,15 @@ function avatarIMG(num, size) {
 }
 function go(view, params = {}) { Object.assign(S, params); S.view = view; render(); }
 // Phone bottom bar order, then the sections that live under More.
-const PARENT_TAB_ORDER = ['overview', 'chores', 'kids', 'money', 'more', 'bonuses', 'rewards', 'settings', 'faq'];
-const MORE_TABS = ['more', 'bonuses', 'rewards', 'settings', 'faq'];
+const PARENT_TAB_ORDER = ['overview', 'chores', 'kids', 'money', 'more', 'bonuses', 'rewards', 'goals', 'settings', 'faq'];
+const MORE_TABS = ['more', 'bonuses', 'rewards', 'goals', 'settings', 'faq'];
 // Bottom bar slot for a tab: the four main tabs, everything else sits under More.
 function bottomNavIndex(tab) {
     const i = ['overview', 'chores', 'kids', 'money'].indexOf(tab);
     return i >= 0 ? i : 4;
 }
 // Desktop sidebar slot for a tab (-1: not in the list, e.g. Help & FAQ).
-const SIDEBAR_ORDER = ['overview', 'chores', 'kids', 'money', 'bonuses', 'rewards', 'settings'];
+const SIDEBAR_ORDER = ['overview', 'chores', 'kids', 'money', 'bonuses', 'rewards', 'goals', 'settings'];
 function scrollPageToTop(smooth) {
     const behavior = smooth && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto';
     window.scrollTo({ top: 0, behavior });
@@ -2926,6 +3136,7 @@ async function runCycleCloseOut() {
             await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, kid_id: kid.id, amount: amountPaid, type: 'cycle_allowance', description: desc, created_at: createdAt });
             kid.balance = newBalance;
             cache.transactions.push({ id: txId, kidId: kid.id, amount: amountPaid, type: 'cycle_allowance', description: desc, createdAt });
+            await allocateToGoals(kid, amountPaid);
         }
         await sb.from('cycle_history').insert({ id: historyId, user_id: currentUser.id, kid_id: kid.id, period_type: period, start_date: anchor, end_date: end, weight_completed: completed, weight_assigned: assigned, percent: pct, amount_ceiling: ceiling, amount_paid: amountPaid, created_at: createdAt });
         cache.cycleHistory.push({ id: historyId, kidId: kid.id, periodType: period, startDate: anchor, endDate: end, weightCompleted: completed, weightAssigned: assigned, percent: pct, amountCeiling: ceiling, amountPaid: amountPaid, createdAt });
@@ -2960,6 +3171,7 @@ function openModal(type, data = {}) {
     S.selectedWeight   = data.weight == null ? 1 : (+data.weight || 1);
     S.selectedRepeat   = data.repeat ? { ...data.repeat, order: [...(data.repeat.order || [])] }
                        : { every: 'week', when: 'day', day: 'Sat', nth: 1, start: mondayOf(toLocalDateStr(new Date())), turns: false, order: [] };
+    if (type === 'add-goal' && !data.kidId && DB.load().kids.length === 1) data = { ...data, kidId: DB.load().kids[0].id };
     if (type === 'quick-task') {
         S.selectedKids = [];
     } else if (type === 'add-bonus') {
@@ -3021,6 +3233,16 @@ function snapModalInputs() {
         const n = document.getElementById('cp-name');
         const p = document.getElementById('cp-pin');
         if (n) S.modal.data = { ...S.modal.data, ownerName: on?.value, ownerPin: op?.value, name: n.value, pin: p?.value };
+    }
+    if (t === 'add-goal' || t === 'edit-goal') {
+        const n = document.getElementById('g-name');
+        const tg = document.getElementById('g-target');
+        const pc = document.getElementById('g-pct');
+        if (n) S.modal.data = { ...S.modal.data, name: n.value, target: tg?.value, percent: pc?.value };
+    }
+    if (t === 'goal-money') {
+        const a = document.getElementById('gm-amount');
+        if (a) S.modal.data = { ...S.modal.data, amount: a.value };
     }
     if (t === 'capture-expense') {
         const a = document.getElementById('exp-amount');
@@ -4456,6 +4678,7 @@ function vParent() {
     const db = DB.load();
     const pending = db.completions.filter(c => !c.approved && !c.rejected && !c.missed).length;
     const pendingRewards = (db.rewardCompletions || []).filter(c => !c.approved && !c.rejected).length;
+    const readyGoals = goalsReadyToBuy(db).length;
     const navItems = [
         { id: 'overview', label: 'Overview', badge: pending, svg: uiIcon('grid', 18) },
         { id: 'chores',   label: 'Chores',   svg: uiIcon('list', 18) },
@@ -4463,6 +4686,7 @@ function vParent() {
         { id: 'money',    label: 'Money',    svg: uiIcon('banknote', 18) },
         { id: 'bonuses',  label: 'Bonuses',  svg: uiIcon('star', 18) },
         { id: 'rewards',  label: 'Rewards',  badge: pendingRewards, svg: uiIcon('trophy', 18) },
+        { id: 'goals',    label: 'Goals',    badge: readyGoals, svg: uiIcon('target', 18) },
         { id: 'settings', label: 'Settings', svg: uiIcon('gear', 18) },
     ];
     const sidebar = `
@@ -4496,7 +4720,7 @@ function vParent() {
     // bottom bar where thumbs reach. Everything else lives under More.
     const mobileItems = [
         ...navItems.filter(t => ['overview', 'chores', 'kids', 'money'].includes(t.id)),
-        { id: 'more', label: 'More', badge: pendingRewards, svg: uiIcon('menu', 18) },
+        { id: 'more', label: 'More', badge: pendingRewards + readyGoals, svg: uiIcon('menu', 18) },
     ];
     const mobileActive = MORE_TABS.includes(S.tab) ? 'more' : S.tab;
     const mobileHeader = `
@@ -4529,6 +4753,7 @@ function vParent() {
             S.tab === 'money'     ? pMoney(db) :
             S.tab === 'bonuses'   ? pBonuses(db) :
             S.tab === 'rewards'   ? pRewards(db) :
+            S.tab === 'goals'     ? pGoals(db) :
             S.tab === 'faq'       ? pFAQ() :
             S.tab === 'more'      ? pMore(db) :
                                     pSettings()}
@@ -5337,6 +5562,91 @@ function pRewards(db) {
     </div>` : ''}`;
 }
 
+function goalsReadyToBuy(db) { return (db.goals || []).filter(g => g.status === 'achieved' && !g.boughtAt); }
+
+function pGoals(db) {
+    const goals  = db.goals || [];
+    const ready  = goalsReadyToBuy(db).sort((a, b) => new Date(a.achievedAt) - new Date(b.achievedAt));
+    const active = goals.filter(g => g.status === 'active').sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const closedAt = g => new Date(g.cancelledAt || g.boughtAt || g.achievedAt || g.createdAt);
+    const history = goals.filter(g => g.status === 'cancelled' || g.boughtAt).sort((a, b) => closedAt(b) - closedAt(a));
+    const kidOf = g => db.kids.find(k => k.id === g.kidId);
+    const kidLine = k => k ? `<div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span style="display:flex">${kidIcon(k, 24)}</span><span style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;color:${kidAccent(k).text}">${esc(k.name)}</span></div>` : '';
+    const bar = g => `
+          <div style="background:var(--color-green-100);border-radius:var(--radius-full);height:8px;overflow:hidden;margin:12px 0 6px">
+            <div style="background:var(--color-green-500);width:${goalPct(g)}%;height:100%;border-radius:var(--radius-full)"></div>
+          </div>
+          <p style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:600;color:var(--color-text-secondary)"><strong style="color:var(--color-text-primary)">${R(g.saved)}</strong> of ${R(g.target)} · ${goalPct(g)}%</p>`;
+    const chips = g => `
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+            <span class="sp-tag sp-tag-green" style="margin-top:0">${g.percent}% of earnings</span>
+            ${g.matchPercent ? `<span class="sp-tag sp-tag-amber" style="margin-top:0">+${g.matchPercent}% match</span>` : ''}
+          </div>`;
+
+    const readyCards = ready.map(g => `
+        <div class="card" style="border:2px solid var(--color-green-500)">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            ${goalPhoto(g, 64)}
+            <div class="flex-1 min-w-0">
+              <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-sm)">${esc(g.name)}</p>
+              ${kidLine(kidOf(g))}
+              <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-green-700);font-weight:700;margin-top:6px">${R(g.saved)} saved - time to buy it!</p>
+            </div>
+            ${moreMenu('goal-' + g.id, [
+                { label: 'Cancel goal', icon: 'cross', danger: true, onclick: `cancelGoal('${g.id}')` },
+            ])}
+          </div>
+          <button onclick="openModal('goal-bought',{goalId:'${g.id}'})" class="btn-primary" style="width:100%;margin-top:12px;padding:10px;display:flex;align-items:center;justify-content:center;gap:6px">${uiIcon('check', 16, 2.5)}Bought it</button>
+        </div>`).join('');
+
+    const activeCards = active.map(g => `
+        <div class="card">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            ${goalPhoto(g, 64)}
+            <div class="flex-1 min-w-0">
+              <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-sm)">${esc(g.name)}</p>
+              ${kidLine(kidOf(g))}
+            </div>
+            ${moreMenu('goal-' + g.id, [
+                { label: 'Edit', icon: 'pencil', onclick: `openModal('edit-goal',{goalId:'${g.id}',image_path:${g.image_path ? `'${g.image_path}'` : 'null'}})` },
+                { label: 'Add money', icon: 'plus', onclick: `openModal('goal-money',{goalId:'${g.id}',mode:'add',source:'savings'})` },
+                ...(g.saved > 0 ? [{ label: 'Move back to savings', icon: 'coin', onclick: `openModal('goal-money',{goalId:'${g.id}',mode:'withdraw'})` }] : []),
+                { label: 'Cancel goal', icon: 'cross', danger: true, onclick: `cancelGoal('${g.id}')` },
+            ])}
+          </div>
+          ${bar(g)}
+          ${chips(g)}
+        </div>`).join('');
+
+    const historyRows = history.map(g => {
+        const k = kidOf(g);
+        const cancelled = g.status === 'cancelled';
+        return `
+        <div class="card flex items-center gap-3">
+          ${goalPhoto(g, 44)}
+          <div class="flex-1 min-w-0">
+            <p style="font-family:var(--font-family);font-weight:700;color:var(--color-text-primary);font-size:var(--text-sm)">${esc(g.name)}</p>
+            <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:1px">${esc(k?.name) || '?'} · ${cancelled ? `${R(g.saved)} back to savings` : `${R(g.saved)} spent`} · ${dateStr(closedAt(g).toISOString())}</p>
+          </div>
+          <span class="sp-tag ${cancelled ? 'sp-tag-grey' : 'sp-tag-green'}" style="margin-top:0;flex-shrink:0">${cancelled ? 'Cancelled' : 'Achieved'}</span>
+        </div>`;
+    }).join('');
+
+    const grid = cards => `<div class="gap-3 mb-6" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));align-items:start">${cards}</div>`;
+    return `
+    <div class="sp-page-head"><h1 class="sp-page-title">Goals</h1><button onclick="openModal('add-goal')" class="btn-primary sp-head-btn">${uiIcon('plus', 16, 2.5)}Add goal</button></div>
+    <p class="sp-page-intro">Something a kid is saving up for. A set share of everything they earn goes into it automatically. Goal money is kept apart from their savings - it doesn't grow their tree or count toward bonuses - and you hold it until you buy the item.</p>
+    ${ready.length ? `<p class="pr-section-label mb-3">Ready to buy</p>${grid(readyCards)}` : ''}
+    ${active.length
+        ? `${ready.length ? '<p class="pr-section-label mb-3">Saving up</p>' : ''}${grid(activeCards)}`
+        : !ready.length ? `<div class="card text-center py-12 mb-6" style="color:var(--color-text-muted);font-family:var(--font-family);font-size:var(--text-sm)"><div style="display:flex;justify-content:center;margin-bottom:12px;color:var(--color-green-600)">${uiIcon('target', 40, 2)}</div>No goals yet.<br>Add one to help your kids save for something special.</div>` : ''}
+    ${history.length ? `
+    <div class="mt-2">
+      <p class="pr-section-label mb-3">Goal history</p>
+      <div class="sp-narrow-list flex flex-col gap-2">${historyRows}</div>
+    </div>` : ''}`;
+}
+
 const FAQ_ITEMS = [
     { q: "Is there an iOS or Android app?",
       // A function, not a string, so the "View a video" buttons can open their video in place.
@@ -5446,6 +5756,7 @@ function pMore(db) {
     const rows = [
         { tab: 'bonuses',  icon: 'star',   title: 'Bonuses',    sub: 'Savings milestones that pay a one-time bonus' },
         { tab: 'rewards',  icon: 'trophy', title: 'Rewards',    sub: 'Bigger goals you approve', badge: pendingRewards },
+        { tab: 'goals',    icon: 'target', title: 'Goals',      sub: 'Things your kids are saving up for', badge: goalsReadyToBuy(db).length },
         { tab: 'settings', icon: 'gear',   title: 'Settings',   sub: 'Allowance, currency, PINs, notifications' },
         { tab: 'faq',      icon: 'help',   title: 'Help & FAQ', sub: 'Answers to common questions' },
     ];
@@ -5846,6 +6157,56 @@ async function checkParentPin() {
     }
 }
 
+// Kid view: what they're saving for, between today's chores and bonuses. Same
+// shape as a bonus card (name, progress line, %), with the goal's photo beside it.
+function kidGoalsSection(db, kid) {
+    const goals = (db.goals || []).filter(g => g.kidId === kid.id);
+    if (!goals.length) return '';
+    const active = activeGoals(kid.id);
+    const closedAt = g => new Date(g.cancelledAt || g.achievedAt || g.createdAt);
+    const done = goals.filter(g => g.status !== 'active').sort((a, b) => closedAt(b) - closedAt(a));
+    const cards = active.map(g => {
+        const pct = goalPct(g);
+        const left = goalRemaining(g);
+        const match = goalMatchText(g);
+        return `
+        <div class="card" style="display:flex;gap:14px;align-items:center">
+          ${goalPhoto(g, 76)}
+          <div class="flex-1 min-w-0">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+              <p style="font-family:var(--font-family);font-weight:800;color:var(--color-text-primary);font-size:var(--text-sm);min-width:0;overflow-wrap:anywhere">${esc(g.name)}</p>
+              <span style="font-family:var(--font-family);font-size:var(--text-base);font-weight:800;color:var(--color-green-700);flex-shrink:0">${pct}%</span>
+            </div>
+            <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin:2px 0 8px">${g.percent > 0 ? `${g.percent}% of everything you earn goes here` : 'Your parents add to this one'}${match ? ` · ${match}` : ''}</p>
+            <div style="background:var(--color-green-100);border-radius:var(--radius-full);height:8px;overflow:hidden;margin-bottom:6px">
+              <div style="background:var(--color-green-500);width:${pct}%;height:100%;border-radius:var(--radius-full);transition:width 0.4s ease"></div>
+            </div>
+            <p style="font-family:var(--font-family);font-size:var(--text-xs);font-weight:600;color:var(--color-text-secondary)">${R(g.saved)} of ${R(g.target)} · ${R(left)} to go</p>
+          </div>
+        </div>`;
+    }).join('');
+    const historyRows = done.map(g => {
+        const cancelled = g.status === 'cancelled';
+        const when = closedAt(g).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+        return `
+        <div class="card flex items-center gap-3" style="padding:8px 12px">
+          ${goalPhoto(g, 36)}
+          <div class="flex-1 min-w-0">
+            <p style="font-family:var(--font-family);font-weight:600;color:var(--color-text-primary);font-size:var(--text-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(g.name)}</p>
+            <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary)">${cancelled ? 'Cancelled' : 'Reached'} on ${when}</p>
+          </div>
+          <span class="sp-tag ${cancelled ? 'sp-tag-grey' : 'sp-tag-green'}" style="margin-top:0;flex-shrink:0">${cancelled ? 'Cancelled' : 'Achieved'}</span>
+        </div>`;
+    }).join('');
+    const noneNote = `<div class="card" style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-secondary);display:flex;align-items:center;gap:8px"><span style="color:var(--color-green-600);display:flex">${uiIcon('target', 16, 2)}</span>No goals right now. New ones will show here.</div>`;
+    return `
+    ${kidSectionHeader('Goals', done.length, S.goalHistoryOpen, 'toggleGoalHistory')}
+    ${active.length
+        ? `<div class="grid grid-cols-1 md:grid-cols-2 gap-3 ${S.goalHistoryOpen ? 'mb-3' : 'mb-6'}">${cards}</div>`
+        : `<div class="${S.goalHistoryOpen ? 'mb-2' : 'mb-6'}">${noneNote}</div>`}
+    ${S.goalHistoryOpen ? `<div class="flex flex-col gap-2 mb-6">${historyRows}</div>` : ''}`;
+}
+
 function vKid() {
     const db = DB.load();
     const kid = db.kids.find(k => k.id === S.kidId);
@@ -5875,7 +6236,9 @@ function vKid() {
     const txns      = db.transactions.filter(t => t.kidId === kid.id)
                         .sort((a,b) => new Date(txDate(b))-new Date(txDate(a)));
     const typeIcon  = { payout: faIcon('money-bill-wave'), weekly: faIcon('calendar-day'), chore: faIcon('circle-check'),
-                        manual: faIcon('coins'), bonus: milestoneStarSVG(16), reward: faIcon('trophy'), expense: faIcon('bag-shopping') };
+                        manual: faIcon('coins'), bonus: milestoneStarSVG(16), reward: faIcon('trophy'), expense: faIcon('bag-shopping'),
+                        goal: uiIcon('target', 15, 2.5), goal_return: uiIcon('target', 15, 2.5) };
+    const kidActiveGoals = activeGoals(kid.id);
     const treeStageIdx = getTreeStage(kid.balance);
     const treeThresh   = loadTreeThresholds();
     const threshArr    = [treeThresh.t1, treeThresh.t2, treeThresh.t3, treeThresh.t4];
@@ -5922,6 +6285,7 @@ function vKid() {
                 <p style="font-family:var(--font-family);font-size:var(--text-2xl);font-weight:800;line-height:1.1;color:#fff;white-space:nowrap">${R(kid.balance)}</p>
               </div>
               <div style="display:flex;flex-direction:column;gap:2px;margin-top:8px">
+                ${kidActiveGoals.length ? `<p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:600;color:rgba(255,255,255,0.85)">Goals: <strong>${goalsCombinedPct(kid.id)}%</strong> saved</p>` : ''}
                 <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:600;color:rgba(255,255,255,0.85)">Bonuses: <strong>${kidMilestonesAchieved}</strong> of ${kidMilestonesTotal}</p>
                 <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:600;color:rgba(255,255,255,0.85)">Rewards: <strong>${kidRewardsAchieved}</strong> of ${kidRewardsTotal}</p>
               </div>
@@ -6050,6 +6414,7 @@ function vKid() {
               </div>`;
             }).join('')}
           </div>` : ''}
+        ${kidGoalsSection(db, kid)}
         ${(() => {
             const milestones = (db.bonusMilestones || []).filter(m =>
                 m.assignedTo === 'all' || (Array.isArray(m.assignedTo) && m.assignedTo.includes(kid.id))
@@ -6393,7 +6758,7 @@ function renderModal() {
         <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:12px">Are you sure?</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:20px">${data.msg}</p>
         <div class="sp-modal-actions">
-          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">${data.cancelLabel || 'Cancel'}</button>
           <button onclick="${data.onConfirm}" style="flex:1;padding:10px;font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;background:var(--color-coral);color:white;border:none;border-radius:var(--radius-lg);cursor:pointer">${data.confirmLabel || 'Delete'}</button>
         </div>`;
     }
@@ -6604,6 +6969,112 @@ function renderModal() {
         </div>`;
     }
 
+    if (type === 'add-goal' || type === 'edit-goal') {
+        const g = type === 'edit-goal' ? (db.goals || []).find(x => x.id === data.goalId) : null;
+        const isEdit = !!g;
+        const kidId = g ? g.kidId : data.kidId;
+        const kid = db.kids.find(k => k.id === kidId);
+        const used = kidId ? goalPercentUsed(kidId, g?.id) : 0;
+        const match = data.match ?? g?.matchPercent ?? 0;
+        const photoURL = S.chorePhotoPreview || (S.chorePhotoPath ? choreImgURL[S.chorePhotoPath] : null);
+        const chip = (sel, onclick, label) => `<button onclick="${onclick}" type="button"
+            style="padding:8px 14px;border-radius:var(--radius-sm);font-size:var(--text-sm);font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? 'var(--color-green-600)' : 'var(--color-border)'};background:${sel ? 'var(--color-green-50)' : 'var(--color-surface)'};color:${sel ? 'var(--color-green-800)' : 'var(--color-text-secondary)'};cursor:pointer;display:flex;align-items:center;gap:6px">${label}</button>`;
+        const label = (text, hint) => `<p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">${text}${hint ? ` <span style="font-weight:400;color:var(--color-text-secondary)">${hint}</span>` : ''}</p>`;
+        const matchExample = m => isPoints() ? `${m}% on top` : `${R(m / 100)} per ${R(1)}`;
+        body = `
+        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${isEdit ? 'Edit' : 'Add'} goal</h3>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">Something to save up for. A share of everything they earn goes into it until it's reached.</p>
+        ${isEdit ? '' : `
+        ${label('Who is saving?')}
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+          ${db.kids.length ? db.kids.map(k => chip(k.id === kidId, `pickGoalKid('${k.id}')`, `${kidIcon(k, 36)}${esc(k.name)}`)).join('')
+            : `<p style="font-family:var(--font-family);font-size:var(--text-sm);color:var(--color-text-muted)">Add a kid first.</p>`}
+        </div>`}
+        ${label('Goal name')}
+        <input id="g-name" placeholder="e.g. New bike" value="${esc(data.name ?? g?.name ?? '')}" class="mb-3">
+        ${label('Goal amount')}
+        <div class="relative mb-4">
+          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:var(--text-base);line-height:1;pointer-events:none">${currSymbol()}</span>
+          <input id="g-target" type="number" placeholder="${isPoints() ? '500' : '0.00'}" value="${data.target ?? g?.target ?? ''}" step="${isPoints() ? '1' : '0.01'}" min="0" style="padding-left:38px !important">
+        </div>
+        ${label('Photo', '(optional)')}
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">
+          <label title="Take or choose a photo"
+            style="flex-shrink:0;width:104px;height:104px;border-radius:var(--radius-lg);cursor:pointer;display:flex;align-items:center;justify-content:center;background:var(--color-green-50);border:2px ${photoURL ? 'solid var(--color-green-600)' : 'dashed var(--color-border)'}">
+            ${photoURL
+              ? `<img src="${photoURL}" alt="Goal photo" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);display:block">`
+              : `<span style="color:var(--color-green-600)">${uiIcon('camera', 30)}</span>`}
+            <input type="file" accept="image/*" onchange="pickChorePhoto(this)" style="display:none">
+          </label>
+          <div style="flex:1;min-width:0">
+            <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary)">${photoURL ? 'Looking good' : 'A picture of the real thing'}</p>
+            <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:2px">${photoURL ? 'Kids see this on their goal card.' : 'Tap to take a photo or choose one. Keep the item in the middle - it gets cropped square.'}</p>
+            ${photoURL ? `<button onclick="clearChorePhoto()" type="button" style="margin-top:6px;padding:5px 11px;border-radius:var(--radius-sm);font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;border:1.5px solid var(--color-border);background:white;color:var(--color-coral-text);cursor:pointer">Remove photo</button>` : ''}
+          </div>
+        </div>
+        ${label('Share of earnings')}
+        <div class="relative mb-1" style="max-width:160px">
+          <input id="g-pct" type="number" placeholder="50" value="${data.percent ?? g?.percent ?? ''}" step="1" min="0" max="100" style="padding-right:38px !important">
+          <span style="position:absolute;right:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:var(--text-base);line-height:1;pointer-events:none">%</span>
+        </div>
+        <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:16px">Of every chore, cycle payout, reward and bonus.${kid && used > 0 ? ` ${esc(kid.name)}'s other goals take ${used}%, so up to ${Math.max(0, 100 - used)}% is left.` : ''}</p>
+        ${label('Parent match', '(optional)')}
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+          ${[0, 25, 50, 100].map(m => chip(+match === m, `setGoalMatch(${m})`, m === 0 ? 'No match' : matchExample(m))).join('')}
+        </div>
+        <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:20px">You add this on top of what the kid saves automatically. It goes straight into the goal.</p>
+        <div class="sp-modal-actions">
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+          <button onclick="saveGoal(${isEdit ? `'${g.id}'` : 'null'})" class="btn-primary flex-1" style="padding:10px">${isEdit ? 'Save changes' : 'Add goal'}</button>
+        </div>`;
+    }
+
+    if (type === 'goal-money') {
+        const g = (db.goals || []).find(x => x.id === data.goalId);
+        const kid = g && db.kids.find(k => k.id === g.kidId);
+        if (g && kid) {
+            const isAdd = data.mode === 'add';
+            const fromSavings = data.source !== 'new';
+            const opt = (sel, onclick, title, sub) => `<button onclick="${onclick}" type="button"
+                style="flex:1;text-align:left;padding:10px 12px;border-radius:var(--radius-sm);font-family:var(--font-family);border:2px solid ${sel ? 'var(--color-green-600)' : 'var(--color-border)'};background:${sel ? 'var(--color-green-50)' : 'white'};cursor:pointer">
+                <span style="display:block;font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary)">${title}</span>
+                <span style="display:block;font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:2px">${sub}</span></button>`;
+            body = `
+            <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${isAdd ? 'Add money' : 'Move back to savings'}</h3>
+            <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">${esc(g.name)} · ${R(g.saved)} of ${R(g.target)} saved</p>
+            ${isAdd ? `
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+              ${opt(fromSavings, `setGoalMoneySource('savings')`, `From ${esc(kid.name)}'s savings`, `${R(kid.balance)} available`)}
+              ${opt(!fromSavings, `setGoalMoneySource('new')`, 'New money from you', 'e.g. a birthday gift')}
+            </div>` : ''}
+            <p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">Amount</p>
+            <div class="relative mb-2">
+              <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:var(--text-base);line-height:1;pointer-events:none">${currSymbol()}</span>
+              <input id="gm-amount" type="number" placeholder="0.00" value="${data.amount || ''}" step="0.01" min="0" style="padding-left:38px !important">
+            </div>
+            <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:20px">${isAdd
+                ? `${R(goalRemaining(g))} still needed. Parent match doesn't apply to money added by hand.`
+                : `Goes back into ${esc(kid.name)}'s savings, where it counts toward their tree and bonuses.`}</p>
+            <div class="sp-modal-actions">
+              <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Cancel</button>
+              <button onclick="saveGoalMoney('${g.id}')" class="btn-primary flex-1" style="padding:10px">${isAdd ? 'Add to goal' : 'Move to savings'}</button>
+            </div>`;
+        }
+    }
+
+    if (type === 'goal-bought') {
+        const g = (db.goals || []).find(x => x.id === data.goalId);
+        const kid = g && db.kids.find(k => k.id === g.kidId);
+        if (g) body = `
+        <div style="display:flex;justify-content:center;margin-bottom:12px">${goalPhoto(g, 88)}</div>
+        <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:8px;text-align:center">Bought ${esc(g.name)}?</h3>
+        <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:20px;text-align:center">This records the ${R(g.saved)} ${esc(kid?.name || '')} saved as spent and moves the goal to history.</p>
+        <div class="sp-modal-actions">
+          <button onclick="closeModal()" class="btn-outline flex-1" style="padding:10px">Not yet</button>
+          <button onclick="doMarkGoalBought('${g.id}')" class="btn-primary flex-1" style="padding:10px">Bought it</button>
+        </div>`;
+    }
+
     if (type === 'add-bonus' || type === 'edit-bonus') {
         const m = type === 'edit-bonus' ? (db.bonusMilestones || []).find(x => x.id === data.milestoneId) : null;
         const isEdit = !!m;
@@ -6789,6 +7260,8 @@ async function doDeleteKid(id) {
     cache.kids         = cache.kids.filter(x => x.id !== id);
     cache.completions  = cache.completions.filter(x => x.kidId !== id);
     cache.transactions = cache.transactions.filter(x => x.kidId !== id);
+    cache.goals        = cache.goals.filter(x => x.kidId !== id);
+    cache.goalEntries  = cache.goalEntries.filter(x => x.kidId !== id);
     closeModal(); render();
 }
 
@@ -7160,6 +7633,7 @@ async function checkBonusMilestones(kidId, newBalance) {
         await sb.from('kids').update({ balance: finalBalance }).eq('id', kidId).eq('user_id', currentUser.id);
         kid.balance = finalBalance;
         await sb.from('transactions').insert(txInserts);
+        await allocateToGoals(kid, bonusTotal);
         toast(`${kid.name} earned ${eligible.length > 1 ? eligible.length + ' bonuses' : 'a bonus'}: +${R(bonusTotal)}!`, 'success');
         render();
     }
@@ -7179,6 +7653,7 @@ async function approveChore(cid) {
     // progress bar — the payout happens once at cycle close, not per chore.
     // Quick (one-off) chores are a flat bonus and still pay out immediately in both modes.
     const paysOut = !isCycleMode() || chore?.oneOff;
+    let toGoals = 0;
     if (chore && kid && paysOut) {
         const newBalance = (kid.balance || 0) + chore.value;
         const txId = uid();
@@ -7192,12 +7667,13 @@ async function approveChore(cid) {
         await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kid.id, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt, chore_date: comp.dueDate || null });
         kid.balance = newBalance;
         cache.transactions.push({ actioned_by: actionedBy(), id: txId, kidId: kid.id, amount: chore.value, type: 'chore', description: chore.name, createdAt: txCreatedAt, choreDate: comp.dueDate || null });
-        await checkBonusMilestones(kid.id, newBalance);
+        toGoals = await allocateToGoals(kid, chore.value, comp.dueDate || null);
+        await checkBonusMilestones(kid.id, kid.balance);
     }
     const approvedCount = cache.completions.filter(c => c.approved).length;
     trackLoops(approvedCount === 1 ? 'first_chore_approved' : null, { hasApprovedChore: true });
     track('chore_approved', { pays_out: paysOut, mode: isCycleMode() ? 'cycle' : 'per_chore' });
-    toast(paysOut ? `Approved! ${R(chore?.value)} added to ${kid?.name}.` : `Approved! Counts toward ${kid?.name}'s cycle progress.`, 'success');
+    toast(paysOut ? `Approved! ${R(chore?.value)} added to ${kid?.name}${toGoals > 0 ? ` (${R(toGoals)} to goals)` : ''}.` : `Approved! Counts toward ${kid?.name}'s cycle progress.`, 'success');
     render();
 }
 async function approveAllForKid(kidId) {
@@ -7222,20 +7698,22 @@ async function approveAllForKid(kidId) {
             txInserts.push({ id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kidId, amount: chore.value, type: 'chore', description: chore.name, created_at: txCreatedAt, chore_date: comp.dueDate || null });
         }
     });
-    if (totalAdded > 0) {
-        const newBalance = (kid.balance || 0) + totalAdded;
-        await sb.from('kids').update({ balance: newBalance }).eq('id', kidId).eq('user_id', currentUser.id);
-        kid.balance = newBalance;
-        await checkBonusMilestones(kidId, newBalance);
-    }
     if (txInserts.length) {
         await sb.from('transactions').insert(txInserts);
         txInserts.forEach(t => cache.transactions.push({ actioned_by: t.actioned_by, id: t.id, kidId, amount: t.amount, type: t.type, description: t.description, createdAt: t.created_at, choreDate: t.chore_date }));
     }
+    let toGoals = 0;
+    if (totalAdded > 0) {
+        const newBalance = (kid.balance || 0) + totalAdded;
+        await sb.from('kids').update({ balance: newBalance }).eq('id', kidId).eq('user_id', currentUser.id);
+        kid.balance = newBalance;
+        toGoals = await allocateToGoals(kid, totalAdded);
+        await checkBonusMilestones(kidId, kid.balance);
+    }
     const approvedCountAll = cache.completions.filter(c => c.approved).length;
     trackLoops(approvedCountAll === wonComps.length ? 'first_chore_approved' : null, { hasApprovedChore: true });
     wonComps.forEach(() => track('chore_approved', { bulk: true, mode: isCycleMode() ? 'cycle' : 'per_chore' }));
-    toast(isCycleMode() ? `All approved! Counts toward ${kid.name}'s cycle progress${totalAdded > 0 ? ` (plus ${R(totalAdded)} from quick chores)` : ''}.` : `All approved! ${R(totalAdded)} added to ${kid.name}.`, 'success');
+    toast(isCycleMode() ? `All approved! Counts toward ${kid.name}'s cycle progress${totalAdded > 0 ? ` (plus ${R(totalAdded)} from quick chores)` : ''}.` : `All approved! ${R(totalAdded)} added to ${kid.name}${toGoals > 0 ? ` (${R(toGoals)} to goals)` : ''}.`, 'success');
     render();
 }
 async function rejectChore(cid) {
@@ -7324,7 +7802,8 @@ async function approveReward(cid) {
         await sb.from('transactions').insert({ id: txId, user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kid.id, amount: reward.value, type: 'reward', description: reward.name, created_at: txCreatedAt });
         kid.balance = newBalance;
         cache.transactions.push({ actioned_by: actionedBy(), id: txId, kidId: kid.id, amount: reward.value, type: 'reward', description: reward.name, createdAt: txCreatedAt });
-        await checkBonusMilestones(kid.id, newBalance);
+        await allocateToGoals(kid, reward.value);
+        await checkBonusMilestones(kid.id, kid.balance);
     }
     track('reward_approved', { amount: reward?.value });
     toast(`Approved! ${R(reward?.value)} added to ${kid?.name}.`, 'success');
@@ -7336,6 +7815,135 @@ async function rejectReward(cid) {
     if (c) c.rejected = true;
     render();
 }
+// ─── GOAL ACTIONS (parent) ───────────────────────────────────────
+function pickGoalKid(id) { snapModalInputs(); S.modal.data = { ...S.modal.data, kidId: id }; render(); }
+function setGoalMatch(m) { snapModalInputs(); S.modal.data = { ...S.modal.data, match: m }; render(); }
+function setGoalMoneySource(src) { snapModalInputs(); S.modal.data = { ...S.modal.data, source: src }; render(); }
+
+async function saveGoal(editId) {
+    const name    = document.getElementById('g-name').value.trim();
+    const target  = moneyRound(parseFloat(document.getElementById('g-target').value) || 0);
+    const percent = Math.round(parseFloat(document.getElementById('g-pct').value) || 0);
+    const g       = editId ? cache.goals.find(x => x.id === editId) : null;
+    const match   = +(S.modal.data.match ?? g?.matchPercent ?? 0);
+    const kidId   = g ? g.kidId : S.modal.data.kidId;
+    const kid     = cache.kids.find(k => k.id === kidId);
+    if (!kid) return toast('Please choose who is saving.', 'warn');
+    if (!name) return toast('Please enter a goal name.', 'warn');
+    if (target <= 0) return toast('Please enter a goal amount.', 'warn');
+    if (percent < 0 || percent > 100) return toast('The share must be between 0% and 100%.', 'warn');
+    const used = goalPercentUsed(kidId, editId);
+    if (used + percent > 100) return toast(`Only ${100 - used}% is left - ${kid.name}'s other goals take ${used}%.`, 'warn');
+    const id = g ? g.id : uid();
+    const oldPath = g ? (g.image_path || null) : null;
+    let imagePath = S.chorePhotoPath || null;
+    if (S.chorePhotoBlob) {
+        imagePath = await uploadChorePhoto(`goal-${id}`);
+        if (!imagePath) return toast('Could not upload the photo. Check your connection.', 'error');
+    }
+    if (g) {
+        const { error } = await sb.from('goals').update({ name, target, percent, match_percent: match, image_path: imagePath }).eq('id', id).eq('user_id', currentUser.id);
+        if (error) { if (imagePath !== oldPath) await removeChorePhoto(imagePath); return toast('Could not save.', 'error'); }
+        if (oldPath && oldPath !== imagePath) await removeChorePhoto(oldPath);
+        Object.assign(g, { name, target, percent, matchPercent: match, image_path: imagePath });
+        // Lowering the target below what's already saved finishes the goal.
+        const reached = goalReachedCheck(g, kid);
+        if (reached) await saveGoalProgress(g);
+        closeModal(); toast(reached ? `${g.name} is fully saved - time to buy it!` : 'Goal updated.', reached ? 'success' : null);
+        return;
+    }
+    const createdAt = new Date().toISOString();
+    const row = { id, user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kidId, name, target, percent, match_percent: match, image_path: imagePath, saved: 0, status: 'active', created_at: createdAt };
+    const { error } = await sb.from('goals').insert(row);
+    if (error) { await removeChorePhoto(imagePath); return toast('Could not save. Check your connection.', 'error'); }
+    cache.goals.push(mapGoalRow(row));
+    track('goal_created', { goals_count: cache.goals.length, percent, match_percent: match, has_photo: Boolean(imagePath) });
+    closeModal(); toast('Goal added!');
+}
+
+async function saveGoalMoney(goalId) {
+    const g   = cache.goals.find(x => x.id === goalId);
+    const kid = g && cache.kids.find(k => k.id === g.kidId);
+    if (!g || !kid) return;
+    const amount = moneyRound(parseFloat(document.getElementById('gm-amount').value) || 0);
+    if (amount <= 0) return toast('Please enter an amount.', 'warn');
+    const isAdd = S.modal.data.mode === 'add';
+    const fromSavings = S.modal.data.source !== 'new';
+    const now = new Date().toISOString();
+    let txRow = null, entry;
+    if (isAdd) {
+        if (g.status !== 'active') return toast('This goal is already reached.', 'warn');
+        if (amount > goalRemaining(g)) return toast(`Only ${R(goalRemaining(g))} is needed to finish this goal.`, 'warn');
+        if (fromSavings && amount > (kid.balance || 0)) return toast(`${kid.name} only has ${R(kid.balance)} in savings.`, 'warn');
+        if (fromSavings) txRow = { id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kid.id, amount: -amount, type: 'goal', description: `Moved to ${g.name}`, created_at: now, goal_id: g.id };
+        entry = { id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), goal_id: g.id, kid_id: kid.id, amount, kind: 'topup', description: fromSavings ? 'Moved from savings' : 'Added by parent', transaction_id: txRow?.id || null, created_at: now };
+        g.saved = moneyRound(g.saved + amount);
+    } else {
+        if (amount > g.saved) return toast(`There's only ${R(g.saved)} in this goal.`, 'warn');
+        txRow = { id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kid.id, amount, type: 'goal_return', description: `Back from ${g.name}`, created_at: now, goal_id: g.id };
+        entry = { id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), goal_id: g.id, kid_id: kid.id, amount: -amount, kind: 'withdraw', description: 'Moved back to savings', transaction_id: txRow.id, created_at: now };
+        g.saved = moneyRound(g.saved - amount);
+    }
+    if (txRow) {
+        kid.balance = moneyRound((kid.balance || 0) + txRow.amount);
+        await sb.from('kids').update({ balance: kid.balance }).eq('id', kid.id).eq('user_id', currentUser.id);
+        await sb.from('transactions').insert(txRow);
+        goalCacheTx(txRow);
+    }
+    await sb.from('goal_entries').insert(entry);
+    goalCacheEntry(entry);
+    const reached = isAdd && goalReachedCheck(g, kid);
+    await saveGoalProgress(g);
+    closeModal();
+    toast(reached ? `${g.name} is fully saved - time to buy it!` : isAdd ? `${R(amount)} added to ${g.name}.` : `${R(amount)} moved back to ${kid.name}'s savings.`, 'success');
+    if (!isAdd) await checkBonusMilestones(kid.id, kid.balance);
+}
+
+function cancelGoal(id) {
+    const g   = cache.goals.find(x => x.id === id);
+    const kid = g && cache.kids.find(k => k.id === g.kidId);
+    if (!g) return;
+    openModal('confirm-delete', {
+        msg: g.saved > 0
+            ? `Cancel ${esc(g.name)}? The ${R(g.saved)} saved goes back into ${esc(kid?.name || '')}'s savings, where it counts toward their tree and bonuses.`
+            : `Cancel ${esc(g.name)}? It moves to history.`,
+        onConfirm: `doCancelGoal('${id}')`, confirmLabel: 'Cancel goal', cancelLabel: 'Keep it',
+    });
+}
+async function doCancelGoal(id) {
+    const g   = cache.goals.find(x => x.id === id);
+    const kid = g && cache.kids.find(k => k.id === g.kidId);
+    if (!g || !kid || g.status === 'cancelled' || g.boughtAt) return closeModal();
+    const now = new Date().toISOString();
+    const { error } = await sb.from('goals').update({ status: 'cancelled', cancelled_at: now }).eq('id', id).eq('user_id', currentUser.id);
+    if (error) return toast('Could not cancel. Check your connection.', 'error');
+    g.status = 'cancelled'; g.cancelledAt = now;
+    // `saved` is left as it was so history can say how much went back.
+    if (g.saved > 0) {
+        const txRow = { id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kid.id, amount: g.saved, type: 'goal_return', description: `Back from cancelled goal: ${g.name}`, created_at: now, goal_id: g.id };
+        const entry = { id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), goal_id: g.id, kid_id: kid.id, amount: -g.saved, kind: 'return', description: 'Goal cancelled', transaction_id: txRow.id, created_at: now };
+        kid.balance = moneyRound((kid.balance || 0) + g.saved);
+        await sb.from('kids').update({ balance: kid.balance }).eq('id', kid.id).eq('user_id', currentUser.id);
+        await sb.from('transactions').insert(txRow);
+        await sb.from('goal_entries').insert(entry);
+        goalCacheTx(txRow); goalCacheEntry(entry);
+    }
+    track('goal_cancelled', { saved: g.saved });
+    closeModal();
+    toast(g.saved > 0 ? `Goal cancelled. ${R(g.saved)} is back in ${kid.name}'s savings.` : 'Goal cancelled.');
+    await checkBonusMilestones(kid.id, kid.balance);
+}
+async function doMarkGoalBought(id) {
+    const g = cache.goals.find(x => x.id === id);
+    if (!g) return closeModal();
+    const now = new Date().toISOString();
+    const { error } = await sb.from('goals').update({ bought_at: now }).eq('id', id).eq('user_id', currentUser.id);
+    if (error) return toast('Could not save. Check your connection.', 'error');
+    g.boughtAt = now;
+    track('goal_bought', { target: g.target });
+    closeModal(); toast(`${g.name} marked as bought. Enjoy!`, 'success');
+}
+
 async function saveTreeThresholdsFromUI() {
     const vals = ['t1','t2','t3','t4'].map(k => parseFloat(document.getElementById('thresh-'+k)?.value));
     if (vals.some(v => isNaN(v) || v <= 0)) return toast('All thresholds must be positive numbers.', 'warn');

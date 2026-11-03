@@ -5,7 +5,7 @@ const ATTRIBUTION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 // Deletion order matters: these reference kids/chores/rewards, so they have
 // to go first, before the tables they point to.
-const CHILD_TABLES = ['completions', 'transactions', 'reward_completions'];
+const CHILD_TABLES = ['completions', 'transactions', 'reward_completions', 'goal_entries', 'goals'];
 const PARENT_TABLES = ['kids', 'chores', 'rewards', 'bonus_milestones'];
 const CHORE_PHOTO_BUCKET = 'chore-photos';
 
