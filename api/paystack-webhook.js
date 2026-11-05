@@ -287,6 +287,20 @@ async function handleCardUpdate(supabaseAdmin, data) {
   await applyCardUpdate(supabaseAdmin, userId, data);
 }
 
+// One billing period after a charge. Month-end dates clamp (31 Jan -> 28 Feb)
+// instead of rolling into the following month the way Date#setMonth does.
+function nextChargeAfter(paidAt, planInterval) {
+  if (!paidAt) return paidAt;
+  const d = new Date(paidAt);
+  const months = planInterval === 'annually' ? 12 : planInterval === 'biannually' ? 6 : planInterval === 'quarterly' ? 3 : 1;
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay));
+  return d.toISOString();
+}
+
 // A subscription charge went through — either the first one at the end of the
 // trial, or a later renewal.
 async function handleSubscriptionCharge(supabaseAdmin, data) {
@@ -304,7 +318,9 @@ async function handleSubscriptionCharge(supabaseAdmin, data) {
 
   const email = applied.user.email;
   const firstName = ((applied.metadata.name || '').split(' ')[0]) || 'there';
-  const nextBillingDate = formatDate(data.paid_at);
+  // paid_at is the charge that just went through, so the next one is a
+  // billing period later (charge.success carries no next_payment_date).
+  const nextBillingDate = formatDate(nextChargeAfter(data.paid_at, data.plan && data.plan.interval));
 
   await recordReferralSignup(supabaseAdmin, {
     userId, email,
