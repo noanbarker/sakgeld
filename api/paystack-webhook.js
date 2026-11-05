@@ -562,19 +562,37 @@ async function handleCancellationScheduled(supabaseAdmin, data) {
     return;
   }
 
+  // The cancellation email goes out now, while they still have access, with
+  // the real last day. Sending it from handleSubscriptionEnded instead meant it
+  // arrived the day access ran out and read "keep using Sprout until <today>".
+  // A redelivered event finds cancel_scheduled already set and sends nothing.
   const applied = await applySubscriptionState(supabaseAdmin, userId, {
     cancel_scheduled: true,
     current_period_ends_at: data.next_payment_date || null,
+    // Tells handleSubscriptionEnded the family already has their email.
+    // Without a date there is nothing true to tell them yet, so that handler
+    // sends it instead.
+    cancel_email_sent: Boolean(data.next_payment_date),
   });
   if (!applied) return;
+  const sendConfirmation = !applied.metadata.cancel_scheduled && Boolean(data.next_payment_date);
 
+  const firstName = ((applied.metadata.name || '').split(' ')[0]) || 'there';
   await syncLoopsContact(applied.user.email, {
-    firstName: ((applied.metadata.name || '').split(' ')[0]) || 'there',
+    firstName,
     cancelScheduled: true,
     // accessEndsAt is a "Date" type property in Loops — see the note in
     // startTrialFromCardSetup on why the formatted display string breaks this.
     accessEndsAt: data.next_payment_date || undefined,
   });
+  if (sendConfirmation) {
+    const accessEndsAt = formatDate(data.next_payment_date);
+    if (applied.previousStatus === 'trialing') {
+      await sendLoopsEmail(LOOPS_TEMPLATE.trialCancelled, applied.user.email, { firstName, accessEndsAt });
+    } else if (applied.previousStatus) {
+      await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionCancelled, applied.user.email, { firstName, accessEndsAt });
+    }
+  }
   await trackSubscriptionChange({
     userId,
     userMetadata: applied.metadata,
@@ -610,6 +628,7 @@ async function handleSubscriptionEnded(supabaseAdmin, data) {
     subscription_status: 'canceled',
     canceled_at: now,
     cancel_scheduled: false,
+    cancel_email_sent: false,
   });
   if (!applied) return;
 
@@ -629,10 +648,14 @@ async function handleSubscriptionEnded(supabaseAdmin, data) {
 
   // Which email depends on whether they ever paid us — the same split the
   // Paddle rail makes between a trial that lapsed and a subscription that ended.
+  // Skipped when handleCancellationScheduled already sent it at cancel time.
+  // Still sent here when the subscription ended without the family cancelling
+  // (payment retries ran out), where access really does end today.
+  const alreadyEmailed = applied.metadata.cancel_scheduled && applied.metadata.cancel_email_sent;
   if (applied.previousStatus === 'trialing') {
-    await sendLoopsEmail(LOOPS_TEMPLATE.trialCancelled, email, { firstName, accessEndsAt });
+    if (!alreadyEmailed) await sendLoopsEmail(LOOPS_TEMPLATE.trialCancelled, email, { firstName, accessEndsAt });
     await sendLoopsEvent(email, 'trial_cancelled', { firstName });
-  } else if (applied.previousStatus) {
+  } else if (applied.previousStatus && !alreadyEmailed) {
     await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionCancelled, email, { firstName, accessEndsAt });
   }
   // Drives the win-back Workflow: one event for both kinds of cancellation,

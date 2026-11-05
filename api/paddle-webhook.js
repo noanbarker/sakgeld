@@ -150,6 +150,17 @@ module.exports = async (req, res) => {
         return;
       }
 
+      // A cancellation Paddle has just been told about (subscription.updated
+      // with a scheduled_change, status still active/trialing). Its email goes
+      // out now, while the family still has access: by the time the status
+      // turns 'canceled', Paddle has nulled current_billing_period and
+      // scheduled_change, so the email sent then had no end date to show.
+      const prevMeta = existing.user.user_metadata || {};
+      const cancelPending = Boolean(sub.scheduled_change && sub.scheduled_change.action === 'cancel');
+      const newlyScheduledCancel = cancelPending && sub.status !== 'canceled' && !prevMeta.cancel_scheduled
+        && Boolean(sub.scheduled_change.effective_at);
+      const cancelEmailSent = newlyScheduledCancel || (cancelPending && Boolean(prevMeta.cancel_email_sent));
+
       // Cancellation doesn't delete anything here — it only stamps when it
       // happened. api/purge-canceled-accounts.js does the actual deletion,
       // once the 60-day grace period has passed, so a family that reactivates
@@ -166,7 +177,9 @@ module.exports = async (req, res) => {
           canceled_at: sub.status === 'canceled' ? (event.occurred_at || new Date().toISOString()) : null,
           // Remembered so the next event can tell a newly scheduled cancellation
           // from one already known about (the Paystack rail stores the same flag).
-          cancel_scheduled: Boolean(sub.scheduled_change && sub.scheduled_change.action === 'cancel'),
+          cancel_scheduled: cancelPending,
+          // Lets the 'canceled' transition below skip the email already sent.
+          cancel_email_sent: cancelEmailSent,
         },
       });
       if (error) {
@@ -182,9 +195,11 @@ module.exports = async (req, res) => {
       // A scheduled (end-of-period) cancellation carries the real access-end
       // date in scheduled_change; an immediate one falls back to the current
       // billing period's end (which Paddle can null out on immediate cancels).
+      // Once canceled, Paddle nulls both, and access has ended at that moment.
       const accessEndsAtRaw =
         (sub.scheduled_change && sub.scheduled_change.action === 'cancel' && sub.scheduled_change.effective_at)
-        || (sub.current_billing_period ? sub.current_billing_period.ends_at : null);
+        || (sub.current_billing_period ? sub.current_billing_period.ends_at : null)
+        || (sub.status === 'canceled' ? (sub.canceled_at || event.occurred_at || null) : null);
       const accessEndsAt = formatDate(accessEndsAtRaw);
       const billingInterval = billingIntervalLabel(sub.billing_cycle && sub.billing_cycle.interval);
       const nextBillingDateRaw = sub.next_billed_at;
@@ -263,6 +278,14 @@ module.exports = async (req, res) => {
 
       // Only fire on an actual status transition, so a duplicate Paddle
       // delivery (they don't guarantee exactly-once) doesn't resend the email.
+      if (newlyScheduledCancel) {
+        if (newStatus === 'trialing') {
+          await sendLoopsEmail(LOOPS_TEMPLATE.trialCancelled, email, { firstName, accessEndsAt });
+        } else {
+          await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionCancelled, email, { firstName, accessEndsAt });
+        }
+      }
+      const alreadyEmailed = Boolean(prevMeta.cancel_scheduled && prevMeta.cancel_email_sent);
       if (newStatus && newStatus !== previousStatus) {
         if (previousStatus === null && newStatus === 'trialing') {
           // *Display, not trialEndsAt: sendLoopsEvent also writes these onto the
@@ -274,7 +297,7 @@ module.exports = async (req, res) => {
           // fires the Pixel copy under the same event_id (see lib/meta-attribution.js).
           await sendStartTrialConversion(supabaseAdmin, { userId, email, trialRef: `paddle:${sub.id}` });
         } else if (previousStatus === 'trialing' && newStatus === 'canceled') {
-          await sendLoopsEmail(LOOPS_TEMPLATE.trialCancelled, email, { firstName, accessEndsAt });
+          if (!alreadyEmailed) await sendLoopsEmail(LOOPS_TEMPLATE.trialCancelled, email, { firstName, accessEndsAt });
           await sendLoopsEvent(email, 'trial_cancelled', { firstName });
           await sendLoopsEvent(email, 'account_cancelled', { firstName, wasPaying: false, deletionDate: purgeDateFrom(event.occurred_at) });
         } else if (previousStatus === 'trialing' && newStatus === 'active') {
@@ -286,7 +309,7 @@ module.exports = async (req, res) => {
           // this fires from the server only (no dedup event_id needed).
           await sendMetaCAPIEvent({ eventName: 'Subscribe', eventId: `subscription_paid_${userId}`, email, userId, value: extractChargeValue(sub), currency: sub.currency_code });
         } else if (previousStatus && previousStatus !== 'trialing' && newStatus === 'canceled') {
-          await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionCancelled, email, { firstName, accessEndsAt });
+          if (!alreadyEmailed) await sendLoopsEmail(LOOPS_TEMPLATE.subscriptionCancelled, email, { firstName, accessEndsAt });
           // Drives the win-back Workflow: one event for both kinds of cancellation,
           // carrying the day api/purge-canceled-accounts.js will wipe their data.
           await sendLoopsEvent(email, 'account_cancelled', { firstName, wasPaying: true, deletionDate: purgeDateFrom(event.occurred_at) });
