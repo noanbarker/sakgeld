@@ -1014,6 +1014,30 @@ fetchAppVersionTag().then(tag => { if (!appVersionTag) appVersionTag = tag; });
 document.addEventListener('visibilitychange', checkForAppUpdate);
 window.addEventListener('pageshow', e => { if (e.persisted) checkForAppUpdate(); });
 
+// The account details the app opens with are the copy saved in the browser at
+// the last sign-in or token refresh (up to an hour old), not what's on the
+// server now. Billing changes are written by the webhooks while the app is
+// shut or in the background — a parent who cancels on Paystack's page and
+// comes straight back would otherwise see no "Keep my subscription" banner.
+// So fetch the live copy on opening and on each return, and redraw if it moved.
+let lastAccountRefresh = 0;
+async function refreshAccountDetails(force) {
+    if (!currentUser || (force !== true && document.visibilityState !== 'visible')) return;
+    if (force !== true && Date.now() - lastAccountRefresh < UPDATE_CHECK_GAP) return;
+    lastAccountRefresh = Date.now();
+    try {
+        const { data } = await sb.auth.getUser();
+        const fresh = data?.user;
+        if (!fresh || !currentUser || fresh.id !== currentUser.id) return;
+        const changed = JSON.stringify(fresh.user_metadata || {}) !== JSON.stringify(currentUser.user_metadata || {});
+        currentUser = fresh;
+        // Mid-task, the next redraw picks it up instead of wiping their input.
+        if (changed && !midTask()) render();
+    } catch (e) {}
+}
+document.addEventListener('visibilitychange', refreshAccountDetails);
+window.addEventListener('pageshow', e => { if (e.persisted) refreshAccountDetails(); });
+
 // Partner referral codes — a school's code, arriving from a poster, a QR, or
 // the /join/ short link. Codes are letters and digits only, so normalising here
 // means one typed by hand into the signup form matches one that arrived by link
@@ -1559,6 +1583,7 @@ async function initApp() {
         await checkCycleCloseOut();
     }
     render();
+    refreshAccountDetails(true);
     handlePaystackReturn();
     // Catches a trial the webhook confirmed after the parent had already left
     // the page (see watchMetaTrial).
