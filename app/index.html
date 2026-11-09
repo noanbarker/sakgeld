@@ -3263,7 +3263,8 @@ function snapModalInputs() {
         const n = document.getElementById('g-name');
         const tg = document.getElementById('g-target');
         const pc = document.getElementById('g-pct');
-        if (n) S.modal.data = { ...S.modal.data, name: n.value, target: tg?.value, percent: pc?.value };
+        const st = document.getElementById('g-start');
+        if (n) S.modal.data = { ...S.modal.data, name: n.value, target: tg?.value, percent: pc?.value, start: st?.value };
     }
     if (t === 'goal-money') {
         const a = document.getElementById('gm-amount');
@@ -7016,6 +7017,8 @@ function renderModal() {
             style="padding:8px 14px;border-radius:var(--radius-sm);font-size:var(--text-sm);font-weight:700;font-family:var(--font-family);border:2px solid ${sel ? 'var(--color-green-600)' : 'var(--color-border)'};background:${sel ? 'var(--color-green-50)' : 'var(--color-surface)'};color:${sel ? 'var(--color-green-800)' : 'var(--color-text-secondary)'};cursor:pointer;display:flex;align-items:center;gap:6px">${label}</button>`;
         const label = (text, hint) => `<p style="font-family:var(--font-family);font-size:var(--text-sm);font-weight:700;color:var(--color-text-primary);margin-bottom:6px">${text}${hint ? ` <span style="font-weight:400;color:var(--color-text-secondary)">${hint}</span>` : ''}</p>`;
         const matchExample = m => isPoints() ? `${m}% on top` : `${R(m / 100)} per ${R(1)}`;
+        const pctVal = data.percent ?? g?.percent ?? '';
+        const zeroPct = pctVal !== '' && +pctVal === 0;
         body = `
         <h3 style="font-family:var(--font-family);font-size:var(--text-lg);font-weight:800;color:var(--color-text-primary);margin-bottom:4px">${isEdit ? 'Edit' : 'Add'} goal</h3>
         <p style="font-family:var(--font-family);color:var(--color-text-secondary);font-size:var(--text-sm);margin-bottom:16px">Something to save up for. A share of everything they earn goes into it until it's reached.</p>
@@ -7049,10 +7052,18 @@ function renderModal() {
         </div>
         ${label('Share of earnings')}
         <div class="relative mb-1" style="max-width:160px">
-          <input id="g-pct" type="number" placeholder="50" value="${data.percent ?? g?.percent ?? ''}" step="1" min="0" max="100" style="padding-right:38px !important">
+          <input id="g-pct" type="number" placeholder="50" value="${data.percent ?? g?.percent ?? ''}" step="1" min="0" max="100" oninput="goalPctZeroNote()" style="padding-right:38px !important">
           <span style="position:absolute;right:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:var(--text-base);line-height:1;pointer-events:none">%</span>
         </div>
-        <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:16px">Of every chore, cycle payout, reward and bonus.${kid && used > 0 ? ` ${esc(kid.name)}'s other goals take ${used}%, so up to ${Math.max(0, 100 - used)}% is left.` : ''}</p>
+        <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:${zeroPct ? '6px' : '16px'}">Of every chore, cycle payout, reward and bonus.${kid && used > 0 ? ` ${esc(kid.name)}'s other goals take ${used}%, so up to ${Math.max(0, 100 - used)}% is left.` : ''}</p>
+        <p id="g-pct-zero" style="display:${zeroPct ? 'block' : 'none'};font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fcd34d;border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:16px">At 0%, nothing goes in automatically. The goal only grows when you add money yourself.</p>
+        ${isEdit ? '' : `
+        ${label('Start with money from savings', '(optional)')}
+        <div class="relative mb-1" style="max-width:200px">
+          <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--color-text-secondary);font-size:var(--text-base);line-height:1;pointer-events:none">${currSymbol()}</span>
+          <input id="g-start" type="number" placeholder="${isPoints() ? '0' : '0.00'}" value="${data.start ?? ''}" step="${isPoints() ? '1' : '0.01'}" min="0" style="padding-left:38px !important">
+        </div>
+        <p style="font-family:var(--font-family);font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:16px">${kid ? `${esc(kid.name)} has ${R(kid.balance || 0)} in savings. Anything you enter here moves into the goal straight away.` : 'Moves money they have already saved into the goal straight away.'}</p>`}
         ${label('Parent match', '(optional)')}
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">
           ${[0, 25, 50, 100].map(m => chip(+match === m, `setGoalMatch(${m})`, m === 0 ? 'No match' : matchExample(m))).join('')}
@@ -7855,11 +7866,37 @@ async function rejectReward(cid) {
 function pickGoalKid(id) { snapModalInputs(); S.modal.data = { ...S.modal.data, kidId: id }; render(); }
 function setGoalMatch(m) { snapModalInputs(); S.modal.data = { ...S.modal.data, match: m }; render(); }
 function setGoalMoneySource(src) { snapModalInputs(); S.modal.data = { ...S.modal.data, source: src }; render(); }
+function goalPctZeroNote() {
+    const v = document.getElementById('g-pct')?.value;
+    const note = document.getElementById('g-pct-zero');
+    if (note) note.style.display = v !== '' && +v === 0 ? 'block' : 'none';
+}
+
+// Parent puts money into a goal by hand, from the kid's savings or as new money.
+async function topUpGoal(g, kid, amount, fromSavings) {
+    const now = new Date().toISOString();
+    const txRow = fromSavings ? { id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kid.id, amount: -amount, type: 'goal', description: `Moved to ${g.name}`, created_at: now, goal_id: g.id } : null;
+    const entry = { id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), goal_id: g.id, kid_id: kid.id, amount, kind: 'topup', description: fromSavings ? 'Moved from savings' : 'Added by parent', transaction_id: txRow?.id || null, created_at: now };
+    g.saved = moneyRound(g.saved + amount);
+    if (txRow) {
+        kid.balance = moneyRound((kid.balance || 0) + txRow.amount);
+        await sb.from('kids').update({ balance: kid.balance }).eq('id', kid.id).eq('user_id', currentUser.id);
+        await sb.from('transactions').insert(txRow);
+        goalCacheTx(txRow);
+    }
+    await sb.from('goal_entries').insert(entry);
+    goalCacheEntry(entry);
+    const reached = goalReachedCheck(g, kid);
+    await saveGoalProgress(g);
+    return reached;
+}
 
 async function saveGoal(editId) {
     const name    = document.getElementById('g-name').value.trim();
     const target  = moneyRound(parseFloat(document.getElementById('g-target').value) || 0);
-    const percent = Math.round(parseFloat(document.getElementById('g-pct').value) || 0);
+    const pctRaw  = document.getElementById('g-pct').value.trim();
+    const percent = Math.round(parseFloat(pctRaw) || 0);
+    const start   = moneyRound(parseFloat(document.getElementById('g-start')?.value) || 0);
     const g       = editId ? cache.goals.find(x => x.id === editId) : null;
     const match   = +(S.modal.data.match ?? g?.matchPercent ?? 0);
     const kidId   = g ? g.kidId : S.modal.data.kidId;
@@ -7867,9 +7904,12 @@ async function saveGoal(editId) {
     if (!kid) return toast('Please choose who is saving.', 'warn');
     if (!name) return toast('Please enter a goal name.', 'warn');
     if (target <= 0) return toast('Please enter a goal amount.', 'warn');
+    if (pctRaw === '') return toast('Please enter a share of earnings (0% if you will only add money yourself).', 'warn');
     if (percent < 0 || percent > 100) return toast('The share must be between 0% and 100%.', 'warn');
     const used = goalPercentUsed(kidId, editId);
     if (used + percent > 100) return toast(`Only ${100 - used}% is left - ${kid.name}'s other goals take ${used}%.`, 'warn');
+    if (!g && start > (kid.balance || 0)) return toast(`${kid.name} only has ${R(kid.balance || 0)} in savings.`, 'warn');
+    if (!g && start > target) return toast(`The goal only needs ${R(target)}.`, 'warn');
     const id = g ? g.id : uid();
     const oldPath = g ? (g.image_path || null) : null;
     let imagePath = S.chorePhotoPath || null;
@@ -7892,9 +7932,12 @@ async function saveGoal(editId) {
     const row = { id, user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kidId, name, target, percent, match_percent: match, image_path: imagePath, saved: 0, status: 'active', created_at: createdAt };
     const { error } = await sb.from('goals').insert(row);
     if (error) { await removeChorePhoto(imagePath); return toast('Could not save. Check your connection.', 'error'); }
-    cache.goals.push(mapGoalRow(row));
-    track('goal_created', { goals_count: cache.goals.length, percent, match_percent: match, has_photo: Boolean(imagePath) });
-    closeModal(); toast('Goal added!');
+    const goal = mapGoalRow(row);
+    cache.goals.push(goal);
+    track('goal_created', { goals_count: cache.goals.length, percent, match_percent: match, has_photo: Boolean(imagePath), start_amount: start });
+    const reached = start > 0 && await topUpGoal(goal, kid, start, true);
+    closeModal();
+    toast(reached ? `${goal.name} is fully saved - time to buy it!` : start > 0 ? `Goal added with ${R(start)} from savings.` : 'Goal added!', start > 0 ? 'success' : null);
 }
 
 async function saveGoalMoney(goalId) {
@@ -7905,34 +7948,29 @@ async function saveGoalMoney(goalId) {
     if (amount <= 0) return toast('Please enter an amount.', 'warn');
     const isAdd = S.modal.data.mode === 'add';
     const fromSavings = S.modal.data.source !== 'new';
-    const now = new Date().toISOString();
-    let txRow = null, entry;
     if (isAdd) {
         if (g.status !== 'active') return toast('This goal is already reached.', 'warn');
         if (amount > goalRemaining(g)) return toast(`Only ${R(goalRemaining(g))} is needed to finish this goal.`, 'warn');
         if (fromSavings && amount > (kid.balance || 0)) return toast(`${kid.name} only has ${R(kid.balance)} in savings.`, 'warn');
-        if (fromSavings) txRow = { id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kid.id, amount: -amount, type: 'goal', description: `Moved to ${g.name}`, created_at: now, goal_id: g.id };
-        entry = { id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), goal_id: g.id, kid_id: kid.id, amount, kind: 'topup', description: fromSavings ? 'Moved from savings' : 'Added by parent', transaction_id: txRow?.id || null, created_at: now };
-        g.saved = moneyRound(g.saved + amount);
-    } else {
-        if (amount > g.saved) return toast(`There's only ${R(g.saved)} in this goal.`, 'warn');
-        txRow = { id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kid.id, amount, type: 'goal_return', description: `Back from ${g.name}`, created_at: now, goal_id: g.id };
-        entry = { id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), goal_id: g.id, kid_id: kid.id, amount: -amount, kind: 'withdraw', description: 'Moved back to savings', transaction_id: txRow.id, created_at: now };
-        g.saved = moneyRound(g.saved - amount);
+        const reached = await topUpGoal(g, kid, amount, fromSavings);
+        closeModal();
+        return toast(reached ? `${g.name} is fully saved - time to buy it!` : `${R(amount)} added to ${g.name}.`, 'success');
     }
-    if (txRow) {
-        kid.balance = moneyRound((kid.balance || 0) + txRow.amount);
-        await sb.from('kids').update({ balance: kid.balance }).eq('id', kid.id).eq('user_id', currentUser.id);
-        await sb.from('transactions').insert(txRow);
-        goalCacheTx(txRow);
-    }
+    if (amount > g.saved) return toast(`There's only ${R(g.saved)} in this goal.`, 'warn');
+    const now = new Date().toISOString();
+    const txRow = { id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), kid_id: kid.id, amount, type: 'goal_return', description: `Back from ${g.name}`, created_at: now, goal_id: g.id };
+    const entry = { id: uid(), user_id: currentUser.id, actioned_by: actionedBy(), goal_id: g.id, kid_id: kid.id, amount: -amount, kind: 'withdraw', description: 'Moved back to savings', transaction_id: txRow.id, created_at: now };
+    g.saved = moneyRound(g.saved - amount);
+    kid.balance = moneyRound((kid.balance || 0) + amount);
+    await sb.from('kids').update({ balance: kid.balance }).eq('id', kid.id).eq('user_id', currentUser.id);
+    await sb.from('transactions').insert(txRow);
+    goalCacheTx(txRow);
     await sb.from('goal_entries').insert(entry);
     goalCacheEntry(entry);
-    const reached = isAdd && goalReachedCheck(g, kid);
     await saveGoalProgress(g);
     closeModal();
-    toast(reached ? `${g.name} is fully saved - time to buy it!` : isAdd ? `${R(amount)} added to ${g.name}.` : `${R(amount)} moved back to ${kid.name}'s savings.`, 'success');
-    if (!isAdd) await checkBonusMilestones(kid.id, kid.balance);
+    toast(`${R(amount)} moved back to ${kid.name}'s savings.`, 'success');
+    await checkBonusMilestones(kid.id, kid.balance);
 }
 
 function cancelGoal(id) {

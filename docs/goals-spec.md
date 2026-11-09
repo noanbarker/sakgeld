@@ -50,3 +50,4 @@ When a kid logs in and a parent has approved anything since their last visit, sh
 - Push kind `goal` added to `api/push-send.js`.
 - Vercel preview builds of this branch use the **live** database. Test on a test family account, not a real one: approving a chore in the preview moves money into a pot that the live app doesn't know about yet.
 - "New feature" pop-up for existing families: `WHATS_NEW` in app/index.html now announces Goals (replaces the chore-pause one). `launchedAt` is the go-live moment (2026-11-03 17:20 SAST), so only families who signed up before then see it.
+- Add goal form (2026-11-09, after Donne Close's goal sat at 0% with R0 while her son had R703 saved): optional "Start with money from savings" moves money in on creation (can finish the goal at once); the share field must be filled in (blank used to save silently as 0%); typing 0% shows a note that the goal only grows by hand.
