@@ -1763,7 +1763,20 @@ const CHORE_ICON_FILES = {
   29: 'Water Plants.webp', 30: 'Pack School Bag.webp', 31: 'Unpack School Bag.webp',
   32: 'Wash Lunchboxes.webp', 33: 'Tidy Lounge.webp', 34: 'Wipe Table.webp',
   35: 'Bring in Washing.webp', 36: 'Pack Firewood.webp', 37: 'Custom.webp',
-  38: 'Garden Work.webp', 39: 'DIY.webp', 40: 'Do homework.webp', 41: 'Read a book.webp'
+  38: 'Garden Work.webp', 39: 'DIY.webp', 40: 'Do homework.webp', 41: 'Read a book.webp',
+  // Added Nov 2026 from the chores parents were typing themselves.
+  42: 'Brush Teeth.webp', 43: 'Bath Or Shower.webp', 44: 'Get Ready Or Get Dressed.webp',
+  45: 'Personal Hygiene.webp', 46: 'Hang Up Towel.webp', 47: 'Dirty Clothes In Wash Basket.webp',
+  48: 'Lay Out Clothes And Kit For Tomorrow.webp', 49: 'Organise School Clothes - Boys.webp',
+  50: 'Organise School Clothes - Girls.webp', 51: 'Polish Clean Shoes.webp', 52: 'Pack Own Lunch.webp',
+  53: 'Take Plate Or Lunchbox To Kitchen.webp', 54: 'Pack Away Clean Dishes.webp',
+  55: 'Help With Cooking.webp', 56: 'Unpack Groceries Or The Car.webp', 57: 'Tidy Cupboard Or Desk.webp',
+  58: 'Clean The Whole Bathroom.webp', 59: 'Pick Up Dog Poo.webp', 60: 'Fill Pets Water Bowls.webp',
+  61: 'Feed Birds.webp', 62: 'Play With The Pets.webp', 63: 'Groom Or Wash The Dog.webp',
+  64: 'Sweep The Stoep Or Outside.webp', 65: 'Pull Weeds.webp', 66: 'Compost.webp',
+  67: 'Clean The Pool.webp', 68: 'Wash The Car.webp', 69: 'Extra Learning Practice.webp',
+  70: 'Bible Reading And Prayer.webp', 71: 'Practise An Instrument Or Skill.webp',
+  72: 'Exercise Or Sport.webp'
 };
 
 const CHORE_ICON_NAMES = {
@@ -1779,8 +1792,48 @@ const CHORE_ICON_NAMES = {
   29:'Water Plants', 30:'Pack School Bag', 31:'Unpack School Bag',
   32:'Wash Lunchboxes', 33:'Tidy Lounge', 34:'Wipe Table',
   35:'Bring in Washing', 36:'Pack Firewood', 37:'Custom', 38:'Garden Work', 39:'DIY',
-  40:'Do Homework', 41:'Read a Book'
+  40:'Do Homework', 41:'Read a Book',
+  42:'Brush Teeth', 43:'Bath Or Shower', 44:'Get Ready Or Get Dressed',
+  45:'Personal Hygiene', 46:'Hang Up Towel', 47:'Dirty Clothes In Wash Basket',
+  48:'Lay Out Clothes And Kit For Tomorrow', 49:'Organise School Clothes - Boys',
+  50:'Organise School Clothes - Girls', 51:'Polish Clean Shoes', 52:'Pack Own Lunch',
+  53:'Take Plate Or Lunchbox To Kitchen', 54:'Pack Away Clean Dishes',
+  55:'Help With Cooking', 56:'Unpack Groceries Or The Car', 57:'Tidy Cupboard Or Desk',
+  58:'Clean The Whole Bathroom', 59:'Pick Up Dog Poo', 60:'Fill Pets Water Bowls',
+  61:'Feed Birds', 62:'Play With The Pets', 63:'Groom Or Wash The Dog',
+  64:'Sweep The Stoep Or Outside', 65:'Pull Weeds', 66:'Compost',
+  67:'Clean The Pool', 68:'Wash The Car', 69:'Extra Learning Practice',
+  70:'Bible Reading And Prayer', 71:'Practise An Instrument Or Skill',
+  72:'Exercise Or Sport'
 };
+
+// Order the icon picker shows them in: grouped by kind of chore, not by
+// number. The numbers are what saved chores store, so they never change -
+// to move an icon, move it here.
+const CHORE_ICON_ORDER = [
+  // Bedroom and clothes
+  1, 2, 3, 57, 9, 47, 48, 49, 50, 51,
+  // Getting ready and personal care
+  42, 43, 44, 45, 46,
+  // Laundry
+  4, 5, 6, 7, 35, 8,
+  // Kitchen and meals
+  10, 11, 53, 34, 12, 13, 54, 14, 15, 16, 55, 56,
+  // Around the house
+  33, 17, 18, 19, 20, 21,
+  // Bathroom
+  58, 23, 24, 25, 22, 26,
+  // School
+  30, 31, 52, 32,
+  // Learning and growing
+  40, 69, 41, 70, 71, 72,
+  // Pets
+  27, 61, 60, 28, 62, 63, 59,
+  // Outside
+  29, 38, 65, 66, 64, 67, 68, 36,
+  // Anything else
+  39, 37
+];
 
 // ─── UI LINE ICONS (consistent stroke icons for controls) ────────
 const UI_ICON_PATHS = {
@@ -1926,7 +1979,7 @@ function choreIconSVG(key, size = 44) {
     const num = parseInt(key);
     // Fall back to the "Custom" icon (37) for unknown/legacy keys (e.g. older
     // quick tasks saved with a star), rather than misleadingly showing Make Bed.
-    const idx = (num >= 1 && num <= 41) ? num : 37;
+    const idx = CHORE_ICON_FILES[num] ? num : 37;
     const file = CHORE_ICON_FILES[idx];
     const name = CHORE_ICON_NAMES[idx];
     const pngFile = file.replace(/\.webp$/i, '.png');
@@ -6700,8 +6753,7 @@ function renderModal() {
             ${usingPhoto ? `<button onclick="clearChorePhoto()" type="button" style="margin-top:6px;padding:5px 11px;border-radius:var(--radius-sm);font-family:var(--font-family);font-size:var(--text-xs);font-weight:700;border:1.5px solid var(--color-border);background:white;color:var(--color-coral-text);cursor:pointer">Remove photo</button>` : ''}
           </div>
         </div>`;
-        const iconGrid = Object.keys(CHORE_ICON_FILES).map(num => {
-            const n = parseInt(num);
+        const iconGrid = CHORE_ICON_ORDER.map(n => {
             const isSel = !usingPhoto && (String(n) === String(selIcon) || n === selIconNum);
             return `<button onclick="pickEmoji('${n}')" type="button" title="${CHORE_ICON_NAMES[n]}"
                 style="width:104px;height:104px;border-radius:var(--radius-lg);border:2px solid ${isSel?'var(--color-green-600)':'transparent'};background:${isSel?'var(--color-green-100)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.1s">
