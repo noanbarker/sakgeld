@@ -1000,7 +1000,7 @@ function maybeResumeAfterUpdate() {
         sessionStorage.removeItem(RESUME_AFTER_UPDATE_KEY);
     } catch (e) {}
     // Only straight after our own reload — never a stale note from long ago.
-    if (!saved || !currentUser || Date.now() - saved.at > 120000) return;
+    if (!saved || !currentUser || Date.now() - saved.at > 120000) return resumeKidScreen();
     if (saved.view === 'parent') {
         if (saved.parentId && parentProfiles.length && !parentProfiles.some(p => p.id === saved.parentId && !p.removed)) return;
         S.activeParentId = saved.parentId || null;
@@ -1010,6 +1010,58 @@ function maybeResumeAfterUpdate() {
         go('kid');
     }
 }
+// A kid who refreshes their own screen lands back on it rather than on the
+// portal screen. sessionStorage lives only as long as the tab or home-screen app
+// stays open, so closing it still starts from the portal. Kids only: the parent
+// screen always goes back through the parent PIN.
+const KID_SCREEN_KEY = 'sprout_kid_screen';
+function rememberKidScreen() {
+    try {
+        if (S.view === 'kid' && S.kidId) sessionStorage.setItem(KID_SCREEN_KEY, S.kidId);
+        else sessionStorage.removeItem(KID_SCREEN_KEY);
+    } catch (e) {}
+}
+function resumeKidScreen() {
+    let kidId = null;
+    try { kidId = sessionStorage.getItem(KID_SCREEN_KEY); } catch (e) {}
+    if (!kidId || !currentUser || S.view !== 'home' || !cache.kids.some(k => k.id === kidId)) return;
+    S.kidId = kidId;
+    go('kid');
+    startCelebration(kidId);
+}
+
+// The kid screen keeps itself current, so kids see money a parent approves
+// without refreshing: a quiet reload every 30 seconds while it's on screen, and
+// straight away when the app comes back to the front. It only redraws when
+// something changed, and an approval made meanwhile shows the usual pop-up.
+const KID_REFRESH_EVERY = 30000;
+let kidRefreshBusy = false;
+function kidScreenSnapshot() {
+    const id = S.kidId;
+    const kid = cache.kids.find(k => k.id === id);
+    return JSON.stringify([kid?.balance, cache.transactions.filter(t => t.kidId === id).length,
+        cache.completions.filter(c => c.kidId === id).map(c => [c.id, c.approved, c.rejected, c.missed]),
+        cache.rewardCompletions.filter(r => r.kidId === id).map(r => [r.id, r.approved, r.rejected]),
+        (cache.goals || []).filter(g => g.kidId === id).map(g => [g.id, g.saved, g.status]),
+        cache.chores.length, cache.rewards.length]);
+}
+async function refreshKidScreen() {
+    if (kidRefreshBusy || !currentUser || S.view !== 'kid' || document.visibilityState !== 'visible' || midTask() || S.celebration) return;
+    kidRefreshBusy = true;
+    try {
+        const before = kidScreenSnapshot();
+        await loadCache();
+        // They may have left the screen or started something while it loaded.
+        if (S.view !== 'kid' || midTask() || S.celebration || kidScreenSnapshot() === before) return;
+        render();
+        startCelebration(S.kidId);
+    } catch (e) {
+    } finally { kidRefreshBusy = false; }
+}
+setInterval(refreshKidScreen, KID_REFRESH_EVERY);
+document.addEventListener('visibilitychange', refreshKidScreen);
+window.addEventListener('pageshow', e => { if (e.persisted) refreshKidScreen(); });
+
 fetchAppVersionTag().then(tag => { if (!appVersionTag) appVersionTag = tag; });
 document.addEventListener('visibilitychange', checkForAppUpdate);
 window.addEventListener('pageshow', e => { if (e.persisted) checkForAppUpdate(); });
@@ -1571,7 +1623,7 @@ async function initApp() {
                 maybeResumeAfterUpdate();
             }
         }
-        else { parentProfiles = []; S.activeParentId = null; S.pinParentId = null; cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [], goals: [], goalEntries: [] }; S.view = 'home'; }
+        else { parentProfiles = []; S.activeParentId = null; S.pinParentId = null; cache = { kids: [], chores: [], completions: [], transactions: [], bonusMilestones: [], rewards: [], rewardCompletions: [], distributions: [], cycleHistory: [], goals: [], goalEntries: [] }; S.view = 'home'; rememberKidScreen(); }
         render();
     });
     const { data: { session } } = await sb.auth.getSession();
@@ -2388,7 +2440,7 @@ function avatarIMG(num, size) {
         `<img src="../images/avatars/${pngFile}" alt="${name}" ` +
         `style="${box};object-fit:cover;border-radius:50%;display:block"></picture>`;
 }
-function go(view, params = {}) { Object.assign(S, params); S.view = view; render(); }
+function go(view, params = {}) { Object.assign(S, params); S.view = view; rememberKidScreen(); render(); }
 // Phone bottom bar order, then the sections that live under More.
 const PARENT_TAB_ORDER = ['overview', 'chores', 'kids', 'money', 'more', 'bonuses', 'rewards', 'goals', 'settings', 'faq'];
 const MORE_TABS = ['more', 'bonuses', 'rewards', 'goals', 'settings', 'faq'];
